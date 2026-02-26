@@ -3,7 +3,7 @@
 namespace LootingBots.Actions
 {
     public class LootingSwapAction(
-        Item toThrow = null,
+        Item toThrow,
         Item toEquip = null,
         ActionCallback callback = null,
         ActionCallback onComplete = null

@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Diagnostics;
 using EFT;
 using EFT.Interactive;
 using EFT.InventoryLogic;
@@ -52,10 +53,10 @@ namespace LootingBots.Components
 
         public bool IsPlayerScav;
 
-        public bool LockUntilNextScan = false;
+        public bool LockUntilNextScan;
 
         // Allows external methods to force the looting brain for a bot to be enabled regardless of performance settings
-        public bool ForceBrainEnabled = false;
+        public bool ForceBrainEnabled;
 
         public bool IsBrainEnabled
         {
@@ -94,7 +95,7 @@ namespace LootingBots.Components
         }
 
         // Boolean showing when the looting coroutine is running
-        public bool LootTaskRunning = false;
+        public bool LootTaskRunning;
         public float DistanceToLoot = -1f;
 
         // Delay simulating the time it takes for the UI to open and start searching a container
@@ -131,8 +132,8 @@ namespace LootingBots.Components
             get { return DistanceLimit == 0 || DistanceToPlayer <= DistanceLimit; }
         }
 
-        private bool _isDisabledForPerformance = false;
-        private float _performanceTimer = 0f;
+        private bool _isDisabledForPerformance;
+        private float _performanceTimer;
         private BotLog _log;
 
         public void Init(BotOwner botOwner)
@@ -226,14 +227,18 @@ namespace LootingBots.Components
 
                     if (IsBrainEnabled)
                     {
-                        if (InventoryController.ShouldSort)
-                        {
-                            // Sort items in tacVest for better space management
-                            StartCoroutine(InventoryController.SortTacVest());
-                        }
+                        // Does not work in Fika
+                        // if (InventoryController.ShouldSort)
+                        // {
+                        //     // Sort items in tacVest for better space management
+                        //     SearchableItemItemClass tacVest = (SearchableItemItemClass)
+                        //         BotOwner.InventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem;
+                        //
+                        //     StartCoroutine(InventoryController.SortSearchableItem(tacVest));
+                        // }
 
                         // If a player picks up an item that was marked as active by a bot, its ItemOwner?.RootItem will be null. In this case cleanup the active item
-                        if (ActiveItem && ActiveItem?.ItemOwner?.RootItem == null)
+                        if (ActiveItem != null && ActiveItem.ItemOwner?.RootItem == null)
                         {
                             CleanupItem(false);
                         }
@@ -268,6 +273,8 @@ namespace LootingBots.Components
             }
         }
 
+        private readonly Stopwatch _lootTimer = Stopwatch.StartNew();
+
         /**
         * Handles looting a corpse found on the map.
         */
@@ -275,9 +282,7 @@ namespace LootingBots.Components
         {
             if (ActiveCorpse != null)
             {
-                var watch = new System.Diagnostics.Stopwatch();
-                watch.Start();
-
+                _lootTimer.Restart();
                 LootTaskRunning = true;
 
                 if (_log.InfoEnabled)
@@ -291,7 +296,7 @@ namespace LootingBots.Components
                 // Get items to loot from the corpse in a priority order based off the slots
                 IEnumerable<Slot> prioritySlots = LootUtils.GetPrioritySlots(corpseInventoryController);
 
-                List<Item> priorityItems = new();
+                List<Item> priorityItems = [];
 
                 foreach (Slot slot in prioritySlots)
                 {
@@ -314,11 +319,9 @@ namespace LootingBots.Components
                 CleanupCorpse(lootTask.Result);
                 OnLootTaskEnd(lootTask.Result);
 
-                watch.Stop();
-
                 if (_log.DebugEnabled)
                 {
-                    _log.LogDebug($"Corpse loot time: {watch.ElapsedMilliseconds / 1000f}s. Net Worth: {Stats.NetLootValue}");
+                    _log.LogDebug($"Corpse loot time: {_lootTimer.ElapsedMilliseconds / 1000f}s. Net Worth: {Stats.NetLootValue}. Was successful: {lootTask.Result}");
                 }
             }
         }
@@ -328,20 +331,23 @@ namespace LootingBots.Components
         */
         public IEnumerator LootContainer()
         {
-            var watch = new System.Diagnostics.Stopwatch();
-            watch.Start();
+            _lootTimer.Restart();
             LootTaskRunning = true;
 
             Item item = ActiveContainer.ItemOwner.Items.GetFirstItem();
 
             if (_log.DebugEnabled)
             {
+                if (item is null)
+                {
+                    _log.LogWarning("Tried to loot container but container is empty");
+                }
                 _log.LogDebug($"Trying to add items from: {item.Name.Localized()}");
             }
 
             bool didOpen = false;
             // If a container was closed, open it before looting
-            if (ActiveContainer?.DoorState == EDoorState.Shut)
+            if (ActiveContainer.DoorState == EDoorState.Shut)
             {
                 LootUtils.InteractContainer(ActiveContainer, BotOwner, EInteractionType.Open);
                 didOpen = true;
@@ -365,11 +371,9 @@ namespace LootingBots.Components
             CleanupContainer(lootTask.Result);
             OnLootTaskEnd(lootTask.Result);
 
-            watch.Stop();
-
             if (_log.DebugEnabled)
             {
-                _log.LogDebug($"Container loot time: {watch.ElapsedMilliseconds / 1000f}s. Net Worth: {Stats.NetLootValue}");
+                _log.LogDebug($"Container loot time: {_lootTimer.ElapsedMilliseconds / 1000f}s. Net Worth: {Stats.NetLootValue}. Was successful: {lootTask.Result}");
             }
         }
 
@@ -378,7 +382,7 @@ namespace LootingBots.Components
         */
         public IEnumerator LootItem()
         {
-            if (ActiveItem?.ItemOwner?.RootItem != null)
+            if (ActiveItem.ItemOwner?.RootItem != null)
             {
                 LootTaskRunning = true;
 
@@ -394,7 +398,15 @@ namespace LootingBots.Components
 
                 yield return new WaitUntil(() => lootTask.IsCompleted);
 
-                BotOwner.GetPlayer.CurrentManagedState.Pickup(false, null);
+                TaskCompletionClass pickupTask = new TaskCompletionClass();
+                BotOwner.GetPlayer.CurrentManagedState.Pickup(true, () =>
+                {
+                    BotOwner.GetPlayer.CurrentManagedState.Pickup(false, null);
+                    pickupTask.Complete();
+                });
+
+                yield return new WaitUntil(() => pickupTask.Task.IsCompleted);
+
                 InventoryController.UpdateActiveWeapon();
 
                 // Need to manually cleanup item because the ItemOwner on the original object changes. Only ignore if looting was not interrupted
@@ -403,7 +415,7 @@ namespace LootingBots.Components
 
                 if (_log.DebugEnabled)
                 {
-                    _log.LogDebug($"Net Worth: {Stats.NetLootValue}");
+                    _log.LogDebug($"Net Worth: {Stats.NetLootValue}. Was successful: {lootTask.Result}");
                 }
             }
         }
@@ -435,7 +447,7 @@ namespace LootingBots.Components
         public bool IsValuableEnough(Item lootItem)
         {
             float itemValue = LootingBots.ItemAppraiser.GetItemPrice(lootItem);
-            return InventoryController.IsValuableEnough(itemValue);
+            return InventoryController.IsValuableEnough(itemValue / lootItem.GetItemSize() /* Divide by slots to get price per slot */);
         }
 
         /**
@@ -443,7 +455,19 @@ namespace LootingBots.Components
         */
         public void HandleNonNavigableLoot()
         {
-            string lootId = ActiveContainer?.Id ?? ActiveItem?.ItemOwner?.RootItem?.Id ?? ActiveCorpse?.name;
+            string lootId = null;
+            if (ActiveContainer != null)
+            {
+                lootId = ActiveContainer.Id;
+            }
+            else if (ActiveItem != null)
+            {
+                lootId = ActiveItem.ItemOwner?.RootItem?.Id;
+            }
+            else if (ActiveCorpse != null)
+            {
+                lootId = ActiveCorpse.name;
+            }
 
             if (lootId != null)
             {

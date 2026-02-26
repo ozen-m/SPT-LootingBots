@@ -63,9 +63,17 @@ namespace LootingBots.Utilities
         /** Triggers a container to open/close */
         public static void InteractContainer(LootableContainer container, IPlayer player, EInteractionType action)
         {
+            if (container == null)
+            {
+                return;
+            }
+
             InteractionResult result = new InteractionResult(action);
-            container?.InteractingPlayer = player;
-            container?.Interact(result);
+            if (container.InteractingPlayer == null)
+            {
+                container.InteractingPlayer = player;
+            }
+            container.Interact(result);
         }
 
         /**
@@ -73,10 +81,7 @@ namespace LootingBots.Utilities
         */
         public static int GetAvailableGridSlots(StashGridClass[] grids)
         {
-            if (grids == null)
-            {
-                grids = [];
-            }
+            grids ??= [];
 
             // Initialize freeSpaces to 0
             int freeSpaces = 0;
@@ -141,7 +146,7 @@ namespace LootingBots.Utilities
 
                 Item rootItem = foundItem.GetRootItem();
 
-                if (rootItem.Parent.Container.ID.Equals("securedcontainer", StringComparison.OrdinalIgnoreCase) == true)
+                if (rootItem.Parent.Container.ID.Equals("securedcontainer", StringComparison.OrdinalIgnoreCase))
                 {
                     continue;
                 }

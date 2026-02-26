@@ -11,10 +11,10 @@ namespace LootingBots.Logic
     {
         private readonly LootingBrain _lootingBrain;
         private readonly BotLog _log;
-        private float _closeEnoughTimer = 0f;
-        private float _moveTimer = 0f;
-        private int _stuckCount = 0;
-        private int _navigationAttempts = 0;
+        private float _closeEnoughTimer;
+        private float _moveTimer;
+        private int _stuckCount;
+        private int _navigationAttempts;
         private Vector3 _destination = Vector3.zero;
 
         // Run looting logic only when the bot is not looting and when the bot has an active item to loot
@@ -60,7 +60,7 @@ namespace LootingBots.Logic
                     bool isCloseEnough = IsCloseEnough();
 
                     // If the bot is closer than 4m from the loot, they should slow down and not sprint to prevent powersliding
-                    bool slowDown = _lootingBrain.DistanceToLoot != -1 && _lootingBrain.DistanceToLoot < 6f;
+                    bool slowDown = _lootingBrain.DistanceToLoot != -1f && _lootingBrain.DistanceToLoot < 6f;
 
                     // If the bot has not just looted something, loot the current item since we are now close enough
                     if (!_lootingBrain.LootTaskRunning && isCloseEnough)
@@ -71,7 +71,8 @@ namespace LootingBots.Logic
                         _lootingBrain.StartLooting();
                         return;
                     }
-                    else if (!_lootingBrain.LootTaskRunning)
+
+                    if (!_lootingBrain.LootTaskRunning)
                     {
                         // Stand and move to lootable
                         BotOwner.SetTargetMoveSpeed(1f);
@@ -140,10 +141,19 @@ namespace LootingBots.Logic
                 //Increment navigation attempt counter
                 _navigationAttempts++;
 
-                string lootableName =
-                    _lootingBrain.ActiveContainer?.ItemOwner.Items.GetFirstItem().Name.Localized()
-                    ?? _lootingBrain.ActiveItem?.Name.Localized()
-                    ?? _lootingBrain.ActiveCorpse?.GetPlayer.name.Localized();
+                string lootableName = "NULL";
+                if (_lootingBrain.ActiveContainer != null)
+                {
+                    lootableName = _lootingBrain.ActiveContainer.ItemOwner.Items.GetFirstItem()?.Name.Localized();
+                }
+                else if (_lootingBrain.ActiveItem != null)
+                {
+                    lootableName = _lootingBrain.ActiveItem.Name.Localized();
+                }
+                else if (_lootingBrain.ActiveCorpse != null)
+                {
+                    lootableName = _lootingBrain.ActiveCorpse.GetPlayer.name.Localized();
+                }
 
                 // If the bot has not been stuck for more than 2 navigation checks, attempt to navigate to the lootable otherwise ignore the container forever
                 bool isBotStuck = _stuckCount > 1;
@@ -163,7 +173,7 @@ namespace LootingBots.Logic
                     {
                         NavMeshPathStatus pathStatus = BotOwner.GoToPoint(_destination, true, -1f, false, false);
 
-                        if (pathStatus != NavMeshPathStatus.PathComplete)
+                        if (pathStatus == NavMeshPathStatus.PathInvalid)
                         {
                             if (_log.WarningEnabled)
                             {
@@ -171,6 +181,14 @@ namespace LootingBots.Logic
                             }
 
                             canMove = false;
+                        }
+
+                        if (pathStatus == NavMeshPathStatus.PathPartial)
+                        {
+                            if (_log.WarningEnabled)
+                            {
+                                _log.LogWarning($"Partial path to: {lootableName}.");
+                            }
                         }
                     }
                 }

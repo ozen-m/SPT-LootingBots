@@ -90,9 +90,9 @@ namespace LootingBots
 
         public override void BuildDebugText(StringBuilder debugPanel)
         {
-            string itemName = _lootingBrain.ActiveItem?.Name?.Localized();
-            string containerName = _lootingBrain.ActiveContainer?.name?.Localized();
-            string corpseName = _lootingBrain.ActiveCorpse?.name?.Localized();
+            string itemName = _lootingBrain.ActiveItem != null ? _lootingBrain.ActiveItem.Name.Localized() : null;
+            string containerName = _lootingBrain.ActiveContainer != null ? _lootingBrain.ActiveContainer.name.Localized() : null;
+            string corpseName = _lootingBrain.ActiveCorpse != null ? _lootingBrain.ActiveCorpse.name.Localized() : null;
             string lootableName = itemName ?? containerName ?? corpseName ?? "-";
 
             string category = "";

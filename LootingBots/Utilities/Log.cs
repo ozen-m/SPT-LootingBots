@@ -106,52 +106,43 @@ namespace LootingBots.Utilities
         }
     }
 
-    public class Log
+    public class Log(BepInEx.Logging.ManualLogSource logger, BepInEx.Configuration.ConfigEntry<LogLevel> logLevels)
     {
-        public BepInEx.Logging.ManualLogSource Logger;
-        public BepInEx.Configuration.ConfigEntry<LogLevel> LogLevels;
-
-        public Log(BepInEx.Logging.ManualLogSource logger, BepInEx.Configuration.ConfigEntry<LogLevel> logLevels)
-        {
-            Logger = logger;
-            LogLevels = logLevels;
-        }
-
         public bool DebugEnabled
         {
-            get { return LogLevels.Value.HasDebug(); }
+            get { return logLevels.Value.HasDebug(); }
         }
         public bool WarningEnabled
         {
-            get { return LogLevels.Value.HasWarning(); }
+            get { return logLevels.Value.HasWarning(); }
         }
         public bool InfoEnabled
         {
-            get { return LogLevels.Value.HasInfo(); }
+            get { return logLevels.Value.HasInfo(); }
         }
         public bool ErrorEnabled
         {
-            get { return LogLevels.Value.HasError(); }
+            get { return logLevels.Value.HasError(); }
         }
 
         public void LogDebug(object data)
         {
-            Logger.LogDebug(data);
+            logger.LogDebug(data);
         }
 
         public void LogInfo(object data)
         {
-            Logger.LogInfo(data);
+            logger.LogInfo(data);
         }
 
         public void LogWarning(object data)
         {
-            Logger.LogWarning(data);
+            logger.LogWarning(data);
         }
 
         public void LogError(object data)
         {
-            Logger.LogError(data);
+            logger.LogError(data);
         }
     }
 

@@ -1,10 +1,7 @@
 using BepInEx;
 using BepInEx.Configuration;
-using Comfort.Common;
 using DrakiaXYZ.BigBrain.Brains;
-using EFT;
 using LootingBots.Components;
-using LootingBots.Patches;
 using LootingBots.Utilities;
 
 using SPT.Reflection.Patching;
@@ -20,7 +17,7 @@ namespace LootingBots
 
         private const string MOD_GUID = "me.skwizzy.lootingbots";
         private const string MOD_NAME = "LootingBots";
-        private const string MOD_VERSION = "1.6.3";
+        private const string MOD_VERSION = "1.6.4";
 
         public const BotType SettingsDefaults = BotType.Scav | BotType.Pmc | BotType.PlayerScav | BotType.Raider;
 
@@ -482,18 +479,32 @@ namespace LootingBots
             BrainManager.AddCustomLayer(typeof(LootingLayer), ["Obdolbs"], 11);
         }
 
+        private Task _isUpdatingPrices;
+
         public void Update()
         {
-            bool shoultInitAppraiser =
-                (!UseMarketPrices.Value && ItemAppraiser.HandbookData == null)
-                || (UseMarketPrices.Value && !ItemAppraiser.MarketInitialized);
-
-            // Initialize the itemAppraiser when the BE instance comes online
-            if (Singleton<ClientApplication<ISession>>.Instance != null && Singleton<HandbookClass>.Instance != null && shoultInitAppraiser)
+            if (!_isUpdatingPrices?.IsCompleted ?? false)
             {
-                LootLog.LogInfo($"Initializing item appraiser");
-                ItemAppraiser.Init();
+                return;
             }
+
+            if (UseMarketPrices.Value)
+            {
+                if (ItemAppraiser.LastPriceUpdate.ElapsedMilliseconds < 1800000f && ItemAppraiser.MarketData is not null)
+                {
+                    return;
+                }
+            }
+            else
+            {
+                if (ItemAppraiser.HandbookData is not null)
+                {
+                    return;
+                }
+            }
+
+            LootLog.LogInfo("Updating item appraiser");
+            _isUpdatingPrices = ItemAppraiser.UpdatePrices();
         }
     }
 }

@@ -3,7 +3,7 @@
 namespace LootingBots.Actions
 {
     public class LootingMoveAction(
-        Item toMove = null,
+        Item toMove,
         ItemAddress place = null,
         Item toItem = null,
         ActionCallback callback = null,

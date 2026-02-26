@@ -1,60 +1,114 @@
+using System.Diagnostics;
 using Comfort.Common;
 using EFT;
 using EFT.HandBook;
 using EFT.InventoryLogic;
 using LootingBots.Utilities;
+using Newtonsoft.Json;
+using SPT.Common.Http;
 
 namespace LootingBots.Components
 {
     public class ItemAppraiser
     {
-        public Log Log;
-        public Dictionary<string, HandbookData> HandbookData;
-        public Dictionary<string, float> MarketData;
+        public readonly Stopwatch LastPriceUpdate = Stopwatch.StartNew();
 
-        public bool MarketInitialized = false;
+        public Dictionary<MongoID, HandbookData> HandbookData;
+        public Dictionary<MongoID, float> MarketData;
 
-        public void Init()
+        private Log _log;
+
+        public async Task UpdatePrices()
         {
-            Log = LootingBots.ItemAppraiserLog;
+            _log = LootingBots.ItemAppraiserLog;
 
             if (LootingBots.UseMarketPrices.Value)
             {
+                // ShowMeTheMoney flea prices
+                var json = await RequestHandler.GetJsonAsync("/showMeTheMoney/getFleaPrices");
+                if (!json.IsNullOrEmpty())
+                {
+                    try
+                    {
+                        MarketData = JsonConvert.DeserializeObject<Dictionary<MongoID, float>>(json);
+                    }
+                    catch
+                    {
+                        // Ignore
+                    }
+                }
+                if (MarketData is not null)
+                {
+                    _log.LogInfo("ShowMeTheMoney flea prices successfully fetched!");
+                    LastPriceUpdate.Restart();
+                    return;
+                }
+
+                _log.LogInfo("ShowMeTheMoney flea prices not available, falling back to BE session");
+
                 // Initialize ragfair prices from the BE session
+                var completionClass = new TaskCompletionSource<Dictionary<MongoID, float>>();
                 Singleton<ClientApplication<ISession>>
                     .Instance.GetClientBackEndSession()
                     .RagfairGetPrices(
-                        new Callback<Dictionary<string, float>>((Result<Dictionary<string, float>> result) => MarketData = result.Value)
+                        result =>
+                        {
+                            Dictionary<MongoID, float> prices = null;
+                            if (result.Succeed)
+                            {
+                                prices = result.Value.ToDictionary(
+                                    pair => new MongoID(pair.Key),
+                                    pair => pair.Value
+                                );
+                            }
+
+                            completionClass.TrySetResult(prices);
+                        }
                     );
-                MarketInitialized = true;
+
+                MarketData = await completionClass.Task;
+                if (MarketData is null)
+                {
+                    _log.LogInfo($"Failed to get flea prices from BE session");
+                }
             }
             else
             {
                 // This is the handbook instance which is initialized when the client first starts.
-                HandbookData = Singleton<HandbookClass>.Instance.Items.ToDictionary((item) => item.Id);
+                HandbookData = Singleton<HandbookClass>.Instance.Items.ToDictionary(item => new MongoID(item.Id));
             }
         }
 
         /** Will either get the lootItem's price using the ragfair service or the handbook depending on the option selected in the mod menu. If the item is a weapon, will calculate its value based off its attachments if the mod setting is enabled */
         public float GetItemPrice(Item lootItem)
         {
+            // Get the price of an ammo box by its ammo
+            if (lootItem is AmmoBox box)
+            {
+                var ammoItem = box.Cartridges.Items.GetFirstItem();
+                if (ammoItem != null)
+                {
+                    lootItem = ammoItem;
+                }
+            }
+
             bool valueFromMods = LootingBots.ValueFromMods.Value;
             if (LootingBots.UseMarketPrices.Value && MarketData != null)
             {
-                return lootItem is Weapon && valueFromMods ? GetWeaponMarketPrice(lootItem as Weapon) : GetItemMarketPrice(lootItem);
+                return lootItem is Weapon weapon && valueFromMods ? GetWeaponMarketPrice(weapon) : GetItemMarketPrice(lootItem);
             }
 
             if (HandbookData != null)
             {
-                return lootItem is Weapon && valueFromMods ? GetWeaponHandbookPrice(lootItem as Weapon) : GetItemHandbookPrice(lootItem);
+                return lootItem is Weapon weapon && valueFromMods ? GetWeaponHandbookPrice(weapon) : GetItemHandbookPrice(lootItem);
             }
 
-            if (Log.DebugEnabled)
+            if (_log.DebugEnabled)
             {
-                Log.LogDebug($"ItemAppraiser data is null");
+                _log.LogDebug($"ItemAppraiser data is null");
             }
 
-            return 0;
+            return 0f;
         }
 
         /**
@@ -62,9 +116,9 @@ namespace LootingBots.Components
         */
         public float GetWeaponHandbookPrice(Weapon lootWeapon)
         {
-            if (Log.DebugEnabled)
+            if (_log.DebugEnabled)
             {
-                Log.LogDebug($"Getting value of attachments for {lootWeapon.Name.Localized()}");
+                _log.LogDebug($"Getting value of attachments for {lootWeapon.Name.Localized()}");
             }
 
             float finalPrice = 0f;
@@ -74,9 +128,9 @@ namespace LootingBots.Components
                 finalPrice += GetItemHandbookPrice(weaponMod);
             }
 
-            if (Log.DebugEnabled)
+            if (_log.DebugEnabled)
             {
-                Log.LogDebug($"Final price of attachments: {finalPrice} compared to full item {GetItemHandbookPrice(lootWeapon)}");
+                _log.LogDebug($"Final price of attachments: {finalPrice} compared to full item {GetItemHandbookPrice(lootWeapon)}");
             }
 
             return finalPrice;
@@ -86,12 +140,13 @@ namespace LootingBots.Components
         public float GetItemHandbookPrice(Item lootItem)
         {
             HandbookData.TryGetValue(lootItem.TemplateId, out HandbookData value);
-            float price = value?.Price ?? 0;
+            float price = value?.Price ?? 0f;
+            price *= lootItem.StackObjectsCount;
 
-            if (Log.DebugEnabled)
-            {
-                Log.LogDebug($"Price of {lootItem.Name.Localized()} is {price}");
-            }
+            // if (_log.DebugEnabled)
+            // {
+            //     _log.LogDebug($"Price of {lootItem.Name.Localized()} is {price}");
+            // }
 
             return price;
         }
@@ -101,9 +156,9 @@ namespace LootingBots.Components
         */
         public float GetWeaponMarketPrice(Weapon lootWeapon)
         {
-            if (Log.DebugEnabled)
+            if (_log.DebugEnabled)
             {
-                Log.LogDebug($"Getting value of attachments for {lootWeapon.Name.Localized()}");
+                _log.LogDebug($"Getting value of attachments for {lootWeapon.Name.Localized()}");
             }
 
             float finalPrice = 0f;
@@ -114,9 +169,9 @@ namespace LootingBots.Components
                 finalPrice += GetItemMarketPrice(weaponMod);
             }
 
-            if (Log.DebugEnabled)
+            if (_log.DebugEnabled)
             {
-                Log.LogDebug($"Final price of attachments: {finalPrice} compared to item template {GetItemMarketPrice(lootWeapon)}");
+                _log.LogDebug($"Final price of attachments: {finalPrice} compared to item template {GetItemMarketPrice(lootWeapon)}");
             }
 
             return finalPrice;
@@ -125,14 +180,20 @@ namespace LootingBots.Components
         /** Gets the price of the item as stated from the ragfair values */
         public float GetItemMarketPrice(Item lootItem)
         {
-            float price = MarketData[lootItem.TemplateId];
-
-            if (Log.DebugEnabled)
+            if (MarketData.TryGetValue(lootItem.TemplateId, out var price))
             {
-                Log.LogDebug($"Price of {lootItem.Name.Localized()} is {price}");
+                price *= lootItem.StackObjectsCount;
+
+                // if (_log.DebugEnabled)
+                // {
+                //     _log.LogDebug($"Price of {lootItem.Name.Localized()} is {price}");
+                // }
+
+                return price;
             }
 
-            return price;
+            // Fallback
+            return GetItemHandbookPrice(lootItem);
         }
     }
 }

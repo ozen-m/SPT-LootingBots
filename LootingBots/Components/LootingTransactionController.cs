@@ -139,7 +139,7 @@ namespace LootingBots.Components
                 // Otherwise, find an empty grid slot to put the item in
                 var gridAddress = inventoryController.FindGridToPickUp(item);
 
-                if (gridAddress != null && !gridAddress.GetRootItem().Parent.Container.ID.ToLower().Equals("securedcontainer"))
+                if (gridAddress != null && !string.Equals(gridAddress.GetRootItem()?.Parent?.Container?.ID, "securedcontainer", StringComparison.OrdinalIgnoreCase))
                 {
                     if (log.WarningEnabled)
                     {
@@ -171,52 +171,50 @@ namespace LootingBots.Components
                     return false;
                 }
 
-                if (moveAction.ToMove is Weapon weapon && !(moveAction.ToMove is AmmoItemClass))
+                if (moveAction.Place == null)
                 {
-                    //Todo: Doesn't work on Fika for obvious reasons
-                    //AddExtraAmmo(weapon);
+                    log.LogWarning($"Cannot move item {moveAction.ToMove} to NULL place!");
+                    return false;
                 }
+
+                // if (moveAction.ToMove is Weapon weapon && moveAction.ToMove is not AmmoItemClass)
+                // {
+                //     //Todo: Doesn't work on Fika for obvious reasons
+                //     //AddExtraAmmo(weapon);
+                // }
 
                 if (log.DebugEnabled)
                 {
-                    log.LogDebug($"Moving item to: {moveAction?.Place?.Container?.ID?.Localized()}");
+                    log.LogDebug($"Moving item to: {moveAction.Place.Container.ID.Localized()}");
                 }
 
-                var value = InteractionsHandlerClass.Move(moveAction.ToMove, moveAction.Place, inventoryController, true);
-
-                if (value.Failed)
+                var moveActionResult = InteractionsHandlerClass.Move(moveAction.ToMove, moveAction.Place, inventoryController, true);
+                if (moveActionResult.Failed)
                 {
                     if (log.ErrorEnabled)
                     {
-                        log.LogError($"Failed to move {moveAction.ToMove.Name.Localized()} to {moveAction.Place.Container.ID.Localized()}");
+                        log.LogWarning($"Failed to move {moveAction.ToMove.Name.Localized()} to {moveAction.Place.Container.ID.Localized()}. Error: {moveActionResult.Error}");
                     }
                     return false;
                 }
 
-                if (moveAction.Callback == null)
+                await SimulatePlayerDelay();
+                var moveActionNetworkResult = await inventoryController.TryRunNetworkTransaction(moveActionResult);
+                if (moveActionNetworkResult.Failed)
+                {
+                    if (log.ErrorEnabled)
+                    {
+                        log.LogError($"Failed to move {moveAction.ToMove.Name.Localized()} to {moveAction.Place.Container.ID.Localized()}. Network Error: {moveActionNetworkResult.Error}");
+                    }
+                    return false;
+                }
+
+                if (moveAction.Callback != null)
                 {
                     await SimulatePlayerDelay();
-                    await inventoryController.TryRunNetworkTransaction(value, null);
+                    await moveAction.Callback();
                 }
-                else
-                {
-                    TaskCompletionSource<IResult> promise = new TaskCompletionSource<IResult>();
 
-                    await inventoryController.TryRunNetworkTransaction(
-                        value,
-                        new Callback(async result =>
-                        {
-                            if (result.Succeed)
-                            {
-                                await SimulatePlayerDelay();
-                                await moveAction.Callback();
-                            }
-                            promise.TrySetResult(result);
-                        })
-                    );
-
-                    await promise.Task;
-                }
                 if (moveAction.OnComplete != null)
                 {
                     await SimulatePlayerDelay();
@@ -241,50 +239,44 @@ namespace LootingBots.Components
                     return false;
                 }
 
-                if (log.DebugEnabled)
+                if (moveAction.ToItem == null)
                 {
-                    log.LogDebug(
-                        $"Merging {moveAction?.ToMove?.Name?.Localized()} (Stack Size: {moveAction?.ToMove?.StackObjectsCount}) with: {moveAction?.ToItem?.Name?.Localized()} (Stack Size: {moveAction?.ToItem?.StackObjectsCount})"
-                    );
+                    log.LogWarning($"Cannot merge item {moveAction.ToMove} to NULL target item!");
+                    return false;
                 }
 
-                var value = InteractionsHandlerClass.Merge(moveAction.ToMove, moveAction.ToItem, inventoryController, true);
+                if (log.DebugEnabled)
+                {
+                    log.LogDebug($"Merging {moveAction.ToMove.Name?.Localized()} (Stack Size: {moveAction.ToMove.StackObjectsCount}) with: {moveAction.ToItem.Name.Localized()} (Stack Size: {moveAction.ToItem.StackObjectsCount})" );
+                }
 
-                if (value.Failed)
+                var mergeResult = InteractionsHandlerClass.Merge(moveAction.ToMove, moveAction.ToItem, inventoryController, true);
+                if (mergeResult.Failed)
                 {
                     if (log.ErrorEnabled)
                     {
-                        log.LogError(
-                            $"Failed to merge {moveAction?.ToMove?.Name?.Localized()} (Stack Size: {moveAction?.ToMove?.StackObjectsCount}) with: {moveAction?.ToItem?.Name?.Localized()} (Stack Size: {moveAction?.ToItem?.StackObjectsCount})"
-                        );
+                        log.LogError($"Failed to merge {moveAction.ToMove.Name.Localized()} (Stack Size: {moveAction.ToMove.StackObjectsCount}) with: {moveAction.ToItem.Name.Localized()} (Stack Size: {moveAction.ToItem.StackObjectsCount}). Error: {mergeResult.Error}" );
                     }
                     return false;
                 }
 
-                if (moveAction.Callback == null)
+                await SimulatePlayerDelay();
+                var mergeNetworkResult = await inventoryController.TryRunNetworkTransaction(mergeResult);
+                if (mergeNetworkResult.Failed)
+                {
+                    if (log.ErrorEnabled)
+                    {
+                        log.LogError($"Failed to merge {moveAction.ToMove.Name.Localized()} (Stack Size: {moveAction.ToMove.StackObjectsCount}) with: {moveAction.ToItem.Name.Localized()} (Stack Size: {moveAction.ToItem.StackObjectsCount}). Network Error: {mergeNetworkResult.Error}" );
+                    }
+                    return false;
+                }
+
+                if (moveAction.Callback != null)
                 {
                     await SimulatePlayerDelay();
-                    await inventoryController.TryRunNetworkTransaction(value, null);
+                    await moveAction.Callback();
                 }
-                else
-                {
-                    TaskCompletionSource<IResult> promise = new TaskCompletionSource<IResult>();
 
-                    await inventoryController.TryRunNetworkTransaction(
-                        value,
-                        new Callback(async result =>
-                        {
-                            if (result.Succeed)
-                            {
-                                await SimulatePlayerDelay();
-                                await moveAction.Callback();
-                            }
-                            promise.TrySetResult(result);
-                        })
-                    );
-
-                    await promise.Task;
-                }
                 if (moveAction.OnComplete != null)
                 {
                     await SimulatePlayerDelay();
@@ -309,33 +301,30 @@ namespace LootingBots.Components
 
             try
             {
-                TaskCompletionSource<IResult> promise = new TaskCompletionSource<IResult>();
                 Item toThrow = swapAction.ToThrow;
-
                 if (log.WarningEnabled)
                 {
                     log.LogWarning($"Throwing item: {toThrow.Name.Localized()}");
                 }
 
+                TaskCompletionSource<IResult> promise = new TaskCompletionSource<IResult>();
                 inventoryController.ThrowItem(
                     toThrow,
                     false,
-                    new Callback(async result =>
+                    result =>
                     {
-                        if (result.Succeed && swapAction.Callback != null)
-                        {
-                            await SimulatePlayerDelay();
-                            await swapAction.Callback();
-                        }
-
-                        promise.TrySetResult(result);
-                    })
+                        _ = SimulatedDelayCallback(result, swapAction.Callback, promise);
+                    }
                 );
 
                 await SimulatePlayerDelay();
-                IResult taskResult = await promise.Task;
-                if (taskResult.Failed)
+                IResult throwResult = await promise.Task;
+                if (throwResult.Failed)
                 {
+                    if (log.WarningEnabled)
+                    {
+                        log.LogWarning($"Failed to throw item: {toThrow.Name.Localized()}. Error: {throwResult.Error}");
+                    }
                     return false;
                 }
 
@@ -366,12 +355,26 @@ namespace LootingBots.Components
 
         public static Task SimulatePlayerDelay(float delay = -1f)
         {
-            if (delay == -1)
+            if (delay == -1f)
             {
                 delay = LootingBots.TransactionDelay.Value;
             }
 
             return Task.Delay(TimeSpan.FromMilliseconds(delay));
+        }
+
+        private async Task SimulatedDelayCallback(IResult result, ActionCallback callback, TaskCompletionSource<IResult> promise)
+        {
+            if (result.Succeed)
+            {
+                await SimulatePlayerDelay();
+                if (callback != null)
+                {
+                    await callback();
+                }
+            }
+
+            promise.TrySetResult(result);
         }
     }
 }

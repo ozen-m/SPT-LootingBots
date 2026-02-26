@@ -67,12 +67,12 @@ namespace LootingBots.Utilities
                 return enabledTypes.HasPlayerScav();
             }
             WildSpawnType role = brain.BotOwner.Profile.Info.Settings.Role;
-            return IsBotEnabled(enabledTypes, role);
+            return enabledTypes.IsBotEnabled(role);
         }
 
         public static bool IsBotEnabled(this BotType enabledTypes, WildSpawnType botType)
         {
-            if (IsPMC(botType))
+            if (botType.IsPMC())
             {
                 return enabledTypes.HasPmc();
             }
@@ -132,14 +132,14 @@ namespace LootingBots.Utilities
             }
         }
 
-        public static bool IsPMC(WildSpawnType wildSpawnType)
+        public static bool IsPMC(this WildSpawnType wildSpawnType)
         {
-            return wildSpawnType == WildSpawnType.pmcBEAR || wildSpawnType == WildSpawnType.pmcUSEC;
+            return wildSpawnType is WildSpawnType.pmcBEAR or WildSpawnType.pmcUSEC;
         }
 
-        public static bool IsScav(WildSpawnType wildSpawnType)
+        public static bool IsScav(this WildSpawnType wildSpawnType)
         {
-            return wildSpawnType == WildSpawnType.assault || wildSpawnType == WildSpawnType.assaultGroup;
+            return wildSpawnType is WildSpawnType.assault or WildSpawnType.assaultGroup;
         }
 
         public static bool IsBoss(WildSpawnType wildSpawnType)
