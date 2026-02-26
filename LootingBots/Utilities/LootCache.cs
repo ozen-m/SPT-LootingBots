@@ -57,6 +57,7 @@ namespace LootingBots.Utilities
             return ActiveLoot.TryGetValue(lootId, out BotOwner _);
         }
 
+        private static readonly List<string> _keysToRemoveScratch = [];
         public static void Cleanup(BotOwner botOwner)
         {
             try
@@ -71,7 +72,7 @@ namespace LootingBots.Utilities
                     return;
                 }
 
-                List<string> keysToRemove = [];
+                _keysToRemoveScratch.Clear();
 
                 // Look through the entries in the dictionary and remove any that match the specified bot owner
                 foreach (KeyValuePair<string, BotOwner> keyValue in ActiveLoot)
@@ -83,17 +84,20 @@ namespace LootingBots.Utilities
                         {
                             LootingBots.LootLog.LogError("Bot in loot cache has no name?");
                         }
+
+                        // Bot is null, so remove it from active loot cache
+                        _keysToRemoveScratch.Add(keyValue.Key);
                         continue;
                     }
 
                     // If the bot's name matches, remove the item
                     if (keyValue.Value.name == botOwner.name)
                     {
-                        keysToRemove.Add(keyValue.Key);
+                        _keysToRemoveScratch.Add(keyValue.Key);
                     }
                 }
 
-                foreach (string key in keysToRemove)
+                foreach (string key in _keysToRemoveScratch)
                 {
                     ActiveLoot.Remove(key);
                 }
