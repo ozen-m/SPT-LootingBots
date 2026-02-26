@@ -227,7 +227,12 @@ namespace LootingBots.Components
                     }
 
                     // Cache the loot and set active target
-                    ActiveLootCache.CacheActiveLootId(rootItem.Id, _botOwner);
+                    if (!ActiveLootCache.CacheActiveLootId(rootItem?.Id, _botOwner))
+                    {
+                        yield return null;
+                        continue;
+                    }
+
                     _lootingBrain.DistanceToLoot = dist;
                     _lootingBrain.Destination = destination;
 

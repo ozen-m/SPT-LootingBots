@@ -43,12 +43,13 @@ namespace LootingBots.Utilities
             ActivePlayers = [];
         }
 
-        public static void CacheActiveLootId(string containerId, BotOwner botOwner)
+        public static bool CacheActiveLootId(string containerId, BotOwner botOwner)
         {
-            if (!string.IsNullOrEmpty(botOwner.name))
+            if (!string.IsNullOrEmpty(botOwner.name) || !string.IsNullOrEmpty(containerId))
             {
-                ActiveLoot.Add(containerId, botOwner);
+                return ActiveLoot.TryAdd(containerId, botOwner);
             }
+            return false;
         }
 
         public static bool IsLootInUse(string lootId)
