@@ -1,4 +1,5 @@
-﻿using EFT;
+﻿using System.Runtime.CompilerServices;
+using EFT;
 using EFT.InventoryLogic;
 using LootingBots.Components;
 using LootingBots.Utilities;
@@ -7,17 +8,21 @@ namespace LootingBots
 {
     public static class External
     {
+        private static readonly ConditionalWeakTable<BotOwner, BotLog> _interopLogs = [];
+
         /** Forces a bot to scan for loot as soon as they are able to. */
         public static bool ForceBotToScanLoot(BotOwner bot)
         {
             if (GetAllComponents(bot, out LootingBrain lootingBrain, out LootFinder lootFinder))
             {
-                BotLog log = CreateInteropLog(bot);
+                BotLog log = GetOrCreateInteropLog(bot);
 
                 if (!lootingBrain.HasFreeSpace)
                 {
                     if (log.WarningEnabled)
+                    {
                         log.LogWarning("Forcing a scan but bot does not have enough free space");
+                    }
                 }
                 else if (log.DebugEnabled)
                 {
@@ -35,10 +40,12 @@ namespace LootingBots
         {
             if (GetAllComponents(bot, out LootingBrain lootingBrain, out LootFinder lootFinder))
             {
-                BotLog log = CreateInteropLog(bot);
+                BotLog log = GetOrCreateInteropLog(bot);
 
                 if (log.DebugEnabled)
+                {
                     log.LogDebug($"Preventing a bot from looting for the next {duration} seconds");
+                }
 
                 if (lootingBrain.IsBrainEnabled)
                 {
@@ -59,10 +66,12 @@ namespace LootingBots
         {
             if (GetLootingBrain(bot, out LootingBrain lootingBrain))
             {
-                BotLog log = CreateInteropLog(bot);
+                BotLog log = GetOrCreateInteropLog(bot);
 
                 if (log.DebugEnabled)
+                {
                     log.LogDebug($"Checking if {bot.name} has Free Space in their inventory. Result: {lootingBrain.HasFreeSpace}");
+                }
 
                 return !lootingBrain.HasFreeSpace;
             }
@@ -76,10 +85,12 @@ namespace LootingBots
         {
             if (GetLootingBrain(bot, out LootingBrain lootingBrain))
             {
-                BotLog log = CreateInteropLog(bot);
+                BotLog log = GetOrCreateInteropLog(bot);
 
                 if (log.DebugEnabled)
+                {
                     log.LogDebug($"Getting Net Loot Value for {bot.name} which is {lootingBrain.Stats.NetLootValue}");
+                }
 
                 return lootingBrain.Stats.NetLootValue;
             }
@@ -113,9 +124,16 @@ namespace LootingBots
             return lootFinder != null;
         }
 
-        private static BotLog CreateInteropLog(BotOwner bot)
+        private static BotLog GetOrCreateInteropLog(BotOwner bot)
         {
-            return new BotLog(LootingBots.InteropLog, bot);
+            if (_interopLogs.TryGetValue(bot, out BotLog log))
+            {
+                return log;
+            }
+
+            log = new BotLog(LootingBots.InteropLog, bot);
+            _interopLogs.Add(bot, log);
+            return log;
         }
     }
 }
