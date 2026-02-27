@@ -349,7 +349,7 @@ namespace LootingBots.Components
             // If a container was closed, open it before looting
             if (ActiveContainer.DoorState == EDoorState.Shut)
             {
-                LootUtils.InteractContainer(ActiveContainer, BotOwner, EInteractionType.Open);
+                LootUtils.InteractContainer(ActiveContainer, BotOwner, EInteractionType.Open, _log);
                 didOpen = true;
             }
 
@@ -362,7 +362,7 @@ namespace LootingBots.Components
             // Close the container if the settings to close containers is checked or if the container was already opened when the bot tried to loot it
             if (LootingBots.BotsAlwaysCloseContainers.Value || !didOpen)
             {
-                LootUtils.InteractContainer(ActiveContainer, BotOwner, EInteractionType.Close);
+                LootUtils.InteractContainer(ActiveContainer, BotOwner, EInteractionType.Close, _log);
             }
 
             InventoryController.UpdateActiveWeapon();

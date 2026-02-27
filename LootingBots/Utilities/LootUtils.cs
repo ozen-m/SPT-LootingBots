@@ -60,20 +60,28 @@ namespace LootingBots.Utilities
             return key != null && key.Template.MaximumNumberOfUsage == 1;
         }
 
-        /** Triggers a container to open/close */
-        public static void InteractContainer(LootableContainer container, IPlayer player, EInteractionType action)
+        /** Triggers a container to open/close **/
+        /** Borrowed from Questing Bots, needed for Fika **/
+        public static void InteractContainer(WorldInteractiveObject worldInteractiveObject, BotOwner botOwner, EInteractionType action, BotLog log)
         {
-            if (container == null)
+            if (worldInteractiveObject == null)
             {
+                if (log.DebugEnabled)
+                {
+                    log.LogWarning($"Interacting [{action.ToString()}] with WorldInteractiveObject but is NULL");
+                }
                 return;
             }
 
-            InteractionResult result = new InteractionResult(action);
-            if (container.InteractingPlayer == null)
+            InteractionResult interactionResult = new InteractionResult(action);
+            if (worldInteractiveObject is Door)
             {
-                container.InteractingPlayer = player;
+                // NOTE: This method MUST be used for Fika compatibility
+                botOwner.GetPlayer.vmethod_0(worldInteractiveObject, interactionResult, null);
             }
-            container.Interact(result);
+
+            // NOTE: This method MUST be used for Fika compatibility
+            botOwner.GetPlayer.vmethod_1(worldInteractiveObject, interactionResult);
         }
 
         /**
