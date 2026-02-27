@@ -95,7 +95,7 @@ namespace LootingBots
             string corpseName = _lootingBrain.ActiveCorpse != null ? _lootingBrain.ActiveCorpse.name.Localized() : null;
             string lootableName = itemName ?? containerName ?? corpseName ?? "-";
 
-            string category = "";
+            string category = string.Empty;
             if (itemName != null)
             {
                 category = "Item";
@@ -112,14 +112,14 @@ namespace LootingBots
             debugPanel.AppendLine(
                 _lootingBrain.LootTaskRunning ? "Looting in progress..."
                     : _lootFinder.IsScanRunning ? "Scan in progress..."
-                    : "",
+                    : string.Empty,
                 Color.green
             );
             debugPanel.AppendLabeledValue($"Target Loot", $" {lootableName} ({category})", Color.yellow, Color.yellow);
 
             debugPanel.AppendLabeledValue(
                 $"Distance to Loot",
-                $" {(category == "" || _lootingBrain.DistanceToLoot == -1f ? "Calculating path..." : $"{Math.Sqrt(_lootingBrain.DistanceToLoot):0.##}m")}",
+                $" {(category == string.Empty || _lootingBrain.DistanceToLoot == -1f ? "Calculating path..." : $"{Math.Sqrt(_lootingBrain.DistanceToLoot):0.##}m")}",
                 Color.grey,
                 Color.grey
             );

@@ -334,7 +334,7 @@ namespace LootingBots.Components
             _lootTimer.Restart();
             LootTaskRunning = true;
 
-            Item item = ActiveContainer.ItemOwner.Items.GetFirstItem();
+            Item item = ActiveContainer.ItemOwner.RootItem;
 
             if (_log.DebugEnabled)
             {
@@ -342,7 +342,10 @@ namespace LootingBots.Components
                 {
                     _log.LogWarning("Tried to loot container but container is empty");
                 }
-                _log.LogDebug($"Trying to add items from: {item.Name.Localized()}");
+                else
+                {
+                    _log.LogDebug($"Trying to loot container: {item?.Name.Localized()}");
+                }
             }
 
             bool didOpen = false;

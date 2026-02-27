@@ -162,7 +162,7 @@ namespace LootingBots.Logic
                 // Log every 5 movement attempts to reduce noise
                 if (_navigationAttempts % 5 == 1 && _log.DebugEnabled)
                 {
-                    _log.LogDebug($"[Attempt: {_navigationAttempts}] Moving to {lootableName}");
+                    _log.LogDebug($"[Attempt: {_navigationAttempts}] Navigating to {lootableName}");
                 }
 
                 if (!isBotStuck && !isNavigationLimit && _lootingBrain.Destination != Vector3.zero)

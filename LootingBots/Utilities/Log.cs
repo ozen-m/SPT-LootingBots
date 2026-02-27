@@ -73,7 +73,7 @@ namespace LootingBots.Utilities
         {
             _log = log;
             _botOwner = botOwner;
-            _botString = $"([{_botOwner.Profile.Info.Settings.Role}] {_botOwner.name})";
+            _botString = $"([{_botOwner.Profile.Info.Settings.Role}] [{_botOwner.name}] {_botOwner.GetPlayer.Profile.GetCorrectedNickname()})";
         }
 
         public void LogDebug(object msg)
