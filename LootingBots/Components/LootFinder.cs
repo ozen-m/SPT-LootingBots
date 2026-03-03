@@ -16,7 +16,11 @@ namespace LootingBots.Components
         BotLog _log;
         public float ScanTimer;
         public bool LockUntilNextScan;
+        public int EmptyAttempts;
 
+        // TODO: Add config
+        private const int MaxEmptyAttempts = 3;
+        private const float EmptyAttemptsCooldown = 180f;
         private static readonly ArrayPool<Collider> ColliderPool = ArrayPool<Collider>.Shared;
 
         public bool IsScheduledScan
@@ -113,7 +117,6 @@ namespace LootingBots.Components
                     {
                         _log.LogDebug("No loot in range");
                     }
-                    IsScanRunning = false;
                     yield break;
                 }
 
@@ -217,7 +220,7 @@ namespace LootingBots.Components
                         {
                             if (_log.DebugEnabled)
                             {
-                                _log.LogDebug("No loot in range");
+                                _log.LogDebug("No loot in range, reached max calculations");
                             }
 
                             break;
@@ -252,11 +255,22 @@ namespace LootingBots.Components
                         _lootingBrain.LootObjectPosition = lootItem.transform.position;
                     }
 
+                    EmptyAttempts = 0;
                     break;
                 }
             }
             finally
             {
+                if (!_lootingBrain.HasActiveLootable && ++EmptyAttempts > MaxEmptyAttempts)
+                {
+                    if (_log.DebugEnabled)
+                    {
+                        _log.LogDebug($"Max empty attempts reached, preventing looting for {EmptyAttemptsCooldown}s");
+                    }
+                    OverrideNextScanTime(EmptyAttemptsCooldown);
+                    EmptyAttempts = 0;
+                }
+
                 ColliderPool.Return(colliders, true);
                 IsScanRunning = false;
             }
