@@ -22,42 +22,42 @@ namespace LootingBots.Utilities
     {
         public static bool HasScav(this BotType botType)
         {
-            return botType.HasFlag(BotType.Scav);
+            return (botType & BotType.Scav) != 0;
         }
 
         public static bool HasPmc(this BotType botType)
         {
-            return botType.HasFlag(BotType.Pmc);
+            return (botType & BotType.Pmc) != 0;
         }
 
         public static bool HasPlayerScav(this BotType botType)
         {
-            return botType.HasFlag(BotType.PlayerScav);
+            return (botType & BotType.PlayerScav) != 0;
         }
 
         public static bool HasRaider(this BotType botType)
         {
-            return botType.HasFlag(BotType.Raider);
+            return (botType & BotType.Raider) != 0;
         }
 
         public static bool HasCultist(this BotType botType)
         {
-            return botType.HasFlag(BotType.Cultist);
+            return (botType & BotType.Cultist) != 0;
         }
 
         public static bool HasBoss(this BotType botType)
         {
-            return botType.HasFlag(BotType.Boss);
+            return (botType & BotType.Boss) != 0;
         }
 
         public static bool HasFollower(this BotType botType)
         {
-            return botType.HasFlag(BotType.Follower);
+            return (botType & BotType.Follower) != 0;
         }
 
         public static bool HasBloodhound(this BotType botType)
         {
-            return botType.HasFlag(BotType.Bloodhound);
+            return (botType & BotType.Bloodhound) != 0;
         }
 
         public static bool IsBotEnabled(this BotType enabledTypes, LootingBrain brain)
