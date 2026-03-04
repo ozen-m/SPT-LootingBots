@@ -163,7 +163,9 @@ namespace LootingBots.Components
                     var interactableObject = collider.gameObject.GetComponentInParent<InteractableObject>();
                     if (corpseLootingEnabled && interactableObject is Corpse corpse)
                     {
-                        if (corpse.ItemOwner?.RootItem is InventoryEquipment equipment)
+                        var player = collider.gameObject.GetComponentInParent<Player>();
+                        if (player != null && // Corpse is a bot corpse and not a static "Dead scav"
+                            corpse.ItemOwner?.RootItem is InventoryEquipment equipment)
                         {
                             rootItem = equipment;
                             lootType = LootType.Corpse;
