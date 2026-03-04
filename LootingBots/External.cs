@@ -51,7 +51,7 @@ public static class External
             {
                 lootFinder.OverrideNextScanTime(duration);
 
-                lootingBrain.DisableTransactions();
+                lootingBrain.StopLooting();
             }
 
             return true;

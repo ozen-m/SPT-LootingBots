@@ -1,5 +1,6 @@
 using BepInEx;
 using BepInEx.Configuration;
+using Cysharp.Threading.Tasks;
 using DrakiaXYZ.BigBrain.Brains;
 using LootingBots.Components;
 using LootingBots.Utilities;
@@ -56,7 +57,7 @@ public class LootingBots : BaseUnityPlugin
     // Loot Settings
     public static ConfigEntry<bool> BotsAlwaysCloseContainers;
     public static ConfigEntry<bool> UseMarketPrices;
-    public static ConfigEntry<int> TransactionDelay;
+    public static ConfigEntry<double> TransactionDelay;
     public static ConfigEntry<bool> UseExamineTime;
     public static ConfigEntry<bool> ValueFromMods;
     public static ConfigEntry<bool> CanStripAttachments;
@@ -73,7 +74,7 @@ public class LootingBots : BaseUnityPlugin
 
     public static ConfigEntry<LogLevel> ItemAppraiserLogLevels;
     public static Log ItemAppraiserLog;
-    public static ItemAppraiser ItemAppraiser { get; private set; } = new ItemAppraiser();
+    public static ItemAppraiser ItemAppraiser { get; private set; }
 
     // Performance Settings
     public static ConfigEntry<int> MaxActiveLootingBots;
@@ -239,7 +240,7 @@ public class LootingBots : BaseUnityPlugin
         TransactionDelay = Config.Bind(
             "Loot Finder (Timing)",
             "Delay after taking item (ms)",
-            500,
+            500D,
             new ConfigDescription(
                 "Amount of milliseconds a bot will wait after taking an item into their inventory before attempting to loot another item. Simulates the amount of time it takes for a player to look through loot decide to take something.",
                 null,
@@ -419,7 +420,7 @@ public class LootingBots : BaseUnityPlugin
 
     public void Awake()
     {
-        _patchManager = new(this, true);
+        _patchManager = new PatchManager(this, true);
 
         LootFinderSettings();
         LootSettings();
@@ -428,6 +429,7 @@ public class LootingBots : BaseUnityPlugin
         LootLog = new Log(Logger, LootingLogLevels);
         InteropLog = new Log(Logger, InteropLogLevels);
         ItemAppraiserLog = new Log(Logger, ItemAppraiserLogLevels);
+        ItemAppraiser = new ItemAppraiser(ItemAppraiserLog);
 
         _patchManager.EnablePatches();
 
@@ -479,17 +481,16 @@ public class LootingBots : BaseUnityPlugin
         BrainManager.AddCustomLayer(typeof(LootingLayer), ["Obdolbs"], 11);
     }
 
-    private Task _isUpdatingPrices;
-
     public void Update()
     {
-        if (!_isUpdatingPrices?.IsCompleted ?? false)
+        if (ItemAppraiser.IsUpdatingPrices)
         {
             return;
         }
 
         if (UseMarketPrices.Value)
         {
+            // 30 minutes
             if (ItemAppraiser.LastPriceUpdate.ElapsedMilliseconds < 1800000f && ItemAppraiser.MarketData is not null)
             {
                 return;
@@ -503,7 +504,14 @@ public class LootingBots : BaseUnityPlugin
             }
         }
 
-        LootLog.LogInfo("Updating item appraiser");
-        _isUpdatingPrices = ItemAppraiser.UpdatePrices();
+        ItemAppraiserLog.LogInfo("Updating item appraiser");
+        ItemAppraiser.UpdatePricesAsync().Forget(ex =>
+        {
+            if (ItemAppraiserLog.ErrorEnabled)
+            {
+                ItemAppraiserLog.LogError("Exception while updating prices:");
+                ItemAppraiserLog.LogError(ex.ToString());
+            }
+        });
     }
 }

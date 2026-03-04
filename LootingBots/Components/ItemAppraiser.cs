@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Comfort.Common;
+using Cysharp.Threading.Tasks;
 using EFT;
 using EFT.HandBook;
 using EFT.InventoryLogic;
@@ -9,73 +10,80 @@ using SPT.Common.Http;
 
 namespace LootingBots.Components;
 
-public class ItemAppraiser
+public class ItemAppraiser(Log _log)
 {
     public readonly Stopwatch LastPriceUpdate = Stopwatch.StartNew();
 
     public Dictionary<MongoID, HandbookData> HandbookData;
     public Dictionary<MongoID, float> MarketData;
 
-    private Log _log;
+    public bool IsUpdatingPrices { get; private set; }
 
-    public async Task UpdatePrices()
+    public async UniTask UpdatePricesAsync()
     {
-        _log = LootingBots.ItemAppraiserLog;
+        IsUpdatingPrices = true;
 
-        if (LootingBots.UseMarketPrices.Value)
+        try
         {
-            // ShowMeTheMoney flea prices
-            var json = await RequestHandler.GetJsonAsync("/showMeTheMoney/getFleaPrices");
-            if (!json.IsNullOrEmpty())
+            if (LootingBots.UseMarketPrices.Value)
             {
-                try
+                // ShowMeTheMoney flea prices
+                var json = await RequestHandler.GetJsonAsync("/showMeTheMoney/getFleaPrices").AsUniTask();
+                if (!json.IsNullOrEmpty())
                 {
-                    MarketData = JsonConvert.DeserializeObject<Dictionary<MongoID, float>>(json);
-                }
-                catch
-                {
-                    // Ignore
-                }
-            }
-            if (MarketData is not null)
-            {
-                _log.LogInfo("ShowMeTheMoney flea prices successfully fetched!");
-                LastPriceUpdate.Restart();
-                return;
-            }
-
-            _log.LogInfo("ShowMeTheMoney flea prices not available, falling back to BE session");
-
-            // Initialize ragfair prices from the BE session
-            var completionClass = new TaskCompletionSource<Dictionary<MongoID, float>>();
-            Singleton<ClientApplication<ISession>>
-                .Instance.GetClientBackEndSession()
-                .RagfairGetPrices(
-                    result =>
+                    try
                     {
-                        Dictionary<MongoID, float> prices = null;
-                        if (result.Succeed)
-                        {
-                            prices = result.Value.ToDictionary(
-                                pair => new MongoID(pair.Key),
-                                pair => pair.Value
-                            );
-                        }
-
-                        completionClass.TrySetResult(prices);
+                        MarketData = JsonConvert.DeserializeObject<Dictionary<MongoID, float>>(json);
                     }
-                );
+                    catch
+                    {
+                        // Ignore
+                    }
+                }
+                if (MarketData is not null)
+                {
+                    _log.LogInfo("ShowMeTheMoney flea prices successfully fetched!");
+                    LastPriceUpdate.Restart();
+                    return;
+                }
 
-            MarketData = await completionClass.Task;
-            if (MarketData is null)
+                _log.LogInfo("ShowMeTheMoney flea prices not available, falling back to BE session");
+
+                // Initialize ragfair prices from the BE session
+                var completionClass = new UniTaskCompletionSource<Dictionary<MongoID, float>>();
+                Singleton<ClientApplication<ISession>>
+                    .Instance.GetClientBackEndSession()
+                    .RagfairGetPrices(
+                        result =>
+                        {
+                            Dictionary<MongoID, float> prices = null;
+                            if (result.Succeed)
+                            {
+                                prices = result.Value.ToDictionary(
+                                    pair => new MongoID(pair.Key),
+                                    pair => pair.Value
+                                );
+                            }
+
+                            completionClass.TrySetResult(prices);
+                        }
+                    );
+
+                MarketData = await completionClass.Task;
+                if (MarketData is null)
+                {
+                    _log.LogInfo("Failed to get flea prices from BE session");
+                }
+            }
+            else
             {
-                _log.LogInfo("Failed to get flea prices from BE session");
+                // This is the handbook instance which is initialized when the client first starts.
+                HandbookData = Singleton<HandbookClass>.Instance.Items.ToDictionary(item => new MongoID(item.Id));
             }
         }
-        else
+        finally
         {
-            // This is the handbook instance which is initialized when the client first starts.
-            HandbookData = Singleton<HandbookClass>.Instance.Items.ToDictionary(item => new MongoID(item.Id));
+            IsUpdatingPrices = false;
         }
     }
 

@@ -45,6 +45,7 @@ internal class LootingLogic : CustomLogic
         _lootingBrain.DistanceToLoot = -1f;
         _stuckCount = 0;
         _navigationAttempts = 0;
+        _lootingBrain.StopLooting();
         base.Stop();
     }
 

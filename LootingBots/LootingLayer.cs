@@ -42,7 +42,6 @@ internal class LootingLayer : CustomLayer
 
     public override void Start()
     {
-        _lootingBrain.EnableTransactions();
         _lootingBrain.UpdateGridStats();
         BotOwner.PatrollingData.Pause();
         base.Start();
@@ -50,7 +49,7 @@ internal class LootingLayer : CustomLayer
 
     public override void Stop()
     {
-        _lootingBrain.DisableTransactions();
+        _lootingBrain.StopLooting();
         _lootingBrain.UpdateGridStats();
         BotOwner.PatrollingData.Unpause();
         base.Stop();

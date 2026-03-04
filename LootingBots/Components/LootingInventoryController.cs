@@ -1,10 +1,11 @@
-using System.Collections;
 using System.Text;
+using Cysharp.Threading.Tasks;
 using EFT;
 using EFT.InventoryLogic;
 using LootingBots.Actions;
 using LootingBots.Utilities;
 using UnityEngine;
+using EquipmentType = LootingBots.Utilities.EquipmentType;
 
 namespace LootingBots.Components;
 
@@ -149,22 +150,6 @@ public class LootingInventoryController
     }
 
     /**
-    * Disable the tranaction controller to ensure transactions do not occur when the looting layer is interrupted
-    */
-    public void DisableTransactions()
-    {
-        _transactionController.DisableTransactions();
-    }
-
-    /**
-    * Used to enable the transaction controller when the looting layer is active
-    */
-    public void EnableTransactions()
-    {
-        _transactionController.EnableTransactions();
-    }
-
-    /**
     * Calculates the value of the bot's current weapons to use in weapon swap comparison checks
     */
     public void CalculateGearValue()
@@ -215,41 +200,38 @@ public class LootingInventoryController
         Stats.TotalGridSpaces = (tacVest?.Grids?.Length ?? 0) + (backpack?.Grids?.Length ?? 0) + (pockets?.Grids?.Length ?? 0);
     }
 
-    /**
-    * Sorts the items in the tactical vest so that items prefer to be in slots that match their size. I.E a 1x1 item will be placed in a 1x1 slot instead of a 1x2 slot
-    */
-    public IEnumerator SortTacVest()
-    {
-        SearchableItemItemClass tacVest = (SearchableItemItemClass)
-            _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem;
-
-        ShouldSort = false;
-
-        if (tacVest != null)
-        {
-            var result = InteractionsHandlerClass.Sort(tacVest, _botInventoryController, true);
-            yield return null;
-
-            if (result.Succeeded)
-            {
-                Task sortTask = Task.CompletedTask;
-                try
-                {
-                    sortTask = _transactionController.TryRunNetworkTransaction(result);
-                }
-                catch (Exception ex)
-                {
-                    _log.LogError($"Failed to execute {nameof(SortTacVest)}: {ex}");
-                }
-
-                yield return new WaitUntil(() => sortTask.IsCompleted);
-            }
-            else if (_log.ErrorEnabled)
-            {
-                _log.LogError($"Failed to execute {nameof(SortTacVest)}: {result.Error}");
-            }
-        }
-    }
+    // /**
+    // * Sorts the items in the tactical vest so that items prefer to be in slots that match their size. I.E a 1x1 item will be placed in a 1x1 slot instead of a 1x2 slot
+    // */
+    // public async UniTask SortTacVestAsync()
+    // {
+    //     SearchableItemItemClass tacVest = (SearchableItemItemClass)
+    //         _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem;
+    //
+    //     ShouldSort = false;
+    //
+    //     if (tacVest != null)
+    //     {
+    //         var result = InteractionsHandlerClass.Sort(tacVest, _botInventoryController, true);
+    //         await UniTask.Yield();
+    //
+    //         if (result.Succeeded)
+    //         {
+    //             try
+    //             {
+    //                 await _transactionController.TryRunNetworkTransactionAsync(result);
+    //             }
+    //             catch (Exception ex)
+    //             {
+    //                 _log.LogError($"Failed to execute {nameof(SortTacVestAsync)}: {ex}");
+    //             }
+    //         }
+    //         else if (_log.ErrorEnabled)
+    //         {
+    //             _log.LogError($"Failed to execute {nameof(SortTacVestAsync)}: {result.Error}");
+    //         }
+    //     }
+    // }
 
     // /**
     // * Sorts the items in the tactical vest so that items prefer to be in slots that match their size. I.E a 1x1 item will be placed in a 1x1 slot instead of a 1x2 slot
@@ -340,24 +322,17 @@ public class LootingInventoryController
     * If bots are looting something that is equippable and they have nothing equipped in that slot, they will always equip it.
     * If the bot decides not to equip the item then it will attempt to put in an available container slot
     */
-    public async Task<bool> TryAddItemsToBot(List<Item> items)
+    public async UniTask<bool> TryAddItemsToBotAsync(List<Item> items, CancellationToken token = default)
     {
         foreach (Item item in items)
         {
             if (item.Name != null)
             {
+                token.ThrowIfCancellationRequested();
+
                 if (LootingBots.UseExamineTime.Value)
                 {
-                    await SimulateExamineTime(item);
-                }
-
-                if (_transactionController.IsLootingInterrupted())
-                {
-                    if (_log.DebugEnabled)
-                    {
-                        _log.LogDebug("Looting interrupted");
-                    }
-                    return false;
+                    await SimulateExamineTimeAsync(item, token);
                 }
 
                 CurrentItemPrice = _itemAppraiser.GetItemPrice(item, _log);
@@ -383,7 +358,7 @@ public class LootingInventoryController
                 LootingEquipAction action = GetEquipAction(item);
                 if (action.Swap != null)
                 {
-                    await _transactionController.ThrowAndEquip(action.Swap);
+                    await _transactionController.ThrowAndEquipAsync(action.Swap, token);
                     continue;
                 }
                 if (action.Move != null)
@@ -393,7 +368,7 @@ public class LootingInventoryController
                         _log.LogWarning($"Moving {action.Move.ToMove.Name.Localized()} to: {action.Move.Place.Container.ID.Localized()}");
                     }
 
-                    if (await _transactionController.MoveItem(action.Move))
+                    if (await _transactionController.MoveItemAsync(action.Move, token))
                     {
                         Stats.AddNetValue(CurrentItemPrice);
                     }
@@ -401,7 +376,7 @@ public class LootingInventoryController
                 }
 
                 // Check to see if we can equip the item
-                if (AllowedToEquip(item) && await _transactionController.TryEquipItem(item))
+                if (AllowedToEquip(item) && await _transactionController.TryEquipItemAsync(item, token))
                 {
                     Stats.AddNetValue(CurrentItemPrice);
                     continue;
@@ -411,7 +386,7 @@ public class LootingInventoryController
                 // This helps when looting rigs to transfer ammo to the bots active rig
                 if (item is SearchableItemItemClass searchableItem)
                 {
-                    bool success = await LootNestedItems(searchableItem);
+                    bool success = await LootNestedItemsAsync(searchableItem, token);
 
                     if (!success)
                     {
@@ -420,7 +395,7 @@ public class LootingInventoryController
                 }
 
                 // Check to see if we can pick up the item
-                if (AllowedToPickup(item) && await _transactionController.TryPickupItem(item))
+                if (AllowedToPickup(item) && await _transactionController.TryPickupItemAsync(item, token))
                 {
                     Stats.AddNetValue(CurrentItemPrice);
                     UpdateGridStats();
@@ -446,17 +421,11 @@ public class LootingInventoryController
                     }
 
                     // Call TryAddItemsToBot with the filtered items
-                    bool success = await TryAddItemsToBot(itemsToAdd);
-
+                    bool success = await TryAddItemsToBotAsync(itemsToAdd, token);
                     if (!success)
                     {
                         return success;
                     }
-                }
-
-                if (_log.DebugEnabled)
-                {
-                    _log.LogDebug($"Item was not looted, {itemName}");
                 }
             }
             else if (_log.DebugEnabled)
@@ -469,11 +438,12 @@ public class LootingInventoryController
     }
 
     /** Use the ExamineTime of an object and the AttentionExamineValue of the bot to calculate the delay for discovering an item while looting */
-    public Task SimulateExamineTime(Item item)
+    public UniTask SimulateExamineTimeAsync(Item item, CancellationToken token = default)
     {
-        // Taken from GClass2665 constructor
-        return LootingTransactionController.SimulatePlayerDelay(
-            item.ExamineTime * 1000f / (1f + _botOwner.Profile.Skills.AttentionExamineValue)
+        // Taken from ExamineOperationClass constructor
+        return LootingTransactionController.SimulatePlayerDelayAsync(
+            item.ExamineTime * 1000f / (1f + _botOwner.Profile.Skills.AttentionExamineValue),
+            token
         );
     }
 
@@ -545,7 +515,7 @@ public class LootingInventoryController
 
         if (lootItem.Template is WeaponTemplate && !BotTypeUtils.IsBoss(_botOwner.Profile.Info.Settings.Role))
         {
-            return GetWeaponEquipAction(lootItem as Weapon);
+            return GetWeaponEquipAction(action, lootItem as Weapon);
         }
 
         if (EquipmentTypeUtils.IsBackpack(lootItem) && ShouldSwapGear(backpack, lootItem))
@@ -573,7 +543,7 @@ public class LootingInventoryController
                 swapAction = GetSwapAction(
                     chest,
                     null,
-                    async () => await _transactionController.ThrowAndEquip(GetSwapAction(tacVest, lootItem, null, true))
+                    async (token) => await _transactionController.ThrowAndEquipAsync(GetSwapAction(tacVest, lootItem, null, true), token)
                 );
             }
             else
@@ -618,8 +588,10 @@ public class LootingInventoryController
     /**
     * Throws all magazines from the rig that are not able to be used by any of the weapons that the bot currently has equipped
     */
-    public async Task ThrowUselessMags(Weapon thrownWeapon)
+    public async UniTask ThrowUselessMagsAsync(Weapon thrownWeapon, CancellationToken token)
     {
+        token.ThrowIfCancellationRequested();
+
         Weapon primary = (Weapon) _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.FirstPrimaryWeapon).ContainedItem;
         Weapon secondary = (Weapon) _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.SecondPrimaryWeapon).ContainedItem;
         Weapon holster = (Weapon) _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Holster).ContainedItem;
@@ -642,7 +614,7 @@ public class LootingInventoryController
 
             bool fitsInEquipped = fitsInPrimary || fitsInSecondary || fitsInHolster;
             bool isSharedMag = fitsInThrown && fitsInEquipped;
-            if (reservedCount < 2 && fitsInThrown && fitsInEquipped)
+            if (reservedCount < 2 && isSharedMag)
             {
                 if (_log.DebugEnabled)
                 {
@@ -658,7 +630,7 @@ public class LootingInventoryController
                     _log.LogDebug($"Removing useless mag {mag.Name.Localized()}");
                 }
 
-                await _transactionController.ThrowAndEquip(new LootingSwapAction(mag));
+                await _transactionController.ThrowAndEquipAsync(new LootingSwapAction(mag), token);
             }
         }
     }
@@ -666,13 +638,12 @@ public class LootingInventoryController
     /**
     * Determines the kind of equip action the bot should take when encountering a weapon. Bots will always prefer to replace weapons that have lower value when encountering a higher value weapon.
     */
-    public LootingEquipAction GetWeaponEquipAction(Weapon lootWeapon)
+    public LootingEquipAction GetWeaponEquipAction(LootingEquipAction action, Weapon lootWeapon)
     {
         Weapon primary = (Weapon) _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.FirstPrimaryWeapon).ContainedItem;
         Weapon secondary = (Weapon) _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.SecondPrimaryWeapon).ContainedItem;
         Weapon holster = (Weapon) _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Holster).ContainedItem;
 
-        LootingEquipAction action = new();
         bool isPistol = lootWeapon.WeapClass.Equals("pistol");
         float lootValue = CurrentItemPrice;
 
@@ -723,15 +694,12 @@ public class LootingInventoryController
                         lootWeapon,
                         place,
                         null,
-                        async () =>
+                        async (token) =>
                         {
-                            while (_botOwner.InventoryController.IsChangingWeapon)
-                            {
-                                await Task.Yield();
-                            }
+                            await UniTask.WaitWhile(_botOwner.InventoryController, static invCont => invCont.IsChangingWeapon, cancellationToken: token);
                             ChangeToPrimary();
                             Stats.AddNetValue(lootValue);
-                            await LootingTransactionController.SimulatePlayerDelay(1500);
+                            await LootingTransactionController.SimulatePlayerDelayAsync(1500D, token);
                         }
                     );
                     Stats.WeaponValues.Primary.UpdatePair(lootWeapon.Id, lootValue);
@@ -754,16 +722,16 @@ public class LootingInventoryController
                             primary,
                             place,
                             null,
-                            async () =>
+                            async (token) =>
                             {
-                                await _transactionController.TryEquipItem(lootWeapon);
-                                await LootingTransactionController.SimulatePlayerDelay(1500);
-                                while (_botOwner.InventoryController.IsChangingWeapon)
+                                await UniTask.WaitWhile(_botOwner.InventoryController, static invCont => invCont.IsChangingWeapon, cancellationToken: token);
+                                if (await _transactionController.TryEquipItemAsync(lootWeapon, token))
                                 {
-                                    await Task.Yield();
+                                    Stats.AddNetValue(lootValue);
+                                    await UniTask.WaitWhile(_botOwner.InventoryController, static invCont => invCont.IsChangingWeapon, cancellationToken: token);
+                                    ChangeToPrimary();
                                 }
-                                ChangeToPrimary();
-                                await LootingTransactionController.SimulatePlayerDelay(1500);
+                                await LootingTransactionController.SimulatePlayerDelayAsync(1500D, token);
                             }
                         );
 
@@ -784,18 +752,17 @@ public class LootingInventoryController
                         primary,
                         null,
                         false,
-                        async () =>
+                        async (token) =>
                         {
-                            await ThrowUselessMags(secondary);
-                            await _transactionController.TryEquipItem(lootWeapon);
-                            Stats.AddNetValue(lootValue);
-                            await LootingTransactionController.SimulatePlayerDelay(1500);
-                            while (_botOwner.InventoryController.IsChangingWeapon)
+                            await ThrowUselessMagsAsync(secondary, token);
+                            await LootingTransactionController.SimulatePlayerDelayAsync(1500D, token);
+                            if (await _transactionController.TryEquipItemAsync(lootWeapon, token))
                             {
-                                await Task.Yield();
+                                Stats.AddNetValue(lootValue);
+                                await UniTask.WaitWhile(_botOwner.InventoryController, static invCont => invCont.IsChangingWeapon, cancellationToken: token);
+                                ChangeToPrimary();
                             }
-                            ChangeToPrimary();
-                            await LootingTransactionController.SimulatePlayerDelay(1500);
+                            await LootingTransactionController.SimulatePlayerDelayAsync(1500D, token);
                         }
                     );
                     Stats.WeaponValues.Secondary.UpdatePair(Stats.WeaponValues.Primary);
@@ -893,16 +860,9 @@ public class LootingInventoryController
     }
 
     /** Searches throught the child items of a container and attempts to loot them */
-    public async Task<bool> LootNestedItems(SearchableItemItemClass parentItem)
+    public async UniTask<bool> LootNestedItemsAsync(SearchableItemItemClass parentItem, CancellationToken token = default)
     {
-        if (_transactionController.IsLootingInterrupted())
-        {
-            if (_log.DebugEnabled)
-            {
-                _log.LogDebug("Looting interrupted");
-            }
-            return false;
-        }
+        token.ThrowIfCancellationRequested();
 
         List<Item> items = [];
 
@@ -924,8 +884,8 @@ public class LootingInventoryController
                 _log.LogDebug($"Looting {items.Count} items from {parentItem.Name.Localized()}");
             }
 
-            await LootingTransactionController.SimulatePlayerDelay(LootingBrain.LootingStartDelay);
-            return await TryAddItemsToBot(items);
+            await LootingTransactionController.SimulatePlayerDelayAsync(LootingBrain.LootingStartDelay, token);
+            return await TryAddItemsToBotAsync(items, token);
         }
 
         if (_log.DebugEnabled)
@@ -955,8 +915,8 @@ public class LootingInventoryController
 
     public bool AllowedToEquip(Item lootItem)
     {
-        Utilities.EquipmentType eligiblePmcGear = (Utilities.EquipmentType) LootingBots.PMCGearToEquip.Value;
-        Utilities.EquipmentType eligibleScavGear = (Utilities.EquipmentType) LootingBots.ScavGearToEquip.Value;
+        EquipmentType eligiblePmcGear = (EquipmentType) LootingBots.PMCGearToEquip.Value;
+        EquipmentType eligibleScavGear = (EquipmentType) LootingBots.ScavGearToEquip.Value;
 
         WildSpawnType botType = _botOwner.Profile.Info.Settings.Role;
         bool isPMC = botType.IsPMC();
@@ -984,20 +944,19 @@ public class LootingInventoryController
     public LootingSwapAction GetSwapAction(
         Item toThrow,
         Item toEquip,
-        ActionCallback callback = null,
+        Func<CancellationToken, UniTask> callback = null,
         bool tranferItems = false,
-        ActionCallback onComplete = null
+        Func<CancellationToken, UniTask> onComplete = null
     )
     {
-        ActionCallback onSwapComplete = null;
+        Func<CancellationToken, UniTask> onSwapComplete = null;
         // If we want to transfer items after the throw and equip fully completes, call the lootNestedItems method
         // on the item that was just thrown
         if (tranferItems)
         {
-            onSwapComplete = async () =>
+            onSwapComplete = async (token) =>
             {
-                await LootingTransactionController.SimulatePlayerDelay();
-                await LootNestedItems((SearchableItemItemClass) toThrow);
+                await LootNestedItemsAsync((SearchableItemItemClass) toThrow, token);
             };
         }
 
@@ -1006,20 +965,22 @@ public class LootingInventoryController
             toEquip,
             callback
             ?? (
-                async () =>
+                async (token) =>
                 {
+                    token.ThrowIfCancellationRequested();
+
                     Stats.SubtractNetValue(_itemAppraiser.GetItemPrice(toThrow, _log));
                     _lootingBrain.IgnoreLoot(toThrow.Id);
-                    await LootingTransactionController.SimulatePlayerDelay(1500);
+                    await LootingTransactionController.SimulatePlayerDelayAsync(1500D, token);
 
                     if (toThrow is Weapon weapon)
                     {
-                        await ThrowUselessMags(weapon);
+                        await ThrowUselessMagsAsync(weapon, token);
                     }
 
                     bool isMovingOwnedItem = _botInventoryController.IsItemEquipped(toEquip);
                     // Try to equip the item after throwing
-                    if (await _transactionController.TryEquipItem(toEquip) && !isMovingOwnedItem)
+                    if (!isMovingOwnedItem && await _transactionController.TryEquipItemAsync(toEquip, token))
                     {
                         Stats.AddNetValue(CurrentItemPrice);
                     }

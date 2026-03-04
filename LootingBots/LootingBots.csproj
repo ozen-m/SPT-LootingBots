@@ -43,6 +43,42 @@
       <HintPath>..\References\Newtonsoft.Json.dll</HintPath>
     </Reference>
     <Reference Include="DissonanceVoip" HintPath="..\References\DissonanceVoip.dll" Private="False" />
+    <Reference Include="UniTask">
+      <HintPath>..\References\UnityToolkit\UniTask.dll</HintPath>
+    </Reference>
+    <Reference Include="UniTask.Addressables">
+      <HintPath>..\References\UnityToolkit\UniTask.Addressables.dll</HintPath>
+    </Reference>
+    <Reference Include="UniTask.DOTween">
+      <HintPath>..\References\UnityToolkit\UniTask.DOTween.dll</HintPath>
+    </Reference>
+    <Reference Include="UniTask.Linq">
+      <HintPath>..\References\UnityToolkit\UniTask.Linq.dll</HintPath>
+    </Reference>
+    <Reference Include="UniTask.TextMeshPro">
+      <HintPath>..\References\UnityToolkit\UniTask.TextMeshPro.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.Collections">
+      <HintPath>..\References\UnityToolkit\Unity.Collections.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityToolkit">
+      <HintPath>..\References\UnityToolkit\UnityToolkit.dll</HintPath>
+    </Reference>
+    <Reference Include="VContainer">
+      <HintPath>..\References\UnityToolkit\VContainer.dll</HintPath>
+    </Reference>
+    <Reference Include="ZLinq">
+      <HintPath>..\References\UnityToolkit\ZLinq.dll</HintPath>
+    </Reference>
+    <Reference Include="ZLinq.Unity">
+      <HintPath>..\References\UnityToolkit\ZLinq.Unity.dll</HintPath>
+    </Reference>
+    <Reference Include="ZLinq.Unity.UnityCollectoins">
+      <HintPath>..\References\UnityToolkit\ZLinq.Unity.UnityCollectoins.dll</HintPath>
+    </Reference>
+    <Reference Include="ZString">
+      <HintPath>..\References\UnityToolkit\ZString.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <!-- Build script for release build-->
   <Target Name="CleanUnwantedFiles" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">

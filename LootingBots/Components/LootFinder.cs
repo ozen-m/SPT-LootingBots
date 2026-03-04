@@ -1,5 +1,5 @@
 using System.Buffers;
-using System.Collections;
+using Cysharp.Threading.Tasks;
 using EFT;
 using EFT.Interactive;
 using EFT.InventoryLogic;
@@ -51,7 +51,8 @@ public class LootFinder : MonoBehaviour
         Item = 3,
     }
 
-    public bool IsScanRunning;
+    public bool IsScanRunning { get; private set; }
+    private CancellationTokenSource _lootFinderCts;
 
     public void Init(BotOwner botOwner)
     {
@@ -73,7 +74,11 @@ public class LootFinder : MonoBehaviour
     public void BeginSearch()
     {
         IsScanRunning = true;
-        StartCoroutine(FindLootCoroutine());
+
+        StopFindLootTask();
+        _lootFinderCts = new CancellationTokenSource();
+        FindLootAsync(_lootFinderCts.Token).Forget();
+
         SetLockUntilNextScan(false);
     }
 
@@ -90,7 +95,19 @@ public class LootFinder : MonoBehaviour
         SetLockUntilNextScan(true);
     }
 
-    public IEnumerator FindLootCoroutine()
+    public void StopFindLootTask()
+    {
+        if (_lootFinderCts is null)
+        {
+            return;
+        }
+
+        _lootFinderCts.Cancel();
+        _lootFinderCts.Dispose();
+        _lootFinderCts = null;
+    }
+
+    private async UniTask FindLootAsync(CancellationToken token)
     {
         IsScanRunning = true;
 
@@ -104,7 +121,7 @@ public class LootFinder : MonoBehaviour
                 {
                     _log.LogDebug("BotOwner is NULL, cannot start scan!");
                 }
-                yield break;
+                return;
             }
 
             // Use the largest detection radius specified in the settings as the main Sphere radius
@@ -121,7 +138,7 @@ public class LootFinder : MonoBehaviour
                 QueryTriggerInteraction.Ignore
             );
 
-            yield return null;
+            await UniTask.Yield(token);
 
             if (hits == 0)
             {
@@ -129,7 +146,7 @@ public class LootFinder : MonoBehaviour
                 {
                     _log.LogDebug("No loot in range");
                 }
-                yield break;
+                return;
             }
 
             // Sort colliders by distance
@@ -140,7 +157,7 @@ public class LootFinder : MonoBehaviour
                 _log.LogDebug($"Scan results: {hits}");
             }
 
-            yield return null;
+            await UniTask.Yield(token);
 
             int rangeCalculations = 0;
             const int maxRangeCalculations = 30;
@@ -154,6 +171,8 @@ public class LootFinder : MonoBehaviour
             // Process sorted colliders
             for (int i = 0; i < hits; i++)
             {
+                token.ThrowIfCancellationRequested();
+
                 var collider = colliders[i];
 
                 Item rootItem = null;
@@ -175,7 +194,7 @@ public class LootFinder : MonoBehaviour
                 {
                     rootItem = container.ItemOwner?.RootItem;
                     if (container.isActiveAndEnabled // Container is marked as active and enabled
-                        && container.DoorState != EDoorState.Locked) // Container is not locked)
+                        && container.DoorState is not EDoorState.Locked) // Container is not locked)
                     {
                         lootType = LootType.Container;
                     }
@@ -197,11 +216,11 @@ public class LootFinder : MonoBehaviour
                     }
                 }
 
-                yield return null;
+                await UniTask.Yield(token);
 
                 if (lootType is LootType.None || rootItem is null)
                 {
-                    yield return null;
+                    await UniTask.Yield(token);
 
                     continue;
                 }
@@ -209,7 +228,7 @@ public class LootFinder : MonoBehaviour
                 // If object has been ignored, skip to the next object detected
                 if (_lootingBrain.IsLootIgnored(rootItem.Id))
                 {
-                    yield return null;
+                    await UniTask.Yield(token);
 
                     continue;
                 }
@@ -218,7 +237,7 @@ public class LootFinder : MonoBehaviour
                 var center = new Vector3(bounds.center.x, bounds.center.y - bounds.extents.y - 0.4f, bounds.center.z);
                 var destination = GetDestination(center);
 
-                yield return null;
+                await UniTask.Yield(token);
 
                 // Check if loot is in range and sight
                 if (!IsLootInRange(lootType, destination, out float dist) || !IsLootInSight(lootType, destination))
@@ -243,15 +262,15 @@ public class LootFinder : MonoBehaviour
                         break;
                     }
 
-                    yield return null;
+                    await UniTask.Yield(token);
 
                     continue;
                 }
 
                 // Cache the loot and set active target
-                if (!ActiveLootCache.CacheActiveLootId(rootItem?.Id, _botOwner))
+                if (!ActiveLootCache.CacheActiveLootId(rootItem.Id, _botOwner))
                 {
-                    yield return null;
+                    await UniTask.Yield(token);
 
                     continue;
                 }
@@ -279,13 +298,14 @@ public class LootFinder : MonoBehaviour
 
             _colliderPool.Return(colliders, true);
             IsScanRunning = false;
+            _lootingBrain.ForceBrainEnabled = false;
         }
     }
 
     /**
     * Checks to see if any of the found lootable items are within their detection range specified in the mod settings.
     */
-    public bool IsLootInRange(LootType lootType, Vector3 destination, out float dist)
+    private bool IsLootInRange(LootType lootType, Vector3 destination, out float dist)
     {
         if (destination == Vector3.zero || _botOwner.Mover == null)
         {

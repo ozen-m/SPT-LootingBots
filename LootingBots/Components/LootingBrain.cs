@@ -1,5 +1,5 @@
-using System.Collections;
 using System.Diagnostics;
+using Cysharp.Threading.Tasks;
 using EFT;
 using EFT.Interactive;
 using EFT.InventoryLogic;
@@ -77,11 +77,11 @@ public class LootingBrain : MonoBehaviour
     }
 
     // Boolean showing when the looting coroutine is running
-    public bool LootTaskRunning;
+    public bool LootTaskRunning { get; private set; }
     public float DistanceToLoot = -1f;
 
     // Delay simulating the time it takes for the UI to open and start searching a container
-    public const int LootingStartDelay = 2500;
+    public const double LootingStartDelay = 2500D;
 
     // Interval for the performance check to disable the looting brain
     const float PeformanceTimerInterval = 3f;
@@ -117,6 +117,7 @@ public class LootingBrain : MonoBehaviour
     private bool _isDisabledForPerformance;
     private float _performanceTimer;
     private BotLog _log;
+    private CancellationTokenSource _lootingCts;
 
     public void Init(BotOwner botOwner)
     {
@@ -256,18 +257,52 @@ public class LootingBrain : MonoBehaviour
     */
     public void StartLooting()
     {
+        StopLooting();
+
+        LootTaskRunning = true;
+        _lootingCts = new CancellationTokenSource();
+
         switch (ActiveLootType)
         {
             case LootFinder.LootType.Corpse:
-                StartCoroutine(LootCorpse());
+                LootCorpseAsync(_lootingCts.Token).Forget(ExceptionHandler);
                 break;
             case LootFinder.LootType.Container:
-                StartCoroutine(LootContainer());
+                LootContainerAsync(_lootingCts.Token).Forget(ExceptionHandler);
                 break;
             case LootFinder.LootType.Item:
-                StartCoroutine(LootItem());
+                LootItemAsync(_lootingCts.Token).Forget(ExceptionHandler);
                 break;
         }
+    }
+
+    public void ExceptionHandler(Exception ex)
+    {
+        if (ex is OperationCanceledException)
+        {
+            if (_log.DebugEnabled)
+            {
+                _log.LogDebug("Looting interrupted");
+            }
+            return;
+        }
+        if (_log.ErrorEnabled)
+        {
+            _log.LogError("Exception while trying to loot:");
+            _log.LogError(ex.ToString());
+        }
+    }
+
+    public void StopLooting()
+    {
+        if (_lootingCts is null)
+        {
+            return;
+        }
+
+        _lootingCts.Cancel();
+        _lootingCts.Dispose();
+        _lootingCts = null;
     }
 
     private readonly Stopwatch _lootTimer = new();
@@ -276,13 +311,12 @@ public class LootingBrain : MonoBehaviour
     /**
     * Handles looting a corpse found on the map.
     */
-    public IEnumerator LootCorpse()
+    private async UniTask LootCorpseAsync(CancellationToken token)
     {
         var isSuccessful = false;
         try
         {
             _lootTimer.Restart();
-            LootTaskRunning = true;
 
             if (_log.InfoEnabled)
             {
@@ -296,27 +330,23 @@ public class LootingBrain : MonoBehaviour
                 {
                     _log.LogDebug($"ActiveLoot.Item for Corpse [{ActiveLoot.GetRootItem().Name.Localized()}] was not InventoryEquipment!");
                 }
-                yield break;
+                return;
             }
 
             // Get items to loot from the corpse in a priority order based off the slots
             _itemsToLoot.Clear();
-            LootUtils.GetPriorityItems(corpseInventoryEquipment, _itemsToLoot);
+            corpseInventoryEquipment.GetPriorityItems(_itemsToLoot);
 
-            Task delayTask = LootingTransactionController.SimulatePlayerDelay(LootingStartDelay);
-            yield return new WaitUntil(() => delayTask.IsCompleted);
+            await LootingTransactionController.SimulatePlayerDelayAsync(LootingStartDelay, token);
 
-            Task<bool> lootTask = InventoryController.TryAddItemsToBot(_itemsToLoot);
-            yield return new WaitUntil(() => lootTask.IsCompleted);
+            isSuccessful = await InventoryController.TryAddItemsToBotAsync(_itemsToLoot, token);
 
-            isSuccessful = lootTask.Result;
-
-            yield return new WaitUntil(() => !BotOwner.InventoryController.IsChangingWeapon);
-
-            InventoryController.UpdateActiveWeapon();
+            await UniTask.WaitWhile(BotOwner.InventoryController, static invCont => invCont.IsChangingWeapon, cancellationToken: token);
         }
         finally
         {
+            InventoryController.UpdateActiveWeapon();
+
             // Only ignore the corpse if looting was not interrupted
             CleanupLoot(isSuccessful);
             OnLootTaskEnd(isSuccessful);
@@ -331,13 +361,12 @@ public class LootingBrain : MonoBehaviour
     /**
     * Handles looting a container found on the map.
     */
-    public IEnumerator LootContainer()
+    private async UniTask LootContainerAsync(CancellationToken token)
     {
         var isSuccessful = false;
         try
         {
             _lootTimer.Restart();
-            LootTaskRunning = true;
 
             if (ActiveLoot is LootableContainer container && container.ItemOwner?.RootItem is { } item)
             {
@@ -352,7 +381,7 @@ public class LootingBrain : MonoBehaviour
                 {
                     _log.LogWarning("Tried to loot container but container is empty");
                 }
-                yield break;
+                return;
             }
 
             // If a container was closed, open it before looting
@@ -363,13 +392,9 @@ public class LootingBrain : MonoBehaviour
                 didOpen = true;
             }
 
-            Task delayTask = LootingTransactionController.SimulatePlayerDelay(LootingStartDelay);
-            yield return new WaitUntil(() => delayTask.IsCompleted);
+            await LootingTransactionController.SimulatePlayerDelayAsync(LootingStartDelay, token);
 
-            Task<bool> lootTask = InventoryController.LootNestedItems((SearchableItemItemClass) item);
-            yield return new WaitUntil(() => lootTask.IsCompleted);
-
-            isSuccessful = lootTask.Result;
+            isSuccessful = await InventoryController.LootNestedItemsAsync((SearchableItemItemClass) item, token);
 
             // Close the container if the settings to close containers is checked or if the container was already opened when the bot tried to loot it
             if (isSuccessful && (LootingBots.BotsAlwaysCloseContainers.Value || !didOpen))
@@ -377,12 +402,12 @@ public class LootingBrain : MonoBehaviour
                 LootUtils.InteractContainer(container, BotOwner, EInteractionType.Close, _log);
             }
 
-            yield return new WaitUntil(() => !BotOwner.InventoryController.IsChangingWeapon);
-            InventoryController.UpdateActiveWeapon();
-
+            await UniTask.WaitWhile(BotOwner.InventoryController, static invCont => invCont.IsChangingWeapon, cancellationToken: token);
         }
         finally
         {
+            InventoryController.UpdateActiveWeapon();
+
             // Only ignore the container if looting was not interrupted
             CleanupLoot(isSuccessful);
             OnLootTaskEnd(isSuccessful);
@@ -397,13 +422,12 @@ public class LootingBrain : MonoBehaviour
     /**
     * Handles looting a loose item found on the map.
     */
-    public IEnumerator LootItem()
+    public async UniTask LootItemAsync(CancellationToken token)
     {
         var isSuccessful = false;
         try
         {
             _lootTimer.Restart();
-            LootTaskRunning = true;
 
             var item = ActiveLoot.GetRootItem();
             if (item != null)
@@ -419,22 +443,20 @@ public class LootingBrain : MonoBehaviour
                 {
                     _log.LogWarning("Trying to pick up loose item but is NULL");
                 }
-                yield break;
+                return;
             }
 
             _itemsToLoot.Clear();
             _itemsToLoot.Add(item);
-            Task<bool> lootTask = InventoryController.TryAddItemsToBot(_itemsToLoot);
-            yield return new WaitUntil(() => lootTask.IsCompleted);
+            isSuccessful = await InventoryController.TryAddItemsToBotAsync(_itemsToLoot, token);
 
-            isSuccessful =  lootTask.Result;
-
-            yield return new WaitUntil(() => !BotOwner.InventoryController.IsChangingWeapon);
-            InventoryController.UpdateActiveWeapon();
+            await UniTask.WaitWhile(BotOwner.InventoryController, static invCont => invCont.IsChangingWeapon, cancellationToken: token);
 
         }
         finally
         {
+            InventoryController.UpdateActiveWeapon();
+
             // Need to manually cleanup item because the ItemOwner on the original object changes. Only ignore if looting was not interrupted
             CleanupLoot(isSuccessful);
             OnLootTaskEnd(isSuccessful);
@@ -499,23 +521,6 @@ public class LootingBrain : MonoBehaviour
     public void IgnoreLoot(string id)
     {
         IgnoredLootIds.Add(id);
-    }
-
-    /**
-    * Wrapper function to enable transactions to be executed by the InventoryController.
-    */
-    public void EnableTransactions()
-    {
-        InventoryController.EnableTransactions();
-    }
-
-    /**
-    * Wrapper function to disable the execution of transactions by the InventoryController.
-    */
-    public void DisableTransactions()
-    {
-        InventoryController.DisableTransactions();
-        Cleanup(false);
     }
 
     /**

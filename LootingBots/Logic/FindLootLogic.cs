@@ -9,7 +9,7 @@ internal class FindLootLogic : CustomLogic
 {
     private readonly LootingBrain _lootingBrain;
     private readonly LootFinder _lootFinder;
-    readonly BotLog _log;
+    private readonly BotLog _log;
 
     public FindLootLogic(BotOwner botOwner)
         : base(botOwner)
@@ -42,9 +42,8 @@ internal class FindLootLogic : CustomLogic
 
     public override void Stop()
     {
-        _lootFinder.IsScanRunning = false;
         _lootFinder.ResetScanTimer();
-        _lootFinder.StopAllCoroutines();
+        _lootFinder.StopFindLootTask();
         base.Stop();
     }
 }

@@ -173,7 +173,7 @@ public static class LootUtils
     /**
    *   Returns the list of slots to loot from a corpse in priority order. When a bot already has a backpack/rig, they will attempt to loot the weapons off the bot first. Otherwise they will loot the equipement first and loot the weapons afterwards.
    */
-    public static void GetPriorityItems(InventoryEquipment targetEquipment, List<Item> preallocatedList)
+    public static void GetPriorityItems(this InventoryEquipment targetEquipment, List<Item> preallocatedList)
     {
         bool hasBackpack = targetEquipment.GetSlot(EquipmentSlot.Backpack).ContainedItem != null;
         bool hasTacVest = targetEquipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem != null;
