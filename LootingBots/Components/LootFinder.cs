@@ -191,7 +191,7 @@ public class LootFinder : MonoBehaviour
                                 rootItem is ArmoredEquipmentItemClass armor
                                 && _lootingBrain.InventoryController.IsBetterArmorThanEquipped(armor)
                             )
-                            || (_lootingBrain.IsValuableEnough(rootItem) && availableGridSpaces > rootItem.GetItemSize())));
+                            || (_lootingBrain.IsValuableEnough(rootItem) && availableGridSpaces > rootItem.GetItemSize())))
                     {
                         lootType = LootType.Item;
                     }
