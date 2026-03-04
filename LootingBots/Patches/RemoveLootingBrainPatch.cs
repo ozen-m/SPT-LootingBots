@@ -4,30 +4,29 @@ using LootingBots.Components;
 using LootingBots.Utilities;
 using SPT.Reflection.Patching;
 
-namespace LootingBots.Patches
+namespace LootingBots.Patches;
+
+public class RemoveLootingBrainPatch : ModulePatch
 {
-    public class RemoveLootingBrainPatch : ModulePatch
+    protected override MethodBase GetTargetMethod()
     {
-        protected override MethodBase GetTargetMethod()
+        return typeof(BotOwner).GetMethod(nameof(BotOwner.Dispose), BindingFlags.Public | BindingFlags.Instance);
+    }
+
+    [PatchPrefix]
+    private static void PatchPrefix(BotOwner __instance)
+    {
+        if (__instance.GetPlayer.TryGetComponent<LootingBrain>(out var component))
         {
-            return typeof(BotOwner).GetMethod(nameof(BotOwner.Dispose), BindingFlags.Public | BindingFlags.Instance);
+            UnityEngine.Object.Destroy(component);
         }
 
-        [PatchPrefix]
-        private static void PatchPrefix(BotOwner __instance)
+        if (LootingBots.LootLog.DebugEnabled)
         {
-            if (__instance.GetPlayer.TryGetComponent<LootingBrain>(out var component))
-            {
-                UnityEngine.Object.Destroy(component);
-            }
-
-            if (LootingBots.LootLog.DebugEnabled)
-            {
-                LootingBots.LootLog.LogDebug("Cleanup on ActiveLootCache");
-            }
-
-            ActiveLootCache.Cleanup(__instance);
-            ActiveBotCache.Remove(__instance);
+            LootingBots.LootLog.LogDebug("Cleanup on ActiveLootCache");
         }
+
+        ActiveLootCache.Cleanup(__instance);
+        ActiveBotCache.Remove(__instance);
     }
 }

@@ -1,8 +1,7 @@
-﻿namespace LootingBots.Actions
+﻿namespace LootingBots.Actions;
+
+public class LootingEquipAction
 {
-    public class LootingEquipAction
-    {
-        public LootingSwapAction Swap { get; set; }
-        public LootingMoveAction Move { get; set; }
-    }
+    public LootingSwapAction Swap { get; set; }
+    public LootingMoveAction Move { get; set; }
 }

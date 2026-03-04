@@ -6,116 +6,115 @@ using LootingBots.Logic;
 using LootingBots.Utilities;
 using UnityEngine;
 
-namespace LootingBots
+namespace LootingBots;
+
+internal class LootingLayer : CustomLayer
 {
-    internal class LootingLayer : CustomLayer
+    private readonly LootingBrain _lootingBrain;
+    private readonly LootFinder _lootFinder;
+
+    public LootingLayer(BotOwner botOwner, int priority)
+        : base(botOwner, priority)
     {
-        private readonly LootingBrain _lootingBrain;
-        private readonly LootFinder _lootFinder;
+        LootingBrain lootingBrain = botOwner.GetPlayer.gameObject.AddComponent<LootingBrain>();
+        LootFinder lootFinder = botOwner.GetPlayer.gameObject.AddComponent<LootFinder>();
+        lootingBrain.Init(botOwner);
+        lootFinder.Init(botOwner);
 
-        public LootingLayer(BotOwner botOwner, int priority)
-            : base(botOwner, priority)
+        _lootingBrain = lootingBrain;
+        _lootFinder = lootFinder;
+    }
+
+    public override string GetName()
+    {
+        return "Looting";
+    }
+
+    public override bool IsActive()
+    {
+        bool isBotActive = BotOwner.BotState == EBotState.Active;
+        bool isNotHealing = !BotOwner.Medecine.FirstAid.Have2Do && !BotOwner.Medecine.SurgicalKit.HaveWork;
+        return isBotActive
+               && isNotHealing
+               && _lootingBrain.IsBrainEnabled
+               && (_lootFinder.IsScheduledScan || _lootingBrain.IsBotLooting);
+    }
+
+    public override void Start()
+    {
+        _lootingBrain.EnableTransactions();
+        _lootingBrain.UpdateGridStats();
+        BotOwner.PatrollingData.Pause();
+        base.Start();
+    }
+
+    public override void Stop()
+    {
+        _lootingBrain.DisableTransactions();
+        _lootingBrain.UpdateGridStats();
+        BotOwner.PatrollingData.Unpause();
+        base.Stop();
+    }
+
+    public override Action GetNextAction()
+    {
+        if (_lootingBrain.IsBotLooting)
         {
-            LootingBrain lootingBrain = botOwner.GetPlayer.gameObject.AddComponent<LootingBrain>();
-            LootFinder lootFinder = botOwner.GetPlayer.gameObject.AddComponent<LootFinder>();
-            lootingBrain.Init(botOwner);
-            lootFinder.Init(botOwner);
-
-            _lootingBrain = lootingBrain;
-            _lootFinder = lootFinder;
+            return new Action(typeof(LootingLogic), "Looting");
         }
 
-        public override string GetName()
+        if (_lootFinder.IsScheduledScan)
         {
-            return "Looting";
+            return new Action(typeof(FindLootLogic), "Loot Scan");
         }
 
-        public override bool IsActive()
+        return new Action(typeof(PeacefulLogic), "Peaceful");
+    }
+
+    public override bool IsCurrentActionEnding()
+    {
+        Type currentActionType = CurrentAction?.Type;
+
+        if (currentActionType == typeof(FindLootLogic))
         {
-            bool isBotActive = BotOwner.BotState == EBotState.Active;
-            bool isNotHealing = !BotOwner.Medecine.FirstAid.Have2Do && !BotOwner.Medecine.SurgicalKit.HaveWork;
-            return isBotActive
-                && isNotHealing
-                && _lootingBrain.IsBrainEnabled
-                && (_lootFinder.IsScheduledScan || _lootingBrain.IsBotLooting);
+            return !_lootFinder.IsScanRunning;
         }
 
-        public override void Start()
+        bool notLooting = !_lootingBrain.IsBotLooting;
+
+        if (currentActionType == typeof(LootingLogic) && notLooting)
         {
-            _lootingBrain.EnableTransactions();
-            _lootingBrain.UpdateGridStats();
-            BotOwner.PatrollingData.Pause();
-            base.Start();
+            // Reset scan timer once looting has completed
+            _lootFinder.ResetScanTimer();
         }
 
-        public override void Stop()
-        {
-            _lootingBrain.DisableTransactions();
-            _lootingBrain.UpdateGridStats();
-            BotOwner.PatrollingData.Unpause();
-            base.Stop();
-        }
+        return notLooting;
+    }
 
-        public override Action GetNextAction()
-        {
-            if (_lootingBrain.IsBotLooting)
-            {
-                return new Action(typeof(LootingLogic), "Looting");
-            }
+    public override void BuildDebugText(StringBuilder debugPanel)
+    {
+        string lootName = _lootingBrain.ActiveLoot != null ? _lootingBrain.ActiveLoot.GetRootItem()?.Name.Localized() : "-";
 
-            if (_lootFinder.IsScheduledScan)
-            {
-                return new Action(typeof(FindLootLogic), "Loot Scan");
-            }
+        debugPanel.AppendLine(
+            _lootingBrain.LootTaskRunning ? "Looting in progress..."
+            : _lootFinder.IsScanRunning ? "Scan in progress..."
+            : string.Empty,
+            Color.green
+        );
+        debugPanel.AppendLabeledValue($"Target Loot", $" {lootName} ({_lootingBrain.ActiveLootType.ToString()})", Color.yellow, Color.yellow);
 
-            return new Action(typeof(PeacefulLogic), "Peaceful");
-        }
+        debugPanel.AppendLabeledValue(
+            $"Distance to Loot",
+            $" {(_lootingBrain.ActiveLootType is LootFinder.LootType.None || _lootingBrain.DistanceToLoot == -1f ? "Calculating path..." : $"{Mathf.Sqrt(_lootingBrain.DistanceToLoot):0.##}m")}",
+            Color.grey,
+            Color.grey
+        );
 
-        public override bool IsCurrentActionEnding()
-        {
-            Type currentActionType = CurrentAction?.Type;
+        _lootingBrain.Stats.StatsDebugPanel(debugPanel);
+    }
 
-            if (currentActionType == typeof(FindLootLogic))
-            {
-                return !_lootFinder.IsScanRunning;
-            }
-
-            bool notLooting = !_lootingBrain.IsBotLooting;
-
-            if (currentActionType == typeof(LootingLogic) && notLooting)
-            {
-                // Reset scan timer once looting has completed
-                _lootFinder.ResetScanTimer();
-            }
-
-            return notLooting;
-        }
-
-        public override void BuildDebugText(StringBuilder debugPanel)
-        {
-            string lootName = _lootingBrain.ActiveLoot != null ? _lootingBrain.ActiveLoot.GetRootItem()?.Name.Localized() : "-";
-
-            debugPanel.AppendLine(
-                _lootingBrain.LootTaskRunning ? "Looting in progress..."
-                    : _lootFinder.IsScanRunning ? "Scan in progress..."
-                    : string.Empty,
-                Color.green
-            );
-            debugPanel.AppendLabeledValue($"Target Loot", $" {lootName} ({_lootingBrain.ActiveLootType.ToString()})", Color.yellow, Color.yellow);
-
-            debugPanel.AppendLabeledValue(
-                $"Distance to Loot",
-                $" {(_lootingBrain.ActiveLootType is LootFinder.LootType.None || _lootingBrain.DistanceToLoot == -1f ? "Calculating path..." : $"{Mathf.Sqrt(_lootingBrain.DistanceToLoot):0.##}m")}",
-                Color.grey,
-                Color.grey
-            );
-
-            _lootingBrain.Stats.StatsDebugPanel(debugPanel);
-        }
-
-        public bool EndLooting()
-        {
-            return _lootingBrain.ActiveLoot == null;
-        }
+    public bool EndLooting()
+    {
+        return _lootingBrain.ActiveLoot == null;
     }
 }
