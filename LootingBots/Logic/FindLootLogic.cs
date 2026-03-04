@@ -24,7 +24,7 @@ namespace LootingBots.Logic
             if (!_lootingBrain.HasFreeSpace)
             {
                 // Need to disable LockUntilNextScan if the bot has no free space to prevent an infinite looting loop
-                _lootFinder.LockUntilNextScan = false;
+                _lootFinder.SetLockUntilNextScan(false);
 
                 return;
             }

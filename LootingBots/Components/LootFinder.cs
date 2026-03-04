@@ -11,32 +11,34 @@ namespace LootingBots.Components
 {
     public class LootFinder : MonoBehaviour
     {
-        LootingBrain _lootingBrain;
-        BotOwner _botOwner;
-        BotLog _log;
-        public float ScanTimer;
-        public bool LockUntilNextScan;
-        public int EmptyAttempts;
+        private static readonly ArrayPool<Collider> _colliderPool = ArrayPool<Collider>.Shared;
 
-        // TODO: Add config
+        private LootingBrain _lootingBrain;
+        private BotOwner _botOwner;
+        private BotLog _log;
+
+        private float _scanTimer;
+        private bool _lockUntilNextScan;
+
         private const int MaxEmptyAttempts = 3;
         private const float EmptyAttemptsCooldown = 180f;
-        private static readonly ArrayPool<Collider> ColliderPool = ArrayPool<Collider>.Shared;
+        private int _emptyAttempts;
+        // TODO: Add config
 
         public bool IsScheduledScan
         {
-            get { return ScanTimer < Time.time; }
+            get { return _scanTimer < Time.time; }
         }
 
-        private float DetectCorpseDistance
+        private static float DetectCorpseDistance
         {
             get { return LootingBots.DetectCorpseDistance.Value; }
         }
-        private float DetectContainerDistance
+        private static float DetectContainerDistance
         {
             get { return LootingBots.DetectContainerDistance.Value; }
         }
-        private float DetectItemDistance
+        private static float DetectItemDistance
         {
             get { return LootingBots.DetectItemDistance.Value; }
         }
@@ -53,7 +55,7 @@ namespace LootingBots.Components
 
         public void Init(BotOwner botOwner)
         {
-            ScanTimer = Time.time + LootingBots.InitialStartTimer.Value;
+            _scanTimer = Time.time + LootingBots.InitialStartTimer.Value;
             _botOwner = botOwner;
             _lootingBrain = _botOwner.GetPlayer.gameObject.GetComponent<LootingBrain>();
             _log = new BotLog(LootingBots.LootLog, _botOwner);
@@ -62,9 +64,9 @@ namespace LootingBots.Components
         public void ResetScanTimer()
         {
             // If the loot finder is locked, do not reset it
-            if (!LockUntilNextScan)
+            if (!_lockUntilNextScan)
             {
-                ScanTimer = Time.time + LootingBots.LootScanInterval.Value;
+                _scanTimer = Time.time + LootingBots.LootScanInterval.Value;
             }
         }
 
@@ -72,27 +74,27 @@ namespace LootingBots.Components
         {
             IsScanRunning = true;
             StartCoroutine(FindLootCoroutine());
-            LockUntilNextScan = false;
+            SetLockUntilNextScan(false);
         }
 
         public void ForceScan()
         {
-            ScanTimer = Time.time - 1f;
-            LockUntilNextScan = true;
+            _scanTimer = Time.time - 1f;
+            SetLockUntilNextScan(true);
             _lootingBrain.ForceBrainEnabled = true;
         }
 
         public void OverrideNextScanTime(float scanTime)
         {
-            ScanTimer = Time.time + scanTime;
-            LockUntilNextScan = true;
+            _scanTimer = Time.time + scanTime;
+            SetLockUntilNextScan(true);
         }
 
         public IEnumerator FindLootCoroutine()
         {
             IsScanRunning = true;
 
-            Collider[] colliders = ColliderPool.Rent(3000);
+            Collider[] colliders = _colliderPool.Rent(3000);
 
             try
             {
@@ -257,23 +259,23 @@ namespace LootingBots.Components
                     _lootingBrain.LootObjectPosition = interactableObject.transform.position;
                     _lootingBrain.SetLoot(interactableObject, lootType);
 
-                    EmptyAttempts = 0;
+                    _emptyAttempts = 0;
                     break;
                 }
             }
             finally
             {
-                if (!_lootingBrain.HasActiveLootable && ++EmptyAttempts > MaxEmptyAttempts)
+                if (!_lootingBrain.HasActiveLootable && ++_emptyAttempts > MaxEmptyAttempts)
                 {
                     if (_log.DebugEnabled)
                     {
                         _log.LogDebug($"Max empty attempts reached, preventing looting for {EmptyAttemptsCooldown}s");
                     }
                     OverrideNextScanTime(EmptyAttemptsCooldown);
-                    EmptyAttempts = 0;
+                    _emptyAttempts = 0;
                 }
 
-                ColliderPool.Return(colliders, true);
+                _colliderPool.Return(colliders, true);
                 IsScanRunning = false;
             }
         }
@@ -360,6 +362,11 @@ namespace LootingBots.Components
             }
 
             return destination;
+        }
+
+        public void SetLockUntilNextScan(bool value)
+        {
+            _lockUntilNextScan = value;
         }
     }
 }
