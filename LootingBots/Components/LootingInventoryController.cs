@@ -340,7 +340,7 @@ public class LootingInventoryController
                 var itemName = item.Name.Localized();
                 if (_log.InfoEnabled)
                 {
-                    _log.LogInfo($"Loot found: {itemName} ({CurrentItemPrice}₽)");
+                    _log.LogInfo($"Loot found: {itemName} ({CurrentItemPrice:N0}₽)");
                 }
 
                 // Ignore magazines that a bot cannot actively use
@@ -363,11 +363,6 @@ public class LootingInventoryController
                 }
                 if (action.Move != null)
                 {
-                    if (_log.WarningEnabled)
-                    {
-                        _log.LogWarning($"Moving {action.Move.ToMove.Name.Localized()} to: {action.Move.Place.Container.ID.Localized()}");
-                    }
-
                     if (await _transactionController.MoveItemAsync(action.Move, token))
                     {
                         Stats.AddNetValue(CurrentItemPrice);
@@ -419,13 +414,21 @@ public class LootingInventoryController
                             }
                         }
                     }
-
-                    // Call TryAddItemsToBot with the filtered items
-                    bool success = await TryAddItemsToBotAsync(itemsToAdd, token);
-                    if (!success)
+                    if (itemsToAdd.Count > 0)
                     {
-                        return success;
+                        if (_log.DebugEnabled)
+                        {
+                            _log.LogDebug($"Trying to strip attachments of weapon: {weapon.Name.Localized()}");
+                        }
+
+                        // Call TryAddItemsToBot with the filtered items
+                        bool success = await TryAddItemsToBotAsync(itemsToAdd, token);
+                        if (!success)
+                        {
+                            return success;
+                        }
                     }
+
                 }
             }
             else if (_log.DebugEnabled)

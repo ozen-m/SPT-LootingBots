@@ -143,7 +143,7 @@ internal class LootingLogic : CustomLogic
             _navigationAttempts++;
 
             // TODO: Check lootable names
-            string lootableName = _lootingBrain.ActiveLoot.GetRootItem()?.Name.Localized() ?? "NULL";
+            string lootableName = _lootingBrain.ActiveLoot.GetLootName();
 
             // If the bot has not been stuck for more than 2 navigation checks, attempt to navigate to the lootable otherwise ignore the container forever
             bool isBotStuck = _stuckCount > 1;

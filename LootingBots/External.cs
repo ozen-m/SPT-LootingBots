@@ -89,7 +89,7 @@ public static class External
 
             if (log.DebugEnabled)
             {
-                log.LogDebug($"Getting Net Loot Value for {bot.name} which is {lootingBrain.Stats.NetLootValue}");
+                log.LogDebug($"Getting Net Loot Value for {bot.name} which is {lootingBrain.Stats.NetLootValue:N0}");
             }
 
             return lootingBrain.Stats.NetLootValue;

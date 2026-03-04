@@ -100,9 +100,9 @@ public class LootingTransactionController(InventoryController inventoryControlle
         var ableToEquip = inventoryController.FindSlotToPickUp(item);
         if (ableToEquip == null)
         {
-            if (log.WarningEnabled)
+            if (log.DebugEnabled)
             {
-                log.LogWarning($"Could not find a place to equip: {item.Name.Localized()}");
+                log.LogDebug($"Could not find a place to equip: {item.Name.Localized()}");
             }
             return UniTask.FromResult(false);
         }
@@ -171,9 +171,9 @@ public class LootingTransactionController(InventoryController inventoryControlle
         //     //AddExtraAmmo(weapon);
         // }
 
-        if (log.DebugEnabled)
+        if (log.WarningEnabled)
         {
-            log.LogDebug($"Moving item to: {moveAction.Place.Container.ID.Localized()}");
+            log.LogWarning($"Moving {moveAction.ToMove.Name.Localized()} to: {moveAction.Place.Container.ID.Localized()}...");
         }
 
         var moveActionResult = InteractionsHandlerClass.Move(moveAction.ToMove, moveAction.Place, inventoryController, true);
@@ -195,6 +195,11 @@ public class LootingTransactionController(InventoryController inventoryControlle
                 log.LogError($"Failed to move {moveAction.ToMove.Name.Localized()} to {moveAction.Place.Container.ID.Localized()}. Network Error: {moveActionNetworkResult.Error}");
             }
             return false;
+        }
+
+        if (log.DebugEnabled)
+        {
+            log.LogDebug($"Moving {moveAction.ToMove.Name.Localized()} to: {moveAction.Place.Container.ID.Localized()}...done");
         }
 
         if (moveAction.Callback != null)
@@ -223,9 +228,9 @@ public class LootingTransactionController(InventoryController inventoryControlle
             return false;
         }
 
-        if (log.DebugEnabled)
+        if (log.WarningEnabled)
         {
-            log.LogDebug($"Merging {moveAction.ToMove.Name?.Localized()} (Stack Size: {moveAction.ToMove.StackObjectsCount}) with: {moveAction.ToItem.Name.Localized()} (Stack Size: {moveAction.ToItem.StackObjectsCount})" );
+            log.LogWarning($"Merging {moveAction.ToMove.Name?.Localized()} (Stack Size: {moveAction.ToMove.StackObjectsCount}) with: {moveAction.ToItem.Name.Localized()} (Stack Size: {moveAction.ToItem.StackObjectsCount})...");
         }
 
         var mergeResult = InteractionsHandlerClass.Merge(moveAction.ToMove, moveAction.ToItem, inventoryController, true);
@@ -247,6 +252,11 @@ public class LootingTransactionController(InventoryController inventoryControlle
                 log.LogError($"Failed to merge {moveAction.ToMove.Name.Localized()} (Stack Size: {moveAction.ToMove.StackObjectsCount}) with: {moveAction.ToItem.Name.Localized()} (Stack Size: {moveAction.ToItem.StackObjectsCount}). Network Error: {mergeNetworkResult.Error}" );
             }
             return false;
+        }
+
+        if (log.DebugEnabled)
+        {
+            log.LogDebug($"Merging {moveAction.ToMove.Name?.Localized()} (Stack Size: {moveAction.ToMove.StackObjectsCount}) with: {moveAction.ToItem.Name.Localized()} (Stack Size: {moveAction.ToItem.StackObjectsCount})...done");
         }
 
         if (moveAction.Callback != null)
@@ -272,7 +282,7 @@ public class LootingTransactionController(InventoryController inventoryControlle
         var toThrow = swapAction.ToThrow;
         if (log.WarningEnabled)
         {
-            log.LogWarning($"Throwing item: {toThrow.Name.Localized()}");
+            log.LogWarning($"Throwing item: {toThrow.Name.Localized()}...");
         }
 
         await SimulatePlayerDelayAsync(token: token);
@@ -298,6 +308,11 @@ public class LootingTransactionController(InventoryController inventoryControlle
             return false;
         }
 
+        if (log.DebugEnabled)
+        {
+            log.LogDebug($"Throwing item: {toThrow.Name.Localized()}...done");
+        }
+
         if (swapAction.OnComplete != null)
         {
             await swapAction.OnComplete(token);
@@ -313,7 +328,7 @@ public class LootingTransactionController(InventoryController inventoryControlle
 
     public static UniTask SimulatePlayerDelayAsync(double delay = -1f, CancellationToken token = default)
     {
-        if (delay == -1f)
+        if (delay == -1D)
         {
             delay = LootingBots.TransactionDelay.Value;
         }

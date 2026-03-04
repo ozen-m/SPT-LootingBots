@@ -241,4 +241,15 @@ public static class LootUtils
             _ => null
         };
     }
+
+    public static string GetLootName(this InteractableObject interactableObject)
+    {
+        return interactableObject switch
+        {
+            LootableContainer container => container.ItemOwner?.RootItem.Name.Localized(),
+            Corpse corpse => corpse.name,
+            LootItem lootItem => lootItem.ItemOwner?.RootItem.Name.Localized(),
+            _ => "-"
+        };
+    }
 }

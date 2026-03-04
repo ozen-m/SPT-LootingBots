@@ -262,6 +262,11 @@ public class LootingBrain : MonoBehaviour
         LootTaskRunning = true;
         _lootingCts = new CancellationTokenSource();
 
+        if (_log.InfoEnabled)
+        {
+            _log.LogInfo($"Trying to loot {ActiveLoot.GetLootName()} [{ActiveLootType.ToString()}]. Net Worth: {Stats.NetLootValue:N0}");
+        }
+
         switch (ActiveLootType)
         {
             case LootFinder.LootType.Corpse:
@@ -318,17 +323,12 @@ public class LootingBrain : MonoBehaviour
         {
             _lootTimer.Restart();
 
-            if (_log.InfoEnabled)
-            {
-                _log.LogInfo("Trying to loot corpse");
-            }
-
             // Initialize corpse inventory equipment
             if (ActiveLoot.GetRootItem() is not InventoryEquipment corpseInventoryEquipment)
             {
                 if (_log.DebugEnabled)
                 {
-                    _log.LogDebug($"ActiveLoot.Item for Corpse [{ActiveLoot.GetRootItem().Name.Localized()}] was not InventoryEquipment!");
+                    _log.LogDebug($"ActiveLoot.Item for Corpse [{ActiveLoot.GetLootName()}] was not InventoryEquipment!");
                 }
                 return;
             }
@@ -353,7 +353,7 @@ public class LootingBrain : MonoBehaviour
 
             if (_log.DebugEnabled)
             {
-                _log.LogDebug($"Corpse loot time: {_lootTimer.ElapsedMilliseconds / 1000f}s. Net Worth: {Stats.NetLootValue}. Was successful: {isSuccessful}");
+                _log.LogDebug($"Corpse loot time: {_lootTimer.ElapsedMilliseconds / 1000f}s. Net Worth: {Stats.NetLootValue:N0}. Was successful: {isSuccessful}");
             }
         }
     }
@@ -368,14 +368,7 @@ public class LootingBrain : MonoBehaviour
         {
             _lootTimer.Restart();
 
-            if (ActiveLoot is LootableContainer container && container.ItemOwner?.RootItem is { } item)
-            {
-                if (_log.DebugEnabled)
-                {
-                    _log.LogDebug($"Trying to loot container: {item.Name.Localized()}");
-                }
-            }
-            else
+            if (ActiveLoot is not LootableContainer container || container.ItemOwner?.RootItem is not { } item)
             {
                 if (_log.WarningEnabled)
                 {
@@ -414,7 +407,7 @@ public class LootingBrain : MonoBehaviour
 
             if (_log.DebugEnabled)
             {
-                _log.LogDebug($"Container loot time: {_lootTimer.ElapsedMilliseconds / 1000f}s. Net Worth: {Stats.NetLootValue}. Was successful: {isSuccessful}");
+                _log.LogDebug($"Container loot time: {_lootTimer.ElapsedMilliseconds / 1000f}s. Net Worth: {Stats.NetLootValue:N0}. Was successful: {isSuccessful}");
             }
         }
     }
@@ -430,14 +423,7 @@ public class LootingBrain : MonoBehaviour
             _lootTimer.Restart();
 
             var item = ActiveLoot.GetRootItem();
-            if (item != null)
-            {
-                if (_log.DebugEnabled)
-                {
-                    _log.LogDebug($"Trying to pick up loose item: {item.Name.Localized()}");
-                }
-            }
-            else
+            if (item == null)
             {
                 if (_log.WarningEnabled)
                 {
@@ -463,7 +449,7 @@ public class LootingBrain : MonoBehaviour
 
             if (_log.DebugEnabled)
             {
-                _log.LogDebug($"Loose item loot time: {_lootTimer.ElapsedMilliseconds / 1000f}s. Net Worth: {Stats.NetLootValue}. Was successful: {isSuccessful}");
+                _log.LogDebug($"Loose item loot time: {_lootTimer.ElapsedMilliseconds / 1000f}s. Net Worth: {Stats.NetLootValue:N0}. Was successful: {isSuccessful}");
             }
         }
     }

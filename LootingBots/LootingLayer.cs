@@ -92,7 +92,7 @@ internal class LootingLayer : CustomLayer
 
     public override void BuildDebugText(StringBuilder debugPanel)
     {
-        string lootName = _lootingBrain.ActiveLoot != null ? _lootingBrain.ActiveLoot.GetRootItem()?.Name.Localized() : "-";
+        string lootName = _lootingBrain.ActiveLoot != null ? _lootingBrain.ActiveLoot.GetLootName() : "-";
 
         debugPanel.AppendLine(
             _lootingBrain.LootTaskRunning ? "Looting in progress..."
