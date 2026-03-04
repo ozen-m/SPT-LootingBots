@@ -6,6 +6,7 @@
     <LangVersion>preview</LangVersion>
     <RootNamespace>LootingBots</RootNamespace>
     <AssemblyName>skwizzy.LootingBots</AssemblyName>
+    <Version>1.6.4</Version>
     <ReleaseOutputDir>..\Build\BepInEx\plugins\</ReleaseOutputDir>
   </PropertyGroup>
   <ItemGroup>

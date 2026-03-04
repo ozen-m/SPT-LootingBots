@@ -161,5 +161,20 @@ namespace LootingBots.Utilities
             };
             return bosses.Contains(wildSpawnType);
         }
+
+        /**
+        * Determines if the bot with the given profile will be a player Scav
+        */
+        public static bool WillBeAPlayerScav(this Profile profile)
+        {
+            // Handle the old version of creating player Scavs
+            if (profile.Info.Nickname.Contains(" ("))
+            {
+                return true;
+            }
+
+            // Check for player Scavs created by SPT
+            return profile.Info.Settings.Role == WildSpawnType.assault && !string.IsNullOrEmpty(profile.Info.MainProfileNickname);
+        }
     }
 }

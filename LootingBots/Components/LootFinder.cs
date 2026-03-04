@@ -41,11 +41,12 @@ namespace LootingBots.Components
             get { return LootingBots.DetectItemDistance.Value; }
         }
 
-        public enum LootType
+        public enum LootType : byte
         {
-            Corpse = 0,
-            Container = 1,
-            Item = 2,
+            None = 0,
+            Corpse = 1,
+            Container = 2,
+            Item = 3,
         }
 
         public bool IsScanRunning;
@@ -95,6 +96,15 @@ namespace LootingBots.Components
 
             try
             {
+                if (_botOwner == null)
+                {
+                    if (_log.DebugEnabled)
+                    {
+                        _log.LogDebug("BotOwner is NULL, cannot start scan!");
+                    }
+                    yield break;
+                }
+
                 // Use the largest detection radius specified in the settings as the main Sphere radius
                 float detectionRadius = Mathf.Max(DetectItemDistance, DetectContainerDistance);
                 detectionRadius = Mathf.Max(detectionRadius, DetectCorpseDistance);
@@ -131,76 +141,72 @@ namespace LootingBots.Components
                 yield return null;
 
                 int rangeCalculations = 0;
-                const int maxRangeCalculations = 3;
+                const int maxRangeCalculations = 30;
 
                 // Cache these values to avoid repeated property access
                 var containerLootingEnabled = LootingBots.ContainerLootingEnabled.Value.IsBotEnabled(_lootingBrain);
                 var itemLootingEnabled = LootingBots.LooseItemLootingEnabled.Value.IsBotEnabled(_lootingBrain);
                 var corpseLootingEnabled = LootingBots.CorpseLootingEnabled.Value.IsBotEnabled(_lootingBrain);
                 var availableGridSpaces = _lootingBrain.Stats.AvailableGridSpaces;
-                var botName = _botOwner.name;
 
                 // Process sorted colliders
                 for (int i = 0; i < hits; i++)
                 {
                     var collider = colliders[i];
 
-                    if (collider == null || string.IsNullOrEmpty(botName))
-                    {
-                        yield return null;
-                        continue;
-                    }
-
-                    // Get components once and reuse
-                    var container = collider.gameObject.GetComponentInParent<LootableContainer>();
-                    var lootItem = collider.gameObject.GetComponentInParent<LootItem>();
-                    var corpse = collider.gameObject.GetComponentInParent<Player>();
                     Item rootItem = null;
-                    if (container != null)
+                    LootType lootType = LootType.None;
+
+                    // Get InteractableObject once and check derived type
+                    var interactableObject = collider.gameObject.GetComponentInParent<InteractableObject>();
+                    if (corpseLootingEnabled && interactableObject is Corpse corpse)
+                    {
+                        if (corpse.ItemOwner?.RootItem is InventoryEquipment equipment)
+                        {
+                            rootItem = equipment;
+                            lootType = LootType.Corpse;
+                        }
+                    }
+                    else if (containerLootingEnabled && interactableObject is LootableContainer container)
                     {
                         rootItem = container.ItemOwner?.RootItem;
+                        if (container.isActiveAndEnabled // Container is marked as active and enabled
+                            && container.DoorState != EDoorState.Locked) // Container is not locked)
+                        {
+                            lootType = LootType.Container;
+                        }
                     }
-                    else if (lootItem != null)
+                    else if (itemLootingEnabled && interactableObject is LootItem lootItem && lootItem is not Corpse)
                     {
                         rootItem = lootItem.ItemOwner?.RootItem;
+                        if (rootItem is not null
+                            && !rootItem.QuestItem // Item is not a quest item
+                            && (
+                                rootItem is SearchableItemItemClass // If the item is something that can be searched, consider it lootable
+                                || (
+                                    rootItem is ArmoredEquipmentItemClass armor
+                                    && _lootingBrain.InventoryController.IsBetterArmorThanEquipped(armor)
+                                )
+                                || (_lootingBrain.IsValuableEnough(rootItem) && availableGridSpaces > rootItem.GetItemSize())));
+                        {
+                            lootType = LootType.Item;
+                        }
+                    }
+
+                    yield return null;
+
+                    if (lootType is LootType.None || rootItem is null)
+                    {
+                        yield return null;
+
+                        continue;
                     }
 
                     // If object has been ignored, skip to the next object detected
-                    if (_lootingBrain.IsLootIgnored(rootItem?.Id))
+                    if (_lootingBrain.IsLootIgnored(rootItem.Id))
                     {
                         yield return null;
-                        continue;
-                    }
 
-                    bool canLootContainer =
-                        containerLootingEnabled
-                        && container != null // Container exists
-                        && container.isActiveAndEnabled // Container is marked as active and enabled
-                        && container.DoorState != EDoorState.Locked; // Container is not locked
-
-                    bool canLootItem =
-                        itemLootingEnabled
-                        && lootItem != null
-                        && lootItem is not Corpse // Item is not a corpse
-                        && rootItem is not null
-                        && !rootItem.QuestItem // Item is not a quest item
-                        && (
-                            rootItem is SearchableItemItemClass // If the item is something that can be searched, consider it lootable
-                            || (
-                                rootItem is ArmoredEquipmentItemClass armor
-                                && _lootingBrain.InventoryController.IsBetterArmorThanEquipped(armor)
-                            )
-                            || (_lootingBrain.IsValuableEnough(rootItem) && availableGridSpaces > rootItem.GetItemSize())
-                        );
-
-                    bool canLootCorpse =
-                        corpseLootingEnabled
-                        && corpse != null // Corpse exists
-                        && corpse.GetPlayer != null; // Corpse is a bot corpse and not a static "Dead scav" corpse
-
-                    if (!(canLootContainer || canLootItem || canLootCorpse))
-                    {
-                        yield return null;
                         continue;
                     }
 
@@ -208,10 +214,7 @@ namespace LootingBots.Components
                     var center = new Vector3(bounds.center.x, bounds.center.y - bounds.extents.y - 0.4f, bounds.center.z);
                     var destination = GetDestination(center);
 
-                    LootType lootType =
-                        container != null ? LootType.Container
-                        : lootItem != null ? LootType.Item
-                        : LootType.Corpse;
+                    yield return null;
 
                     // Check if loot is in range and sight
                     if (!IsLootInRange(lootType, destination, out float dist) || !IsLootInSight(lootType, destination))
@@ -225,7 +228,19 @@ namespace LootingBots.Components
 
                             break;
                         }
+
+                        if (dist == -1f && _botOwner.Mover == null)
+                        {
+                            if (_log.DebugEnabled)
+                            {
+                                _log.LogDebug("Mover was null, stopping search");
+                            }
+
+                            break;
+                        }
+
                         yield return null;
+
                         continue;
                     }
 
@@ -233,27 +248,14 @@ namespace LootingBots.Components
                     if (!ActiveLootCache.CacheActiveLootId(rootItem?.Id, _botOwner))
                     {
                         yield return null;
+
                         continue;
                     }
 
                     _lootingBrain.DistanceToLoot = dist;
                     _lootingBrain.Destination = destination;
-
-                    if (canLootContainer)
-                    {
-                        _lootingBrain.ActiveContainer = container;
-                        _lootingBrain.LootObjectPosition = container.transform.position;
-                    }
-                    else if (canLootCorpse)
-                    {
-                        _lootingBrain.ActiveCorpse = corpse;
-                        _lootingBrain.LootObjectPosition = corpse.Transform.position;
-                    }
-                    else
-                    {
-                        _lootingBrain.ActiveItem = lootItem;
-                        _lootingBrain.LootObjectPosition = lootItem.transform.position;
-                    }
+                    _lootingBrain.LootObjectPosition = interactableObject.transform.position;
+                    _lootingBrain.SetLoot(interactableObject, lootType);
 
                     EmptyAttempts = 0;
                     break;
@@ -281,10 +283,6 @@ namespace LootingBots.Components
         */
         public bool IsLootInRange(LootType lootType, Vector3 destination, out float dist)
         {
-            bool isContainer = lootType == LootType.Container;
-            bool isItem = lootType == LootType.Item;
-            bool isCorpse = lootType == LootType.Corpse;
-
             if (destination == Vector3.zero || _botOwner.Mover == null)
             {
                 if (_botOwner.Mover == null && _log.WarningEnabled)
@@ -296,22 +294,25 @@ namespace LootingBots.Components
             }
 
             dist = _botOwner.Mover.ComputePathLengthToPoint(destination);
-            return (isContainer && dist <= DetectContainerDistance)
-                || (isItem && dist <= DetectItemDistance)
-                || (isCorpse && dist <= DetectCorpseDistance);
+            return lootType switch
+            {
+                LootType.Corpse => dist <= DetectCorpseDistance,
+                LootType.Container => dist <= DetectContainerDistance,
+                LootType.Item => dist <= DetectItemDistance,
+                _ => throw new ArgumentOutOfRangeException(nameof(lootType), lootType, null)
+            };
         }
 
         public bool IsLootInSight(LootType lootType, Vector3 destination)
         {
-            bool isContainer = lootType == LootType.Container;
-            bool isItem = lootType == LootType.Item;
-            bool isCorpse = lootType == LootType.Corpse;
-
-            if (
-                !LootingBots.DetectContainerNeedsSight.Value && isContainer
-                || !LootingBots.DetectItemNeedsSight.Value && isItem
-                || !LootingBots.DetectCorpseNeedsSight.Value && isCorpse
-            )
+            var needsSight = lootType switch
+            {
+                LootType.Corpse => LootingBots.DetectCorpseNeedsSight.Value,
+                LootType.Container => LootingBots.DetectContainerNeedsSight.Value,
+                LootType.Item => LootingBots.DetectItemNeedsSight.Value,
+                _ => throw new ArgumentOutOfRangeException(nameof(lootType), lootType, null)
+            };
+            if (!needsSight)
             {
                 return true;
             }

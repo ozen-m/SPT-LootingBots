@@ -7,9 +7,9 @@ namespace LootingBots.Utilities
 {
     public static class LootUtils
     {
-        public static LayerMask LowPolyMask = LayerMask.GetMask(["LowPolyCollider"]);
-        public static LayerMask LootMask = LayerMask.GetMask(["Interactive", "Loot", "Deadbody"]);
-        public static int RESERVED_SLOT_COUNT = 2;
+        public const int RESERVED_SLOT_COUNT = 2;
+        public static readonly LayerMask LowPolyMask = LayerMask.GetMask(["LowPolyCollider"]);
+        public static readonly LayerMask LootMask = LayerMask.GetMask(["Interactive", "Loot", "Deadbody"]);
 
         private static readonly EquipmentSlot[] WeaponSlots =
         [
@@ -169,32 +169,33 @@ namespace LootingBots.Utilities
             return mergeTarget;
         }
 
+        private static readonly List<EquipmentSlot> _prioritySlotsScratch = new(13);
         /**
        *   Returns the list of slots to loot from a corpse in priority order. When a bot already has a backpack/rig, they will attempt to loot the weapons off the bot first. Otherwise they will loot the equipement first and loot the weapons afterwards.
        */
-        public static IEnumerable<Slot> GetPrioritySlots(InventoryController targetInventory)
+        public static void GetPriorityItems(InventoryEquipment targetEquipment, List<Item> preallocatedList)
         {
-            var equipment = targetInventory.Inventory.Equipment;
-            bool hasBackpack = equipment.GetSlot(EquipmentSlot.Backpack).ContainedItem != null;
-            bool hasTacVest = equipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem != null;
+            bool hasBackpack = targetEquipment.GetSlot(EquipmentSlot.Backpack).ContainedItem != null;
+            bool hasTacVest = targetEquipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem != null;
 
-            var prioritySlots = new List<EquipmentSlot>(13);
+            _prioritySlotsScratch.Clear();
 
             // Add slots in priority order
             if (hasBackpack || hasTacVest)
             {
-                AddUnlockedSlots(equipment, prioritySlots, WeaponSlots);
-                AddUnlockedSlots(equipment, prioritySlots, StorageSlots);
+                AddUnlockedSlots(targetEquipment, _prioritySlotsScratch, WeaponSlots);
+                AddUnlockedSlots(targetEquipment, _prioritySlotsScratch, StorageSlots);
             }
             else
             {
-                AddUnlockedSlots(equipment, prioritySlots, StorageSlots);
-                AddUnlockedSlots(equipment, prioritySlots, WeaponSlots);
+                AddUnlockedSlots(targetEquipment, _prioritySlotsScratch, StorageSlots);
+                AddUnlockedSlots(targetEquipment, _prioritySlotsScratch, WeaponSlots);
             }
 
-            AddUnlockedSlots(equipment, prioritySlots, OtherSlots);
+            AddUnlockedSlots(targetEquipment, _prioritySlotsScratch, OtherSlots);
 
-            return equipment.GetSlotsByName(prioritySlots);
+            preallocatedList.Clear();
+            targetEquipment.GetItemInSlotsNonAlloc(_prioritySlotsScratch, preallocatedList);
         }
 
         private static void AddUnlockedSlots(InventoryEquipment equipment, List<EquipmentSlot> targetList, EquipmentSlot[] slots)
@@ -208,30 +209,37 @@ namespace LootingBots.Utilities
             }
         }
 
-        /** Given a LootItemClass that has slots, return any items that are listed in slots flagged as "Locked" */
-        public static IEnumerable<Item> GetAllLockedItems(CompoundItem itemWithSlots)
+        private static void GetItemInSlotsNonAlloc(this InventoryEquipment equipment, List<EquipmentSlot> slotNames, List<Item> preallocatedList)
         {
-            List<Item> resultItems = [];
-
-            if (itemWithSlots.Slots == null)
+            foreach (EquipmentSlot slotName in slotNames)
             {
-                return resultItems;
-            }
-
-            // Iterate over each slot in Slots
-            foreach (Slot slot in itemWithSlots.Slots)
-            {
-                if (slot.Locked)
+                var slot =  equipment.GetSlot(slotName);
+                var item = slot.ContainedItem;
+                if (item != null)
                 {
-                    // Add all items from the locked slot to the result list
-                    if (slot.Items != null)
-                    {
-                        resultItems.AddRange(slot.Items);
-                    }
+                    preallocatedList.Add(item);
                 }
             }
+        }
 
-            return resultItems;
+        public static Item GetRootItem(this InteractableObject interactableObject)
+        {
+            return interactableObject switch
+            {
+                LootableContainer container => container.ItemOwner?.RootItem,
+                LootItem lootItem => lootItem.ItemOwner?.RootItem,
+                _ => null
+            };
+        }
+
+        public static string GetRootItemId(this InteractableObject interactableObject)
+        {
+            return interactableObject switch
+            {
+                LootableContainer container => container.ItemOwner?.RootItem.Id,
+                LootItem lootItem => lootItem.ItemOwner?.RootItem.Id,
+                _ => null
+            };
         }
     }
 }

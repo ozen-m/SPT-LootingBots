@@ -3,6 +3,7 @@ using DrakiaXYZ.BigBrain.Brains;
 using EFT;
 using LootingBots.Components;
 using LootingBots.Logic;
+using LootingBots.Utilities;
 using UnityEngine;
 
 namespace LootingBots
@@ -43,6 +44,7 @@ namespace LootingBots
         {
             _lootingBrain.EnableTransactions();
             _lootingBrain.UpdateGridStats();
+            BotOwner.PatrollingData.Pause();
             base.Start();
         }
 
@@ -50,6 +52,7 @@ namespace LootingBots
         {
             _lootingBrain.DisableTransactions();
             _lootingBrain.UpdateGridStats();
+            BotOwner.PatrollingData.Unpause();
             base.Stop();
         }
 
@@ -90,24 +93,7 @@ namespace LootingBots
 
         public override void BuildDebugText(StringBuilder debugPanel)
         {
-            string itemName = _lootingBrain.ActiveItem != null ? _lootingBrain.ActiveItem.Name.Localized() : null;
-            string containerName = _lootingBrain.ActiveContainer != null ? _lootingBrain.ActiveContainer.name.Localized() : null;
-            string corpseName = _lootingBrain.ActiveCorpse != null ? _lootingBrain.ActiveCorpse.name.Localized() : null;
-            string lootableName = itemName ?? containerName ?? corpseName ?? "-";
-
-            string category = string.Empty;
-            if (itemName != null)
-            {
-                category = "Item";
-            }
-            else if (containerName != null)
-            {
-                category = "Container";
-            }
-            else if (corpseName != null)
-            {
-                category = "Corpse";
-            }
+            string lootName = _lootingBrain.ActiveLoot != null ? _lootingBrain.ActiveLoot.GetRootItem()?.Name.Localized() : "-";
 
             debugPanel.AppendLine(
                 _lootingBrain.LootTaskRunning ? "Looting in progress..."
@@ -115,11 +101,11 @@ namespace LootingBots
                     : string.Empty,
                 Color.green
             );
-            debugPanel.AppendLabeledValue($"Target Loot", $" {lootableName} ({category})", Color.yellow, Color.yellow);
+            debugPanel.AppendLabeledValue($"Target Loot", $" {lootName} ({_lootingBrain.ActiveLootType.ToString()})", Color.yellow, Color.yellow);
 
             debugPanel.AppendLabeledValue(
                 $"Distance to Loot",
-                $" {(category == string.Empty || _lootingBrain.DistanceToLoot == -1f ? "Calculating path..." : $"{Math.Sqrt(_lootingBrain.DistanceToLoot):0.##}m")}",
+                $" {(_lootingBrain.ActiveLootType is LootFinder.LootType.None || _lootingBrain.DistanceToLoot == -1f ? "Calculating path..." : $"{Mathf.Sqrt(_lootingBrain.DistanceToLoot):0.##}m")}",
                 Color.grey,
                 Color.grey
             );
@@ -129,7 +115,7 @@ namespace LootingBots
 
         public bool EndLooting()
         {
-            return _lootingBrain.ActiveContainer == null && _lootingBrain.ActiveCorpse == null && _lootingBrain.ActiveItem == null;
+            return _lootingBrain.ActiveLoot == null;
         }
     }
 }

@@ -153,7 +153,7 @@ namespace LootingBots.Components
         */
         public void DisableTransactions()
         {
-            _transactionController.Enabled = false;
+            _transactionController.DisableTransactions();
         }
 
         /**
@@ -161,7 +161,7 @@ namespace LootingBots.Components
         */
         public void EnableTransactions()
         {
-            _transactionController.Enabled = true;
+            _transactionController.EnableTransactions();
         }
 
         /**
@@ -180,17 +180,17 @@ namespace LootingBots.Components
 
             if (primary != null && Stats.WeaponValues.Primary.Id != primary.Id)
             {
-                float value = _itemAppraiser.GetItemPrice(primary);
+                float value = _itemAppraiser.GetItemPrice(primary, _log);
                 Stats.WeaponValues.Primary.UpdatePair(primary.Id, value);
             }
             if (secondary != null && Stats.WeaponValues.Secondary.Id != secondary.Id)
             {
-                float value = _itemAppraiser.GetItemPrice(secondary);
+                float value = _itemAppraiser.GetItemPrice(secondary, _log);
                 Stats.WeaponValues.Secondary.UpdatePair(secondary.Id, value);
             }
             if (holster != null && Stats.WeaponValues.Holster.Id != holster.Id)
             {
-                float value = _itemAppraiser.GetItemPrice(holster);
+                float value = _itemAppraiser.GetItemPrice(holster, _log);
                 Stats.WeaponValues.Holster.UpdatePair(holster.Id, value);
             }
         }
@@ -340,7 +340,7 @@ namespace LootingBots.Components
         * If bots are looting something that is equippable and they have nothing equipped in that slot, they will always equip it.
         * If the bot decides not to equip the item then it will attempt to put in an available container slot
         */
-        public async Task<bool> TryAddItemsToBot(IEnumerable<Item> items)
+        public async Task<bool> TryAddItemsToBot(List<Item> items)
         {
             foreach (Item item in items)
             {
@@ -353,14 +353,19 @@ namespace LootingBots.Components
 
                     if (_transactionController.IsLootingInterrupted())
                     {
+                        if (_log.DebugEnabled)
+                        {
+                            _log.LogDebug("Looting interrupted");
+                        }
                         return false;
                     }
 
-                    CurrentItemPrice = _itemAppraiser.GetItemPrice(item);
+                    CurrentItemPrice = _itemAppraiser.GetItemPrice(item, _log);
 
+                    var itemName = item.Name.Localized();
                     if (_log.InfoEnabled)
                     {
-                        _log.LogInfo($"Loot found: {item.Name.Localized()} ({CurrentItemPrice}₽)");
+                        _log.LogInfo($"Loot found: {itemName} ({CurrentItemPrice}₽)");
                     }
 
                     // Ignore magazines that a bot cannot actively use
@@ -368,7 +373,7 @@ namespace LootingBots.Components
                     {
                         if (_log.DebugEnabled)
                         {
-                            _log.LogDebug($"Cannot use mag: {item.Name.Localized()}. Skipping");
+                            _log.LogDebug($"Cannot use mag: {itemName}. Skipping");
                         }
 
                         continue;
@@ -447,6 +452,11 @@ namespace LootingBots.Components
                         {
                             return success;
                         }
+                    }
+
+                    if (_log.DebugEnabled)
+                    {
+                        _log.LogDebug($"Item was not looted, {itemName}");
                     }
                 }
                 else if (_log.DebugEnabled)
@@ -715,6 +725,10 @@ namespace LootingBots.Components
                             null,
                             async () =>
                             {
+                                while (_botOwner.InventoryController.IsChangingWeapon)
+                                {
+                                    await Task.Yield();
+                                }
                                 ChangeToPrimary();
                                 Stats.AddNetValue(lootValue);
                                 await LootingTransactionController.SimulatePlayerDelay(1500);
@@ -744,6 +758,10 @@ namespace LootingBots.Components
                                 {
                                     await _transactionController.TryEquipItem(lootWeapon);
                                     await LootingTransactionController.SimulatePlayerDelay(1500);
+                                    while (_botOwner.InventoryController.IsChangingWeapon)
+                                    {
+                                        await Task.Yield();
+                                    }
                                     ChangeToPrimary();
                                     await LootingTransactionController.SimulatePlayerDelay(1500);
                                 }
@@ -772,6 +790,10 @@ namespace LootingBots.Components
                                 await _transactionController.TryEquipItem(lootWeapon);
                                 Stats.AddNetValue(lootValue);
                                 await LootingTransactionController.SimulatePlayerDelay(1500);
+                                while (_botOwner.InventoryController.IsChangingWeapon)
+                                {
+                                    await Task.Yield();
+                                }
                                 ChangeToPrimary();
                                 await LootingTransactionController.SimulatePlayerDelay(1500);
                             }
@@ -875,20 +897,21 @@ namespace LootingBots.Components
         {
             if (_transactionController.IsLootingInterrupted())
             {
+                if (_log.DebugEnabled)
+                {
+                    _log.LogDebug("Looting interrupted");
+                }
                 return false;
             }
-
-            // If the parentItem is an item that has slots such as armor, find any slots that are locked and return the list of items in those slots to use later
-            HashSet<Item> lockedItems = parentItem is CompoundItem itemWithSlots ? LootUtils.GetAllLockedItems(itemWithSlots).ToHashSet() : null;
 
             List<Item> items = [];
 
             foreach (var nestedItem in parentItem.GetFirstLevelItems())
             {
                 // Check the conditions to filter out items
-                bool isItemLocked = lockedItems != null && lockedItems.Contains(nestedItem);
+                bool isItemLocked = nestedItem.CurrentAddress?.Container is Slot slot && slot.Locked;
 
-                if (nestedItem.Id != parentItem.Id && !nestedItem.QuestItem && !isItemLocked && !nestedItem.IsSingleUseKey())
+                if (nestedItem.Id != parentItem.Id && !nestedItem.QuestItem && !isItemLocked)
                 {
                     items.Add(nestedItem);
                 }
@@ -985,7 +1008,7 @@ namespace LootingBots.Components
                     ?? (
                         async () =>
                         {
-                            Stats.SubtractNetValue(_itemAppraiser.GetItemPrice(toThrow));
+                            Stats.SubtractNetValue(_itemAppraiser.GetItemPrice(toThrow, _log));
                             _lootingBrain.IgnoreLoot(toThrow.Id);
                             await LootingTransactionController.SimulatePlayerDelay(1500);
 

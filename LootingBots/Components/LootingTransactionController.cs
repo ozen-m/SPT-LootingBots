@@ -9,7 +9,7 @@ namespace LootingBots.Components
 {
     public class LootingTransactionController(InventoryController inventoryController, BotLog log)
     {
-        public bool Enabled;
+        private bool _enabled;
 
         /** Tries to add extra spare ammo for the weapon being looted into the bot's secure container so that the bots are able to refill their mags properly in their reload logic */
         public bool AddExtraAmmo(Weapon weapon)
@@ -82,15 +82,14 @@ namespace LootingBots.Components
                 {
                     log.LogDebug($"Already has ammo for {weapon.Name.Localized()}");
                 }
-
-                return true;
             }
             catch (Exception e)
             {
                 log.LogError(e);
+                return false;
             }
 
-            return false;
+            return true;
         }
 
         /** Tries to find an open Slot to equip the current item to. If a slot is found, issue a move action to equip the item */
@@ -100,22 +99,23 @@ namespace LootingBots.Components
             {
                 // Check to see if we can equip the item
                 var ableToEquip = inventoryController.FindSlotToPickUp(item);
-                if (ableToEquip != null)
+                if (ableToEquip == null)
                 {
-                    if (log.WarningEnabled)
-                    {
-                        log.LogWarning($"Equipping: {item.Name.Localized()} [place: {ableToEquip.Container.ID.Localized()}]");
-                    }
-                    bool success = await MoveItem(new LootingMoveAction(item, ableToEquip));
-                    return success;
+                    return false;
                 }
+
+                if (log.WarningEnabled)
+                {
+                    log.LogWarning($"Equipping: {item.Name.Localized()} [place: {ableToEquip.Container.ID.Localized()}]");
+                }
+
+                return await MoveItem(new LootingMoveAction(item, ableToEquip));
             }
             catch (Exception e)
             {
                 log.LogError(e);
+                return false;
             }
-
-            return false;
         }
 
         /** Tries to find a valid grid for the item being looted. Checks all containers currently equipped to the bot. If there is a valid grid to place the item inside of, issue a move action to pick up the item */
@@ -157,8 +157,10 @@ namespace LootingBots.Components
             catch (Exception e)
             {
                 log.LogError(e);
+                return false;
             }
-            return false;
+
+            return true;
         }
 
         /** Moves an item to a specified item address. Supports executing a callback */
@@ -168,6 +170,10 @@ namespace LootingBots.Components
             {
                 if (IsLootingInterrupted())
                 {
+                    if (log.DebugEnabled)
+                    {
+                        log.LogDebug("Looting interrupted");
+                    }
                     return false;
                 }
 
@@ -224,6 +230,7 @@ namespace LootingBots.Components
             catch (Exception e)
             {
                 log.LogError(e);
+                return false;
             }
 
             return true;
@@ -236,6 +243,10 @@ namespace LootingBots.Components
             {
                 if (IsLootingInterrupted())
                 {
+                    if (log.DebugEnabled)
+                    {
+                        log.LogDebug("Looting interrupted");
+                    }
                     return false;
                 }
 
@@ -286,6 +297,7 @@ namespace LootingBots.Components
             catch (Exception e)
             {
                 log.LogError(e);
+                return false;
             }
 
             return true;
@@ -296,6 +308,10 @@ namespace LootingBots.Components
         {
             if (IsLootingInterrupted())
             {
+                if (log.DebugEnabled)
+                {
+                    log.LogDebug("Looting interrupted");
+                }
                 return false;
             }
 
@@ -332,15 +348,14 @@ namespace LootingBots.Components
                 {
                     await swapAction.OnComplete();
                 }
-
-                return true;
             }
             catch (Exception e)
             {
                 log.LogError(e);
+                return false;
             }
 
-            return false;
+            return true;
         }
 
         public Task<IResult> TryRunNetworkTransaction(InventoryControllerResultStruct operationResult, Callback callback = null)
@@ -348,9 +363,19 @@ namespace LootingBots.Components
             return inventoryController.TryRunNetworkTransaction(operationResult, callback);
         }
 
+        public void DisableTransactions()
+        {
+            _enabled = false;
+        }
+
+        public void EnableTransactions()
+        {
+            _enabled = true;
+        }
+
         public bool IsLootingInterrupted()
         {
-            return !Enabled;
+            return !_enabled;
         }
 
         public static Task SimulatePlayerDelay(float delay = -1f)

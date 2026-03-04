@@ -102,7 +102,7 @@ namespace LootingBots
          */
         public static float GetItemPrice(Item item)
         {
-            return LootingBots.ItemAppraiser != null ? LootingBots.ItemAppraiser.GetItemPrice(item) : 0;
+            return LootingBots.ItemAppraiser != null ? LootingBots.ItemAppraiser.GetItemPrice(item, null) : 0;
         }
 
         private static bool GetAllComponents(BotOwner bot, out LootingBrain lootingBrain, out LootFinder lootFinder)

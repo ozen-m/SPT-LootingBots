@@ -63,7 +63,7 @@ namespace LootingBots.Logic
                     bool slowDown = _lootingBrain.DistanceToLoot != -1f && _lootingBrain.DistanceToLoot < 6f;
 
                     // If the bot has not just looted something, loot the current item since we are now close enough
-                    if (!_lootingBrain.LootTaskRunning && isCloseEnough)
+                    if (!_lootingBrain.LootTaskRunning && isCloseEnough && _lootingBrain.HasActiveLootable)
                     {
                         // Crouch and look to item
                         BotOwner.SetPose(0f);
@@ -141,19 +141,8 @@ namespace LootingBots.Logic
                 //Increment navigation attempt counter
                 _navigationAttempts++;
 
-                string lootableName = "NULL";
-                if (_lootingBrain.ActiveContainer != null)
-                {
-                    lootableName = _lootingBrain.ActiveContainer.ItemOwner.Items.GetFirstItem()?.Name.Localized();
-                }
-                else if (_lootingBrain.ActiveItem != null)
-                {
-                    lootableName = _lootingBrain.ActiveItem.Name.Localized();
-                }
-                else if (_lootingBrain.ActiveCorpse != null)
-                {
-                    lootableName = _lootingBrain.ActiveCorpse.GetPlayer.name.Localized();
-                }
+                // TODO: Check lootable names
+                string lootableName = _lootingBrain.ActiveLoot.GetRootItem()?.Name.Localized() ?? "NULL";
 
                 // If the bot has not been stuck for more than 2 navigation checks, attempt to navigate to the lootable otherwise ignore the container forever
                 bool isBotStuck = _stuckCount > 1;
