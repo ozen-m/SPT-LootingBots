@@ -129,7 +129,7 @@ public static class EquipmentTypeUtils
             return allowedGear.HasWeapon();
         }
 
-        return true;
+        return false;
     }
 
     public static bool IsTacticalRig(Item item)

@@ -94,6 +94,8 @@ public class LootingTransactionController(InventoryController inventoryControlle
     /** Tries to find an open Slot to equip the current item to. If a slot is found, issue a move action to equip the item */
     public UniTask<bool> TryEquipItemAsync(Item item, CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
+
         // Check to see if we can equip the item
         var ableToEquip = inventoryController.FindSlotToPickUp(item);
         if (ableToEquip == null)
@@ -116,6 +118,8 @@ public class LootingTransactionController(InventoryController inventoryControlle
     /** Tries to find a valid grid for the item being looted. Checks all containers currently equipped to the bot. If there is a valid grid to place the item inside of, issue a move action to pick up the item */
     public UniTask<bool> TryPickupItemAsync(Item item, CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
+
         // Check to see if this is an item that we can merge with another item in the inventory
         var mergeableItem = inventoryController.FindItemToMerge(item);
 

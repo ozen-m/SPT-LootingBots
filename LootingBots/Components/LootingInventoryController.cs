@@ -724,7 +724,6 @@ public class LootingInventoryController
                             null,
                             async (token) =>
                             {
-                                await UniTask.WaitWhile(_botOwner.InventoryController, static invCont => invCont.IsChangingWeapon, cancellationToken: token);
                                 if (await _transactionController.TryEquipItemAsync(lootWeapon, token))
                                 {
                                     Stats.AddNetValue(lootValue);
