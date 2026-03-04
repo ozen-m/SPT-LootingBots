@@ -150,22 +150,22 @@ namespace LootingBots.Utilities
     {
         public static bool HasError(this LogLevel logLevel)
         {
-            return logLevel.HasFlag(LogLevel.Error);
+            return (logLevel & LogLevel.Error) != 0;
         }
 
         public static bool HasWarning(this LogLevel logLevel)
         {
-            return logLevel.HasFlag(LogLevel.Warning);
+            return (logLevel & LogLevel.Warning) != 0;
         }
 
         public static bool HasInfo(this LogLevel logLevel)
         {
-            return logLevel.HasFlag(LogLevel.Info);
+            return (logLevel & LogLevel.Info) != 0;
         }
 
         public static bool HasDebug(this LogLevel logLevel)
         {
-            return logLevel.HasFlag(LogLevel.Debug);
+            return (logLevel & LogLevel.Debug) != 0;
         }
     }
 }

@@ -36,47 +36,47 @@ namespace LootingBots.Utilities
     {
         public static bool HasBackpack(this EquipmentType equipmentType)
         {
-            return equipmentType.HasFlag(EquipmentType.Backpack);
+            return (equipmentType & EquipmentType.Backpack) != 0;
         }
 
         public static bool HasTacticalRig(this EquipmentType equipmentType)
         {
-            return equipmentType.HasFlag(EquipmentType.TacticalRig);
+            return (equipmentType & EquipmentType.TacticalRig) != 0;
         }
 
         public static bool HasArmoredRig(this EquipmentType equipmentType)
         {
-            return equipmentType.HasFlag(EquipmentType.ArmoredRig);
+            return (equipmentType & EquipmentType.ArmoredRig) != 0;
         }
 
         public static bool HasArmorVest(this EquipmentType equipmentType)
         {
-            return equipmentType.HasFlag(EquipmentType.ArmorVest);
+            return (equipmentType & EquipmentType.ArmorVest) != 0;
         }
 
         public static bool HasGrenade(this EquipmentType equipmentType)
         {
-            return equipmentType.HasFlag(EquipmentType.Grenade);
+            return (equipmentType & EquipmentType.Grenade) != 0;
         }
 
         public static bool HasWeapon(this EquipmentType equipmentType)
         {
-            return equipmentType.HasFlag(EquipmentType.Weapon);
+            return (equipmentType & EquipmentType.Weapon) != 0;
         }
 
         public static bool HasHelmet(this EquipmentType equipmentType)
         {
-            return equipmentType.HasFlag(EquipmentType.Helmet);
+            return (equipmentType & EquipmentType.Helmet) != 0;
         }
 
         public static bool HasArmorPlate(this EquipmentType equipmentType)
         {
-            return equipmentType.HasFlag(EquipmentType.ArmorPlate);
+            return (equipmentType & EquipmentType.ArmorPlate) != 0;
         }
 
         public static bool HasDogtag(this EquipmentType equipmentType)
         {
-            return equipmentType.HasFlag(EquipmentType.Dogtag);
+            return (equipmentType & EquipmentType.Dogtag) != 0;
         }
 
         // GClasses based off GClass2558.FindSlotToPickUp
