@@ -49,7 +49,7 @@ public class BotStats
 
     public void SubtractNetValue(float itemPrice)
     {
-        NetLootValue += itemPrice;
+        NetLootValue -= itemPrice;
     }
 
     public void StatsDebugPanel(StringBuilder debugPanel)
