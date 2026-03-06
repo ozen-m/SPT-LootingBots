@@ -7,15 +7,25 @@ namespace LootingBots.Actions;
 /// <summary>
 /// Base looting action
 /// </summary>
-/// <param name="item">Item operated upon</param>
-/// <param name="netWorthDelta">Value added to the bot's net worth</param>
-public abstract class LootingAction(
-    Item item,
-    float netWorthDelta = 0f
-    )
+public abstract class LootingAction
 {
-    public Item Item { get; set; } = item;
-    public float NetWorthDelta { get; set; } = netWorthDelta;
+    /// <summary>
+    /// Item operated upon
+    /// </summary>
+    public Item Item { get; set; }
+
+    /// <summary>
+    /// Value added to the bot's net worth
+    /// </summary>
+    public float NetWorthDelta { get; set; }
 
     public abstract UniTask<bool> ExecuteAsync(LootingTransactionController controller, CancellationToken token);
+
+    public abstract void Return();
+
+    protected virtual void Reset()
+    {
+        Item = null;
+        NetWorthDelta = 0;
+    }
 }
