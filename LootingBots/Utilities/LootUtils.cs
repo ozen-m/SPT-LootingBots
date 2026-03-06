@@ -169,54 +169,47 @@ public static class LootUtils
         return mergeTarget;
     }
 
-    private static readonly List<EquipmentSlot> _prioritySlotsScratch = new(13);
     /**
    *   Returns the list of slots to loot from a corpse in priority order. When a bot already has a backpack/rig, they will attempt to loot the weapons off the bot first. Otherwise they will loot the equipement first and loot the weapons afterwards.
    */
-    public static void GetPriorityItems(this InventoryEquipment targetEquipment, List<Item> preallocatedList)
+    public static void GetPriorityItems(this InventoryEquipment corpseEquipment, InventoryEquipment botEquipment, List<Item> preallocatedList)
     {
-        bool hasBackpack = targetEquipment.GetSlot(EquipmentSlot.Backpack).ContainedItem != null;
-        bool hasTacVest = targetEquipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem != null;
-
-        _prioritySlotsScratch.Clear();
+        bool hasBackpack = botEquipment.GetSlot(EquipmentSlot.Backpack).ContainedItem != null;
+        bool hasTacVest = botEquipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem != null;
 
         // Add slots in priority order
         if (hasBackpack || hasTacVest)
         {
-            AddUnlockedSlots(targetEquipment, _prioritySlotsScratch, WeaponSlots);
-            AddUnlockedSlots(targetEquipment, _prioritySlotsScratch, StorageSlots);
+            GetItemInSlotsNonAlloc(corpseEquipment, botEquipment, preallocatedList, WeaponSlots);
+            GetItemInSlotsNonAlloc(corpseEquipment, botEquipment, preallocatedList, StorageSlots);
         }
         else
         {
-            AddUnlockedSlots(targetEquipment, _prioritySlotsScratch, StorageSlots);
-            AddUnlockedSlots(targetEquipment, _prioritySlotsScratch, WeaponSlots);
+            GetItemInSlotsNonAlloc(corpseEquipment, botEquipment, preallocatedList, StorageSlots);
+            GetItemInSlotsNonAlloc(corpseEquipment, botEquipment, preallocatedList, WeaponSlots);
         }
 
-        AddUnlockedSlots(targetEquipment, _prioritySlotsScratch, OtherSlots);
-
-        preallocatedList.Clear();
-        targetEquipment.GetItemInSlotsNonAlloc(_prioritySlotsScratch, preallocatedList);
+        GetItemInSlotsNonAlloc(corpseEquipment, botEquipment, preallocatedList, OtherSlots);
     }
 
-    private static void AddUnlockedSlots(InventoryEquipment equipment, List<EquipmentSlot> targetList, EquipmentSlot[] slots)
+    private static void GetItemInSlotsNonAlloc(InventoryEquipment equipment, InventoryEquipment botEquipment, List<Item> preallocatedList, EquipmentSlot[] slots)
     {
-        foreach (var slot in slots)
-        {
-            if (!equipment.GetSlot(slot).Locked)
-            {
-                targetList.Add(slot);
-            }
-        }
-    }
-
-    private static void GetItemInSlotsNonAlloc(this InventoryEquipment equipment, List<EquipmentSlot> slotNames, List<Item> preallocatedList)
-    {
-        foreach (EquipmentSlot slotName in slotNames)
+        var equipmentOwner = equipment.Parent.GetOwner();
+        var botOwner = botEquipment.Parent.GetOwner();
+        foreach (EquipmentSlot slotName in slots)
         {
             var slot =  equipment.GetSlot(slotName);
             var item = slot.ContainedItem;
             if (item != null)
             {
+                // Check if item is unlootable
+                // TODO: Double check, InteractionsHandlerClass.smethod_23, returns InteractionsHandlerClass.GClass1598
+                var itemComponent = item.GetItemComponent<UnlootableComponent>();
+                if (itemComponent != null && equipmentOwner != botOwner && itemComponent.IsUnlootableFrom(item.Parent.Container))
+                {
+                    LootingBots.LootLog.LogWarning($"Item {item.Name} is unlootable");
+                    continue;
+                }
                 preallocatedList.Add(item);
             }
         }
@@ -251,5 +244,18 @@ public static class LootUtils
             LootItem lootItem => lootItem.ItemOwner?.RootItem.Name.Localized(),
             _ => "-"
         };
+    }
+
+    public static bool HasAnyHandsActionNonLinq(this TraderControllerClass controller)
+    {
+        foreach (var eventArg in controller.List_0)
+        {
+            if (eventArg is GInterface418)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

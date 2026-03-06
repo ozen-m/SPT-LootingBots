@@ -5,16 +5,13 @@ using PeacefulNodeClass = GClass266;
 
 namespace LootingBots.Logic;
 
-internal class PeacefulLogic : CustomLogic
+/// <summary>
+/// PatrolAssault peaceful logic
+/// </summary>
+internal class PeacefulLogic(BotOwner botOwner) : CustomLogic(botOwner)
 {
-    private readonly PeacefulNodeClass _baseLogic;
+    private readonly PeacefulNodeClass _baseLogic = new(botOwner);
 
-    // PatrolAssault peaceful logic
-    public PeacefulLogic(BotOwner botOwner)
-        : base(botOwner)
-    {
-        _baseLogic = new PeacefulNodeClass(botOwner);
-    }
 
     public override void Update(CustomLayer.ActionData data)
     {

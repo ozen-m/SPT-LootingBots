@@ -8,14 +8,18 @@ public enum EquipmentType
     Backpack = 1,
     TacticalRig = 2,
     ArmoredRig = 4,
-    ArmorVest = 8,
+    Chest = 8,
     Weapon = 16,
     Grenade = 32,
     Helmet = 64,
     Dogtag = 128,
     ArmorPlate = 256,
+    Earpiece = 512,
+    FaceCover = 1024,
+    Eyewear = 2048,
+    Armband = 4096,
 
-    All = Backpack | TacticalRig | ArmoredRig | ArmorVest | Weapon | Helmet | Grenade | Dogtag | ArmorPlate,
+    All = Backpack | TacticalRig | ArmoredRig | Chest | Weapon | Helmet | Grenade | Dogtag | ArmorPlate | Earpiece | FaceCover | Eyewear | Armband,
 }
 
 [Flags]
@@ -24,12 +28,16 @@ public enum CanEquipEquipmentType
     Backpack = EquipmentType.Backpack,
     TacticalRig = EquipmentType.TacticalRig,
     ArmoredRig = EquipmentType.ArmoredRig,
-    ArmorVest = EquipmentType.ArmorVest,
+    Chest = EquipmentType.Chest,
     Weapon = EquipmentType.Weapon,
     Grenade = EquipmentType.Grenade,
     Helmet = EquipmentType.Helmet,
+    Earpiece = EquipmentType.Earpiece,
+    FaceCover = EquipmentType.FaceCover,
+    Eyewear = EquipmentType.Eyewear,
+    Armband = EquipmentType.Armband,
 
-    All = Backpack | TacticalRig | ArmoredRig | ArmorVest | Weapon | Helmet | Grenade,
+    All = Backpack | TacticalRig | ArmoredRig | Chest | Weapon | Helmet | Grenade | Earpiece | FaceCover | Eyewear | Armband
 }
 
 public static class EquipmentTypeUtils
@@ -49,9 +57,9 @@ public static class EquipmentTypeUtils
         return (equipmentType & EquipmentType.ArmoredRig) != 0;
     }
 
-    public static bool HasArmorVest(this EquipmentType equipmentType)
+    public static bool HasChestArmor(this EquipmentType equipmentType)
     {
-        return (equipmentType & EquipmentType.ArmorVest) != 0;
+        return (equipmentType & EquipmentType.Chest) != 0;
     }
 
     public static bool HasGrenade(this EquipmentType equipmentType)
@@ -79,12 +87,32 @@ public static class EquipmentTypeUtils
         return (equipmentType & EquipmentType.Dogtag) != 0;
     }
 
-    // GClasses based off GClass2558.FindSlotToPickUp
-    public static bool IsItemEligible(this EquipmentType allowedGear, Item item)
+    public static bool HasEarpiece(this EquipmentType equipmentType)
     {
-        if (IsArmorVest(item))
+        return (equipmentType & EquipmentType.Earpiece) != 0;
+    }
+
+    public static bool HasFaceCover(this EquipmentType equipmentType)
+    {
+        return (equipmentType & EquipmentType.FaceCover) != 0;
+    }
+
+    public static bool HasEyewear(this EquipmentType equipmentType)
+    {
+        return (equipmentType & EquipmentType.Eyewear) != 0;
+    }
+
+    public static bool HasArmband(this EquipmentType equipmentType)
+    {
+        return (equipmentType & EquipmentType.Armband) != 0;
+    }
+
+    // GClasses based off GClass3373.FindSlotToPickUp
+    public static bool IsItemEligible(this EquipmentType allowedGear, Item item, bool toPickup = false)
+    {
+        if (IsChestArmor(item))
         {
-            return allowedGear.HasArmorVest();
+            return allowedGear.HasChestArmor();
         }
 
         if (IsHelmet(item))
@@ -97,6 +125,21 @@ public static class EquipmentTypeUtils
             return allowedGear.HasBackpack();
         }
 
+        if (IsEarpiece(item))
+        {
+            return allowedGear.HasEarpiece();
+        }
+
+        if (IsFaceCover(item))
+        {
+            return allowedGear.HasFaceCover();
+        }
+
+        if (IsEyewear(item))
+        {
+            return allowedGear.HasEyewear();
+        }
+
         if (IsArmoredRig(item))
         {
             return allowedGear.HasArmoredRig();
@@ -107,7 +150,7 @@ public static class EquipmentTypeUtils
             return allowedGear.HasTacticalRig();
         }
 
-        if (IsArmorPlate(item, out ArmorPlateItemClass _))
+        if (IsArmorPlate(item))
         {
             return allowedGear.HasArmorPlate();
         }
@@ -129,7 +172,12 @@ public static class EquipmentTypeUtils
             return allowedGear.HasWeapon();
         }
 
-        return false;
+        if (IsArmband(item))
+        {
+            return allowedGear.HasArmband();
+        }
+
+        return toPickup;
     }
 
     public static bool IsTacticalRig(Item item)
@@ -139,7 +187,19 @@ public static class EquipmentTypeUtils
 
     public static bool IsArmoredRig(Item item)
     {
-        return item is VestItemClass && item.IsArmorMod();
+        if (item is VestItemClass vest)
+        {
+            foreach (var slot in vest.Slots)
+            {
+                // If any slot is an armor slot
+                if (slot is GClass3125)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     public static bool IsBackpack(Item item)
@@ -152,26 +212,38 @@ public static class EquipmentTypeUtils
         return item is HeadwearItemClass;
     }
 
-    public static bool IsArmorVest(Item item)
+    public static bool IsChestArmor(Item item)
     {
-        return item is ArmoredEquipmentItemClass;
+        return item is ArmorItemClass;
     }
 
-    public static bool IsFaceCovering(Item item)
+    public static bool IsFaceCover(Item item)
+    {
+        return item is FaceCoverItemClass;
+    }
+
+    public static bool IsEyewear(Item item)
     {
         return item is VisorsItemClass;
     }
 
-    public static bool IsArmorPlate(Item item, out ArmorPlateItemClass plate)
+    public static bool IsArmorPlate(Item item)
     {
-        bool isArmorPlate = item is ArmorPlateItemClass;
-        plate = isArmorPlate ? (ArmorPlateItemClass) item : null;
-
-        return isArmorPlate;
+        return item is ArmorPlateItemClass;
     }
 
     public static bool IsDogtag(Item item)
     {
         return item is OtherItemClass;
+    }
+
+    public static bool IsEarpiece(Item item)
+    {
+        return item is HeadphonesItemClass;
+    }
+
+    public static bool IsArmband(Item item)
+    {
+        return item is ArmBandItemClass;
     }
 }

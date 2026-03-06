@@ -5,20 +5,17 @@ using LootingBots.Components;
 namespace LootingBots.Actions;
 
 /// <summary>
-/// Move action to be executed
+/// Throw action to be executed
 /// </summary>
-/// <param name="place">Move item to this address, if null try equip item</param>
-/// <inheritdoc/>
-public class LootingMoveAction(
+/// <param name="item">Item to dispose</param>
+/// <param name="netWorthDelta">Value added to the bot's net worth, double check negative sign!</param>
+public class LootingThrowAction(
     Item item,
-    ItemAddress place = null,
     float netWorthDelta = 0f
 ) : LootingAction(item, netWorthDelta)
 {
-    public ItemAddress Place { get; set; } = place;
-
     public override async UniTask<bool> ExecuteAsync(LootingTransactionController controller, CancellationToken token)
     {
-        return await controller.MoveItemAsync(Item, Place, token);
+        return await controller.ThrowItemAsync(Item, token);
     }
 }

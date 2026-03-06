@@ -1,17 +1,30 @@
 ﻿using Cysharp.Threading.Tasks;
 using EFT.InventoryLogic;
+using LootingBots.Components;
 
 namespace LootingBots.Actions;
 
+/// <summary>
+/// Swap action to be executed
+/// </summary>
+/// <param name="toSwap"><paramref name="item"/> will be switched to <paramref name="toSwap"/>'s address</param>
+/// <param name="throwMags">Throw unused magazines previously used by <paramref name="toSwap"/></param>
+/// <param name="transferItems">Loot items from thrown item if true</param>
+/// <inheritdoc/>
 public class LootingSwapAction(
-    Item toThrow,
-    Item toEquip = null,
-    Func<CancellationToken, UniTask> callback = null,
-    Func<CancellationToken, UniTask> onComplete = null
-)
+    Item item,
+    Item toSwap,
+    float netWorthDelta = 0f,
+    bool throwMags = false,
+    bool transferItems = false
+) : LootingAction(item, netWorthDelta)
 {
-    public Item ToThrow { get; private set; } = toThrow;
-    public Item ToEquip { get; private set; } = toEquip;
-    public Func<CancellationToken, UniTask> Callback { get; private set; } = callback;
-    public Func<CancellationToken, UniTask> OnComplete { get; private set; } = onComplete;
+    public Item ToSwap { get; set; } = toSwap;
+    public bool ThrowMags { get; set; } = throwMags;
+    public bool TransferItems { get; set; } = transferItems;
+
+    public override async UniTask<bool> ExecuteAsync(LootingTransactionController controller, CancellationToken token)
+    {
+        return await controller.SwapItemsAsync(Item, ToSwap, token);
+    }
 }

@@ -7,6 +7,7 @@ using EFT.InventoryLogic;
 using LootingBots.Utilities;
 using Newtonsoft.Json;
 using SPT.Common.Http;
+using UnityEngine;
 
 namespace LootingBots.Components;
 
@@ -184,7 +185,7 @@ public class ItemAppraiser(Log _log)
         //     }
         // }
 
-        return price;
+        return Mathf.Max(0f, price);
     }
 
     /**
@@ -246,7 +247,7 @@ public class ItemAppraiser(Log _log)
             //     }
             // }
 
-            return price;
+            return Mathf.Max(0f, price);
         }
 
         // Fallback

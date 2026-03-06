@@ -24,13 +24,17 @@ public class LootingBots : BaseUnityPlugin
 
     public const EquipmentType CanPickupEquipmentDefaults =
         EquipmentType.ArmoredRig
-        | EquipmentType.ArmorVest
+        | EquipmentType.Chest
         | EquipmentType.Backpack
         | EquipmentType.Grenade
         | EquipmentType.Helmet
         | EquipmentType.TacticalRig
         | EquipmentType.Weapon
-        | EquipmentType.Dogtag;
+        | EquipmentType.Dogtag
+        | EquipmentType.Earpiece
+        | EquipmentType.FaceCover
+        | EquipmentType.Eyewear
+        | EquipmentType.Armband;
 
     // Loot Finder Settings
     public static ConfigEntry<BotType> CorpseLootingEnabled;
@@ -240,7 +244,7 @@ public class LootingBots : BaseUnityPlugin
         TransactionDelay = Config.Bind(
             "Loot Finder (Timing)",
             "Delay after taking item (ms)",
-            500D,
+            1500D,
             new ConfigDescription(
                 "Amount of milliseconds a bot will wait after taking an item into their inventory before attempting to loot another item. Simulates the amount of time it takes for a player to look through loot decide to take something.",
                 null,

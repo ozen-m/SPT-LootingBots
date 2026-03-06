@@ -2,7 +2,6 @@ using Comfort.Common;
 using Cysharp.Threading.Tasks;
 using EFT;
 using EFT.InventoryLogic;
-using LootingBots.Actions;
 using LootingBots.Utilities;
 using InventoryControllerResultStruct = GStruct153;
 
@@ -112,7 +111,7 @@ public class LootingTransactionController(InventoryController inventoryControlle
             log.LogWarning($"Equipping: {item.Name.Localized()} [place: {ableToEquip.Container.ID.Localized()}]");
         }
 
-        return MoveItemAsync(new LootingMoveAction(item, ableToEquip), token);
+        return MoveItemAsync(item, ableToEquip, token);
     }
 
     /** Tries to find a valid grid for the item being looted. Checks all containers currently equipped to the bot. If there is a valid grid to place the item inside of, issue a move action to pick up the item */
@@ -130,7 +129,7 @@ public class LootingTransactionController(InventoryController inventoryControlle
                 log.LogWarning($"Merging: {item.Name.Localized()} [with: {mergeableItem.Name.Localized()}]");
             }
 
-            return MergeItemAsync(new LootingMoveAction(item, null, mergeableItem), token);
+            return MergeItemAsync(item, mergeableItem, token);
         }
 
         // Otherwise, find an empty grid slot to put the item in
@@ -143,7 +142,7 @@ public class LootingTransactionController(InventoryController inventoryControlle
                 log.LogWarning($"Picking up: {item.Name.Localized()} [place: {gridAddress.GetRootItem()?.Name.Localized()}]");
             }
 
-            return MoveItemAsync(new LootingMoveAction(item, gridAddress), token);
+            return MoveItemAsync(item, gridAddress, token);
         }
 
         if (log.DebugEnabled)
@@ -154,132 +153,143 @@ public class LootingTransactionController(InventoryController inventoryControlle
         return UniTask.FromResult(false);
     }
 
-    /** Moves an item to a specified item address. Supports executing a callback */
-    public async UniTask<bool> MoveItemAsync(LootingMoveAction moveAction, CancellationToken token = default)
+    /// <summary>
+    /// Moves an item to a specified item address
+    /// </summary>
+    public async UniTask<bool> MoveItemAsync(Item item, ItemAddress location, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
 
-        if (moveAction.Place == null)
+        if (location == null)
         {
-            log.LogWarning($"Cannot move item {moveAction.ToMove} to NULL place!");
-            return false;
+            return await TryEquipItemAsync(item, token);
         }
-
-        // if (moveAction.ToMove is Weapon weapon && moveAction.ToMove is not AmmoItemClass)
-        // {
-        //     //Todo: Doesn't work on Fika for obvious reasons
-        //     //AddExtraAmmo(weapon);
-        // }
 
         if (log.WarningEnabled)
         {
-            log.LogWarning($"Moving {moveAction.ToMove.Name.Localized()} to: {moveAction.Place.Container.ID.Localized()}...");
+            log.LogWarning($"Moving {item.Name.Localized()} to: {location.Container.ID.Localized()}...");
         }
 
-        var moveActionResult = InteractionsHandlerClass.Move(moveAction.ToMove, moveAction.Place, inventoryController, true);
-        if (moveActionResult.Failed)
+        await SimulatePlayerDelayAsync(token: token);
+
+        var moveResult = InteractionsHandlerClass.Move(item, location, inventoryController, true);
+        if (moveResult.Failed)
         {
             if (log.ErrorEnabled)
             {
-                log.LogWarning($"Failed to move {moveAction.ToMove.Name.Localized()} to {moveAction.Place.Container.ID.Localized()}. Error: {moveActionResult.Error}");
+                log.LogWarning($"Failed to move {item.Name.Localized()} to {location.Container.ID.Localized()}. Error: {moveResult.Error}");
             }
             return false;
         }
 
-        await SimulatePlayerDelayAsync(token: token);
-        var moveActionNetworkResult = await inventoryController.TryRunNetworkTransaction(moveActionResult).AsUniTask();
-        if (moveActionNetworkResult.Failed)
+        var moveNetworkResult = await inventoryController.TryRunNetworkTransaction(moveResult).AsUniTask().AttachExternalCancellation(token);
+        if (moveNetworkResult.Failed || token.IsCancellationRequested)
         {
             if (log.ErrorEnabled)
             {
-                log.LogError($"Failed to move {moveAction.ToMove.Name.Localized()} to {moveAction.Place.Container.ID.Localized()}. Network Error: {moveActionNetworkResult.Error}");
+                log.LogError($"Failed to move {item.Name.Localized()} to {location.Container.ID.Localized()}. Network Error: {moveNetworkResult.Error}");
             }
             return false;
         }
 
         if (log.DebugEnabled)
         {
-            log.LogDebug($"Moving {moveAction.ToMove.Name.Localized()} to: {moveAction.Place.Container.ID.Localized()}...done");
+            log.LogDebug($"Moving {item.Name.Localized()} to: {location.Container.ID.Localized()}...done");
         }
 
-        if (moveAction.Callback != null)
+        return true;
+    }
+
+    /** Moves an item to a specified item address. Supports executing a callback */
+    public async UniTask<bool> SwapItemsAsync(Item item, Item toSwap, CancellationToken token = default)
+    {
+        token.ThrowIfCancellationRequested();
+
+        if (log.WarningEnabled)
         {
-            await SimulatePlayerDelayAsync(token: token);
-            await moveAction.Callback(token);
+            log.LogWarning($"Swapping {item.Name.Localized()} with {toSwap.Name.Localized()}...");
         }
 
-        if (moveAction.OnComplete != null)
+        await SimulatePlayerDelayAsync(token: token);
+
+        var swapResult = InteractionsHandlerClass.Swap(item, toSwap.CurrentAddress, toSwap, item.CurrentAddress, inventoryController, true);
+        if (swapResult.Failed)
         {
-            await SimulatePlayerDelayAsync(token: token);
-            await moveAction.OnComplete(token);
+            if (log.ErrorEnabled)
+            {
+                log.LogError($"Failed to swap {item.Name.Localized()} with {toSwap.Name.Localized()}. Error: {swapResult.Error}");
+            }
+            return false;
+        }
+
+        var swapNetworkResult = await inventoryController.TryRunNetworkTransaction(swapResult).AsUniTask().AttachExternalCancellation(token);
+        if (swapNetworkResult.Failed || token.IsCancellationRequested)
+        {
+            if (log.ErrorEnabled)
+            {
+                log.LogError($"Failed to swap {item.Name.Localized()} with {toSwap.Name.Localized()}. Network Error: {swapNetworkResult.Error}");
+            }
+            return false;
+        }
+
+        if (log.DebugEnabled)
+        {
+            log.LogWarning($"Swapping {item.Name.Localized()} with {toSwap.Name.Localized()}...done");
         }
 
         return true;
     }
 
     /** Attempts to merge an item stack with another specified item stack. Supports executing a callback */
-    public async UniTask<bool> MergeItemAsync(LootingMoveAction moveAction, CancellationToken token = default)
+    public async UniTask<bool> MergeItemAsync(Item toMove, Item toItem, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
 
-        if (moveAction.ToItem == null)
+        if (toItem == null)
         {
-            log.LogWarning($"Cannot merge item {moveAction.ToMove} to NULL target item!");
+            log.LogWarning($"Cannot merge item {toMove} to NULL target item!");
             return false;
         }
 
         if (log.WarningEnabled)
         {
-            log.LogWarning($"Merging {moveAction.ToMove.Name?.Localized()} (Stack Size: {moveAction.ToMove.StackObjectsCount}) with: {moveAction.ToItem.Name.Localized()} (Stack Size: {moveAction.ToItem.StackObjectsCount})...");
+            log.LogWarning($"Merging {toMove.Name?.Localized()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount})...");
         }
 
-        var mergeResult = InteractionsHandlerClass.Merge(moveAction.ToMove, moveAction.ToItem, inventoryController, true);
+        var mergeResult = InteractionsHandlerClass.Merge(toMove, toItem, inventoryController, true);
         if (mergeResult.Failed)
         {
             if (log.ErrorEnabled)
             {
-                log.LogError($"Failed to merge {moveAction.ToMove.Name.Localized()} (Stack Size: {moveAction.ToMove.StackObjectsCount}) with: {moveAction.ToItem.Name.Localized()} (Stack Size: {moveAction.ToItem.StackObjectsCount}). Error: {mergeResult.Error}" );
+                log.LogError($"Failed to merge {toMove.Name.Localized()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount}). Error: {mergeResult.Error}" );
             }
             return false;
         }
 
         await SimulatePlayerDelayAsync(token: token);
-        var mergeNetworkResult = await inventoryController.TryRunNetworkTransaction(mergeResult).AsUniTask();
-        if (mergeNetworkResult.Failed)
+        var mergeNetworkResult = await inventoryController.TryRunNetworkTransaction(mergeResult).AsUniTask().AttachExternalCancellation(token);
+        if (mergeNetworkResult.Failed || token.IsCancellationRequested)
         {
             if (log.ErrorEnabled)
             {
-                log.LogError($"Failed to merge {moveAction.ToMove.Name.Localized()} (Stack Size: {moveAction.ToMove.StackObjectsCount}) with: {moveAction.ToItem.Name.Localized()} (Stack Size: {moveAction.ToItem.StackObjectsCount}). Network Error: {mergeNetworkResult.Error}" );
+                log.LogError($"Failed to merge {toMove.Name.Localized()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount}). Network Error: {mergeNetworkResult.Error}" );
             }
             return false;
         }
 
         if (log.DebugEnabled)
         {
-            log.LogDebug($"Merging {moveAction.ToMove.Name?.Localized()} (Stack Size: {moveAction.ToMove.StackObjectsCount}) with: {moveAction.ToItem.Name.Localized()} (Stack Size: {moveAction.ToItem.StackObjectsCount})...done");
-        }
-
-        if (moveAction.Callback != null)
-        {
-            await SimulatePlayerDelayAsync(token: token);
-            await moveAction.Callback(token);
-        }
-
-        if (moveAction.OnComplete != null)
-        {
-            await SimulatePlayerDelayAsync(token: token);
-            await moveAction.OnComplete(token);
+            log.LogDebug($"Merging {toMove.Name?.Localized()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount})...done");
         }
 
         return true;
     }
 
     /** Method used when we want the bot the throw an item and then equip an item immediately afterwards */
-    public async UniTask<bool> ThrowAndEquipAsync(LootingSwapAction swapAction, CancellationToken token = default)
+    public async UniTask<bool> ThrowItemAsync(Item toThrow, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
 
-        var toThrow = swapAction.ToThrow;
         if (log.WarningEnabled)
         {
             log.LogWarning($"Throwing item: {toThrow.Name.Localized()}...");
@@ -288,14 +298,10 @@ public class LootingTransactionController(InventoryController inventoryControlle
         await SimulatePlayerDelayAsync(token: token);
 
         var promise = new UniTaskCompletionSource<IResult>();
-        var swapCallback = swapAction.Callback;
         inventoryController.ThrowItem(
             toThrow,
             false,
-            result =>
-            {
-                _ = SimulatedDelayCallbackAsync(result, swapCallback, promise, token);
-            }
+            result => promise.TrySetResult(result)
         );
 
         var throwResult = await promise.Task;
@@ -311,11 +317,6 @@ public class LootingTransactionController(InventoryController inventoryControlle
         if (log.DebugEnabled)
         {
             log.LogDebug($"Throwing item: {toThrow.Name.Localized()}...done");
-        }
-
-        if (swapAction.OnComplete != null)
-        {
-            await swapAction.OnComplete(token);
         }
 
         return true;
@@ -334,19 +335,5 @@ public class LootingTransactionController(InventoryController inventoryControlle
         }
 
         return UniTask.Delay(TimeSpan.FromMilliseconds(delay), cancellationToken: token);
-    }
-
-    private static async UniTask SimulatedDelayCallbackAsync(IResult result, Func<CancellationToken, UniTask> callback, UniTaskCompletionSource<IResult> promise, CancellationToken token = default)
-    {
-        if (result.Succeed)
-        {
-            await SimulatePlayerDelayAsync(token: token);
-            if (callback != null)
-            {
-                await callback(token);
-            }
-        }
-
-        promise.TrySetResult(result);
     }
 }

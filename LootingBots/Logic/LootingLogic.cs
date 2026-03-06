@@ -7,10 +7,10 @@ using UnityEngine.AI;
 
 namespace LootingBots.Logic;
 
-internal class LootingLogic : CustomLogic
+internal class LootingLogic(BotOwner botOwner) : CustomLogic(botOwner)
 {
-    private readonly LootingBrain _lootingBrain;
-    private readonly BotLog _log;
+    private readonly LootingBrain _lootingBrain = botOwner.GetPlayer.gameObject.GetComponent<LootingBrain>();
+    private readonly BotLog _log = new(LootingBots.LootLog, botOwner);
     private float _closeEnoughTimer;
     private float _moveTimer;
     private int _stuckCount;
@@ -21,13 +21,6 @@ internal class LootingLogic : CustomLogic
     private bool _shouldUpdate
     {
         get { return !_lootingBrain.LootTaskRunning && _lootingBrain.HasActiveLootable && BotOwner.BotState == EBotState.Active; }
-    }
-
-    public LootingLogic(BotOwner botOwner)
-        : base(botOwner)
-    {
-        _log = new BotLog(LootingBots.LootLog, botOwner);
-        _lootingBrain = botOwner.GetPlayer.gameObject.GetComponent<LootingBrain>();
     }
 
     public override void Update(CustomLayer.ActionData data)

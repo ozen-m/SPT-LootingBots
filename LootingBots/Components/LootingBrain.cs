@@ -264,7 +264,7 @@ public class LootingBrain : MonoBehaviour
 
         if (_log.InfoEnabled)
         {
-            _log.LogInfo($"Trying to loot {ActiveLoot.GetLootName()} [{ActiveLootType.ToString()}]. Net Worth: {Stats.NetLootValue:N0}");
+            _log.LogInfo($"Trying to loot {ActiveLoot.GetLootName()} [{ActiveLootType.ToString()}]. Looted: {Stats.Looted:N0}₽");
         }
 
         switch (ActiveLootType)
@@ -335,7 +335,7 @@ public class LootingBrain : MonoBehaviour
 
             // Get items to loot from the corpse in a priority order based off the slots
             _itemsToLoot.Clear();
-            corpseInventoryEquipment.GetPriorityItems(_itemsToLoot);
+            corpseInventoryEquipment.GetPriorityItems(BotOwner.InventoryController.Inventory.Equipment, _itemsToLoot);
 
             await LootingTransactionController.SimulatePlayerDelayAsync(LootingStartDelay, token);
 
@@ -353,7 +353,7 @@ public class LootingBrain : MonoBehaviour
 
             if (_log.DebugEnabled)
             {
-                _log.LogDebug($"Corpse loot time: {_lootTimer.ElapsedMilliseconds / 1000f}s. Net Worth: {Stats.NetLootValue:N0}. Was successful: {isSuccessful}");
+                _log.LogDebug($"Corpse loot time: {_lootTimer.ElapsedMilliseconds / 1000f:F0}s. Looted: {Stats.Looted:N0}₽. Was successful: {isSuccessful}");
             }
         }
     }
@@ -407,7 +407,7 @@ public class LootingBrain : MonoBehaviour
 
             if (_log.DebugEnabled)
             {
-                _log.LogDebug($"Container loot time: {_lootTimer.ElapsedMilliseconds / 1000f}s. Net Worth: {Stats.NetLootValue:N0}. Was successful: {isSuccessful}");
+                _log.LogDebug($"Container loot time: {_lootTimer.ElapsedMilliseconds / 1000f:F0}s. Looted: {Stats.Looted:N0}₽. Was successful: {isSuccessful}");
             }
         }
     }
@@ -449,7 +449,7 @@ public class LootingBrain : MonoBehaviour
 
             if (_log.DebugEnabled)
             {
-                _log.LogDebug($"Loose item loot time: {_lootTimer.ElapsedMilliseconds / 1000f}s. Net Worth: {Stats.NetLootValue:N0}. Was successful: {isSuccessful}");
+                _log.LogDebug($"Loose item loot time: {_lootTimer.ElapsedMilliseconds / 1000f:F0}s. Looted: {Stats.Looted:N0}₽. Was successful: {isSuccessful}");
             }
         }
     }
