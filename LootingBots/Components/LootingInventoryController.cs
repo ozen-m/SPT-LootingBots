@@ -674,9 +674,14 @@ public class LootingInventoryController
     {
         token.ThrowIfCancellationRequested();
 
-        Weapon primary = (Weapon) _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.FirstPrimaryWeapon).ContainedItem;
-        Weapon secondary = (Weapon) _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.SecondPrimaryWeapon).ContainedItem;
-        Weapon holster = (Weapon) _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Holster).ContainedItem;
+        var primary = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.FirstPrimaryWeapon).ContainedItem as Weapon;
+        var secondary = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.SecondPrimaryWeapon).ContainedItem as Weapon;
+        var holster = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Holster).ContainedItem as Weapon;
+        var thrownMagSlot = thrownWeapon?.GetMagazineSlot();
+        var primaryMagSlot = primary?.GetMagazineSlot();
+        var secondaryMagSlot = secondary?.GetMagazineSlot();
+        var holsterMagSlot = holster?.GetMagazineSlot();
+
         _throwUselessMagsScratch.Clear();
         _botInventoryController.GetReachableItemsOfTypeNonAlloc(_throwUselessMagsScratch);
 
@@ -688,15 +693,14 @@ public class LootingInventoryController
         int reservedCount = 0;
         foreach (MagazineItemClass mag in _throwUselessMagsScratch)
         {
-            bool fitsInThrown = thrownWeapon.GetMagazineSlot() != null && thrownWeapon.GetMagazineSlot().CanAccept(mag);
-            bool fitsInPrimary = primary?.GetMagazineSlot() != null && primary.GetMagazineSlot().CanAccept(mag);
-            bool fitsInSecondary =
-                secondary?.GetMagazineSlot() != null && secondary.GetMagazineSlot().CanAccept(mag);
-            bool fitsInHolster = holster?.GetMagazineSlot() != null && holster.GetMagazineSlot().CanAccept(mag);
+            var fitsInThrown = thrownMagSlot?.CanAccept(mag) == true;
+            var fitsInPrimary = primaryMagSlot?.CanAccept(mag) == true;
+            var fitsInSecondary = secondaryMagSlot?.CanAccept(mag) == true;
+            var fitsInHolster = holsterMagSlot?.CanAccept(mag) == true;
 
             bool fitsInEquipped = fitsInPrimary || fitsInSecondary || fitsInHolster;
             bool isSharedMag = fitsInThrown && fitsInEquipped;
-            if (reservedCount < 2 && isSharedMag)
+            if (isSharedMag && reservedCount < 2)
             {
                 if (_log.DebugEnabled)
                 {
@@ -705,7 +709,7 @@ public class LootingInventoryController
 
                 reservedCount++;
             }
-            else if ((reservedCount >= 2 && fitsInEquipped) || !fitsInEquipped)
+            else if (!fitsInEquipped || reservedCount >= 2)
             {
                 if (_log.DebugEnabled)
                 {
@@ -714,15 +718,17 @@ public class LootingInventoryController
 
                 await LootingTransactionController.SimulatePlayerDelayAsync(token: token);
 
-                if (await _transactionController.ThrowItemAsync(mag, token))
+                if (!await _transactionController.ThrowItemAsync(mag, token))
                 {
-                    var magPrice = _itemAppraiser.GetItemPrice(mag, _log);
-                    if (_log.DebugEnabled)
-                    {
-                        _log.LogDebug($"Thrown {mag.ShortName.Localized()} (-{magPrice:N0}₽)");
-                    }
-                    Stats.SubtractNetValue(magPrice);
+                    continue;
                 }
+
+                var magPrice = _itemAppraiser.GetItemPrice(mag, _log);
+                if (_log.DebugEnabled)
+                {
+                    _log.LogDebug($"Thrown {mag.ShortName.Localized()} (-{magPrice:N0}₽)");
+                }
+                Stats.SubtractNetValue(magPrice);
             }
         }
 
