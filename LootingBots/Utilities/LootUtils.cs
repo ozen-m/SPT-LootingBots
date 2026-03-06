@@ -266,4 +266,36 @@ public static class LootUtils
 
         return false;
     }
+
+    /// <summary>
+    /// Check if moving an item to a slot is blocked
+    /// Except chest armor
+    /// Based on Slot.method_3
+    /// </summary>
+    public static bool HasBlockingItem(this Slot slot, Item incomingItem)
+    {
+        var conflictingSlots = slot.ConflictingSlots;
+        if (conflictingSlots is null)
+        {
+            return false;
+        }
+
+        if (!incomingItem.TryGetItemComponent<SlotBlockerComponent>(out var slotBlocker))
+        {
+            return false;
+        }
+
+        var slotNames = slotBlocker.ConflictingSlotNames;
+        for (var i = 0; i < slotNames.Length; i++)
+        {
+            if (conflictingSlots.TryGetValue(slotNames[i], out var conflictingSlot) &&
+                conflictingSlot.ContainedItem is {} conflictItem &&
+                conflictItem is not ArmorItemClass and not VestItemClass) // Exclude chest armor
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

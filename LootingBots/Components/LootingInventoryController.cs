@@ -900,6 +900,11 @@ public class LootingInventoryController
             return false;
         }
 
+        if (equipped.Parent.Container is Slot equippedSlot && equippedSlot.HasBlockingItem(itemToLoot))
+        {
+            return false;
+        }
+
         bool foundBiggerContainer = false;
 
         // If the item is a container, calculate the size and see if its bigger than what is equipped
