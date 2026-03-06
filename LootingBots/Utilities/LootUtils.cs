@@ -203,18 +203,23 @@ public static class LootUtils
         {
             var slot =  equipment.GetSlot(slotName);
             var item = slot.ContainedItem;
-            if (item != null)
+            if (item == null)
             {
-                // Check if item is unlootable
-                // TODO: Double check, InteractionsHandlerClass.smethod_23, returns InteractionsHandlerClass.GClass1598
-                var itemComponent = item.GetItemComponent<UnlootableComponent>();
-                if (itemComponent != null && equipmentOwner != botOwner && itemComponent.IsUnlootableFrom(item.Parent.Container))
-                {
-                    LootingBots.LootLog.LogWarning($"Item {item.Name} is unlootable");
-                    continue;
-                }
-                preallocatedList.Add(item);
+                continue;
             }
+
+            // Check if item is unlootable
+            var itemComponent = item.GetItemComponent<UnlootableComponent>();
+            if (itemComponent != null &&
+                equipmentOwner != botOwner &&
+                itemComponent.IsUnlootableFrom(item.Parent.Container) &&
+                item is not PocketsItemClass) // Include pockets
+            {
+                LootingBots.LootLog.LogWarning($"Item {item.Name} is unlootable");
+                continue;
+            }
+
+            preallocatedList.Add(item);
         }
     }
 
