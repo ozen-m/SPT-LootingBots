@@ -643,21 +643,18 @@ public class LootingInventoryController
     }
 
     private static readonly EquipmentSlot[] _weaponSlots = [EquipmentSlot.FirstPrimaryWeapon, EquipmentSlot.SecondPrimaryWeapon, EquipmentSlot.Holster];
-    private static readonly List<Slot> _slotsByNameScratch = [];
 
     private static bool HasAcceptableMagazineSlot(InventoryEquipment equipment, MagazineItemClass mag)
     {
-        _slotsByNameScratch.Clear();
-        equipment.GetSlotsByNameNonAlloc(_weaponSlots, _slotsByNameScratch);
-        foreach (Slot slot in _slotsByNameScratch)
+        foreach (var weaponSlot in _weaponSlots)
         {
-            if (slot.ContainedItem is not Weapon weapon)
+            var slot = equipment.GetSlot(weaponSlot);
+            if (slot?.ContainedItem is not Weapon weapon)
             {
                 continue;
             }
 
-            Slot magazineSlot = weapon.GetMagazineSlot();
-
+            var magazineSlot = weapon.GetMagazineSlot();
             if (magazineSlot != null && magazineSlot.CanAccept(mag))
             {
                 return true;
