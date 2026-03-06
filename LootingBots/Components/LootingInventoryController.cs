@@ -385,8 +385,11 @@ public class LootingInventoryController
                         {
                             if (swapAction.TransferItems)
                             {
-                                // Throw undervalued items in our newly equipped item to make space,
-                                // then loot the thrown item
+                                // To make space we:
+                                // - throw away useless mags in our newly equipped item
+                                // - throw undervalued items in our newly equipped item
+                                // Then loot the thrown item
+                                await ThrowUselessMagsAsync(null, token);
                                 await ThrowUndervaluedItemsAsync((SearchableItemItemClass) swapAction.Item, token);
                                 await LootNestedItemsAsync((SearchableItemItemClass) swapAction.ToSwap, token);
                             }
@@ -1003,29 +1006,36 @@ public class LootingInventoryController
         var itemsToThrow = DictionaryPool<Item, float>.Get();
         try
         {
-            WildSpawnType botType = _botOwner.Profile.Info.Settings.Role;
-            bool isPMC = botType.IsPMC();
+            var botType = _botOwner.Profile.Info.Settings.Role;
+            var isPmc = botType.IsPMC();
 
             foreach (var nestedItem in parentItem.GetFirstLevelItems())
             {
                 // Check the conditions to filter out items
-                bool isItemLocked = nestedItem.CurrentAddress?.Container is Slot slot && slot.Locked;
+                if (nestedItem.Id == parentItem.Id ||
+                    nestedItem is MagazineItemClass || // Use ThrowUselessMagazinesAsync
+                    nestedItem.QuestItem ||
+                    nestedItem.CurrentAddress?.Container is Slot slot && slot.Locked) // Slot is locked
+                {
+                    continue;
+                }
 
                 var value = _itemAppraiser.GetItemPrice(nestedItem, _log);
-                var minimumValue = isPMC ? LootingBots.PMCMinLootThreshold.Value : LootingBots.ScavMinLootThreshold.Value;
-                var shouldThrow = value < minimumValue;
-
-                if (nestedItem.Id != parentItem.Id && !nestedItem.QuestItem && !isItemLocked && shouldThrow)
+                var minimumValue = isPmc ? LootingBots.PMCMinLootThreshold.Value : LootingBots.ScavMinLootThreshold.Value;
+                var isUnderValued = value < minimumValue;
+                if (!isUnderValued)
                 {
-                    itemsToThrow.Add(nestedItem, value);
+                    continue;
                 }
+
+                itemsToThrow.Add(nestedItem, value);
             }
 
             if (itemsToThrow.Count > 0)
             {
                 if (_log.DebugEnabled)
                 {
-                    _log.LogDebug($"Throwing {itemsToThrow.Count} items from {parentItem.Name.Localized()}");
+                    _log.LogDebug($"Throwing {itemsToThrow.Count} undervalued items from {parentItem.Name.Localized()}");
                 }
 
                 foreach ((Item item, float value) in itemsToThrow)
@@ -1036,7 +1046,7 @@ public class LootingInventoryController
                     {
                         if (_log.DebugEnabled)
                         {
-                            _log.LogDebug($"Thrown {item.ShortName.Localized()} (-{value:N0}₽)");
+                            _log.LogDebug($"Thrown {item.Name.Localized()} (-{value:N0}₽)");
                         }
                         Stats.SubtractNetValue(value);
                     }
