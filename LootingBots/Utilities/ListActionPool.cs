@@ -6,7 +6,7 @@ namespace LootingBots.Utilities;
 public static class ListActionPool
 {
     private static readonly ObjectPool<List<LootingAction>> _pool = new(
-        () => [],
+        Create,
         null,
         OnRelease,
         LogOnDestroyInstance,
@@ -14,6 +14,11 @@ public static class ListActionPool
         2,
         32
     );
+
+    public static List<LootingAction> Create()
+    {
+        return [];
+    }
 
     public static List<LootingAction> Rent()
     {
