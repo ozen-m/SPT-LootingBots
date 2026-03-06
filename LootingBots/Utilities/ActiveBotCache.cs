@@ -6,7 +6,7 @@ namespace LootingBots.Utilities;
 // dont try and path to the same lootable
 public static class ActiveBotCache
 {
-    public static List<BotOwner> ActiveBots = [];
+    public static readonly List<BotOwner> ActiveBots = [];
 
     public static bool IsCacheActive
     {
@@ -25,7 +25,7 @@ public static class ActiveBotCache
 
     public static void Reset()
     {
-        ActiveBots = [];
+        ActiveBots.Clear();
     }
 
     public static void Add(BotOwner botOwner)

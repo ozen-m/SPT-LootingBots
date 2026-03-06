@@ -10,9 +10,9 @@ namespace LootingBots.Utilities;
 public static class ActiveLootCache
 {
     // Handle to the players instance for use in friendly checks
-    public static List<IPlayer> ActivePlayers { get; private set; } = [];
+    public static List<IPlayer> ActivePlayers { get; } = [];
 
-    public static Dictionary<string, BotOwner> ActiveLoot { get; private set; } = [];
+    public static Dictionary<string, BotOwner> ActiveLoot { get; } = [];
 
     public static void Init()
     {
@@ -39,8 +39,8 @@ public static class ActiveLootCache
 
     public static void Reset()
     {
-        ActiveLoot = [];
-        ActivePlayers = [];
+        ActiveLoot.Clear();
+        ActivePlayers.Clear();
     }
 
     public static bool CacheActiveLootId(string containerId, BotOwner botOwner)
@@ -58,6 +58,7 @@ public static class ActiveLootCache
     }
 
     private static readonly List<string> _keysToRemoveScratch = [];
+
     public static void Cleanup(BotOwner botOwner)
     {
         try

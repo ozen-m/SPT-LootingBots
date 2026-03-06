@@ -89,7 +89,10 @@ public static class LootUtils
     */
     public static int GetAvailableGridSlots(StashGridClass[] grids)
     {
-        grids ??= [];
+        if (grids is null)
+        {
+            return 0;
+        }
 
         // Initialize freeSpaces to 0
         int freeSpaces = 0;
