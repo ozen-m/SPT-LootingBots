@@ -6,30 +6,35 @@ public static class ScanScheduler
     // TODO: Add config
 
     private static readonly Stack<int> _tickets = [];
-    private static bool _init;
+
+    static ScanScheduler()
+    {
+        for (var i = 1; i <= Capacity; i++)
+        {
+            _tickets.Push(i);
+        }
+    }
 
     public static bool CanStartScan(out int ticket)
     {
-        if (!_init)
-        {
-            Init();
-        }
-
         return _tickets.TryPop(out ticket);
     }
 
     public static void Return(int ticket)
     {
-        _tickets.Push(ticket);
-    }
 
-    private static void Init()
-    {
-        for (var i = 1; i < Capacity + 1; i++)
+#if DEBUG
+        if (ticket is < 1 or > Capacity)
         {
-            _tickets.Push(i);
+            throw new ArgumentOutOfRangeException(nameof(ticket), ticket, $"Ticket is less than 1 or more than the capacity ({Capacity})!");
         }
 
-        _init = true;
+        if (_tickets.Contains(ticket))
+        {
+            throw new InvalidOperationException($"Ticket {ticket} already exists");
+        }
+#endif
+
+        _tickets.Push(ticket);
     }
 }
