@@ -22,13 +22,13 @@ internal class FindLootLogic(BotOwner botOwner) : CustomLogic(botOwner)
         }
 
         // Trigger a scan if one is not running already
-        if (!_lootFinder.IsScanRunning)
+        if (!_lootFinder.IsScanRunning && ScanScheduler.CanStartScan(out var ticket))
         {
             if (_log.DebugEnabled)
             {
                 _log.LogDebug($"Starting scan - free space: {_lootingBrain.HasFreeSpace}. isScanRunning: {_lootFinder.IsScanRunning}");
             }
-            _lootFinder.BeginSearch(queue);
+            _lootFinder.BeginSearch(ticket);
         }
     }
 

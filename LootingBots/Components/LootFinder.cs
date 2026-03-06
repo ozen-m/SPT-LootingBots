@@ -71,13 +71,13 @@ public class LootFinder : MonoBehaviour
         }
     }
 
-    public void BeginSearch()
+    public void BeginSearch(int ticket)
     {
         IsScanRunning = true;
 
         StopFindLootTask();
         _lootFinderCts = new CancellationTokenSource();
-        FindLootAsync(_lootFinderCts.Token).Forget();
+        FindLootAsync(ticket, _lootFinderCts.Token).Forget();
 
         SetLockUntilNextScan(false);
     }
@@ -107,7 +107,7 @@ public class LootFinder : MonoBehaviour
         _lootFinderCts = null;
     }
 
-    private async UniTask FindLootAsync(CancellationToken token)
+    private async UniTask FindLootAsync(int queue, CancellationToken token)
     {
         IsScanRunning = true;
 
@@ -299,6 +299,8 @@ public class LootFinder : MonoBehaviour
             _colliderPool.Return(colliders, true);
             IsScanRunning = false;
             _lootingBrain.ForceBrainEnabled = false;
+
+            ScanScheduler.Return(queue);
         }
     }
 
