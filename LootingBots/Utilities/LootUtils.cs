@@ -209,13 +209,12 @@ public static class LootUtils
             }
 
             // Check if item is unlootable
-            var itemComponent = item.GetItemComponent<UnlootableComponent>();
-            if (itemComponent != null &&
+            var unlootableComponent = item.GetItemComponent<UnlootableComponent>();
+            if (unlootableComponent != null &&
                 equipmentOwner != botOwner &&
-                itemComponent.IsUnlootableFrom(item.Parent.Container) &&
-                item is not PocketsItemClass) // Include pockets
+                unlootableComponent.IsUnlootableFrom(item.Parent.Container) &&
+                item is not PocketsItemClass) // Include pockets to loot list
             {
-                LootingBots.LootLog.LogWarning($"Item {item.Name} is unlootable");
                 continue;
             }
 
@@ -289,8 +288,8 @@ public static class LootUtils
         for (var i = 0; i < slotNames.Length; i++)
         {
             if (conflictingSlots.TryGetValue(slotNames[i], out var conflictingSlot) &&
+                conflictingSlot != slot && // Exclude checking the same slot
                 conflictingSlot.ContainedItem is {} conflictItem &&
-                conflictItem != incomingItem && // Exclude incoming item
                 conflictItem is not ArmorItemClass and not VestItemClass) // Exclude chest armor
             {
                 return true;

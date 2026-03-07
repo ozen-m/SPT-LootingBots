@@ -183,11 +183,11 @@ public class LootingTransactionController(InventoryController inventoryControlle
         }
 
         var moveNetworkResult = await inventoryController.TryRunNetworkTransaction(moveResult).AsUniTask().AttachExternalCancellation(token);
-        if (moveNetworkResult.Failed || token.IsCancellationRequested)
+        if (token.IsCancellationRequested || moveNetworkResult.Failed)
         {
             if (log.ErrorEnabled)
             {
-                log.LogError($"Failed to move {item.Name.Localized()} to {location.Container.ID.Localized()} [{location.GetRootItem()?.Name.Localized()}]. Network Error: {moveNetworkResult.Error}");
+                log.LogError($"Failed to move {item.Name.Localized()} to {location.Container.ID.Localized()} [{location.GetRootItem()?.Name.Localized()}]. Network Error: {moveNetworkResult?.Error}");
             }
             return false;
         }
@@ -223,11 +223,11 @@ public class LootingTransactionController(InventoryController inventoryControlle
         }
 
         var swapNetworkResult = await inventoryController.TryRunNetworkTransaction(swapResult).AsUniTask().AttachExternalCancellation(token);
-        if (swapNetworkResult.Failed || token.IsCancellationRequested)
+        if (token.IsCancellationRequested || swapNetworkResult.Failed)
         {
             if (log.ErrorEnabled)
             {
-                log.LogError($"Failed to swap {item.Name.Localized()} with {toSwap.Name.Localized()}. Network Error: {swapNetworkResult.Error}");
+                log.LogError($"Failed to swap {item.Name.Localized()} with {toSwap.Name.Localized()}. Network Error: {swapNetworkResult?.Error}");
             }
             return false;
         }
@@ -268,11 +268,11 @@ public class LootingTransactionController(InventoryController inventoryControlle
 
         await SimulatePlayerDelayAsync(token: token);
         var mergeNetworkResult = await inventoryController.TryRunNetworkTransaction(mergeResult).AsUniTask().AttachExternalCancellation(token);
-        if (mergeNetworkResult.Failed || token.IsCancellationRequested)
+        if (token.IsCancellationRequested || mergeNetworkResult.Failed)
         {
             if (log.ErrorEnabled)
             {
-                log.LogError($"Failed to merge {toMove.Name.Localized()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount}). Network Error: {mergeNetworkResult.Error}" );
+                log.LogError($"Failed to merge {toMove.Name.Localized()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount}). Network Error: {mergeNetworkResult?.Error}" );
             }
             return false;
         }
