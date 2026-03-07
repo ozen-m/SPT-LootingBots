@@ -56,8 +56,18 @@ public class LootingSwapAction : LootingAction
         }
 
         // Cannot swap, try throwing first then equipping after
-        return await controller.ThrowItemAsync(ToSwap, token) &&
-               await controller.MoveItemAsync(Item, null, token);
+        var throwResult = await controller.ThrowItemAsync(ToSwap, token);
+        var equipResult = await controller.TryEquipItemAsync(Item, token);
+        var shouldRollback =  throwResult && !equipResult;
+
+        // If equipping main item failed, re-equip thrown item
+        if (shouldRollback)
+        {
+            await controller.MoveItemAsync(ToSwap, null, token);
+            return false;
+        }
+
+        return throwResult && equipResult;
     }
 
     public override void Return()

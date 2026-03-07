@@ -832,7 +832,7 @@ public class LootingInventoryController
                     {
                         if (_log.DebugEnabled)
                         {
-                            _log.LogDebug($"Trying to throw secondary {secondary.Name.Localized()} (₽{secondaryValue}), then equip {lootWeapon.Name.Localized()} (₽{lootValue}) to secondary, then swap with primary {primary.Name.Localized()} (₽{primaryValue})");
+                            _log.LogDebug($"Trying to throw secondary {secondary.Name.Localized()} (₽{secondaryValue}), then move primary {primary.Name.Localized()} (₽{primaryValue}) to secondary, then equip {lootWeapon.Name.Localized()} (₽{lootValue})");
                         }
 
                         var throwAction = LootingThrowAction.Rent(secondary, -secondaryValue);
