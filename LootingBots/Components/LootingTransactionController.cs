@@ -167,7 +167,7 @@ public class LootingTransactionController(InventoryController inventoryControlle
 
         if (log.WarningEnabled)
         {
-            log.LogWarning($"Moving {item.Name.Localized()} to: {location.Container.ID.Localized()}...");
+            log.LogWarning($"Moving {item.Name.Localized()} to: {location.Container.ID.Localized()} [{location.GetRootItem()?.Name.Localized()}]...");
         }
 
         await SimulatePlayerDelayAsync(token: token);
@@ -177,7 +177,7 @@ public class LootingTransactionController(InventoryController inventoryControlle
         {
             if (log.ErrorEnabled)
             {
-                log.LogWarning($"Failed to move {item.Name.Localized()} to {location.Container.ID.Localized()}. Error: {moveResult.Error}");
+                log.LogWarning($"Failed to move {item.Name.Localized()} to {location.Container.ID.Localized()} [{location.GetRootItem()?.Name.Localized()}]. Error: {moveResult.Error}");
             }
             return false;
         }
@@ -187,14 +187,14 @@ public class LootingTransactionController(InventoryController inventoryControlle
         {
             if (log.ErrorEnabled)
             {
-                log.LogError($"Failed to move {item.Name.Localized()} to {location.Container.ID.Localized()}. Network Error: {moveNetworkResult.Error}");
+                log.LogError($"Failed to move {item.Name.Localized()} to {location.Container.ID.Localized()} [{location.GetRootItem()?.Name.Localized()}]. Network Error: {moveNetworkResult.Error}");
             }
             return false;
         }
 
         if (log.DebugEnabled)
         {
-            log.LogDebug($"Moving {item.Name.Localized()} to: {location.Container.ID.Localized()}...done");
+            log.LogDebug($"Moving {item.Name.Localized()} to: {location.Container.ID.Localized()} [{location.GetRootItem()?.Name.Localized()}]...done");
         }
 
         return true;
@@ -285,7 +285,9 @@ public class LootingTransactionController(InventoryController inventoryControlle
         return true;
     }
 
-    /** Method used when we want the bot the throw an item and then equip an item immediately afterwards */
+    /// <summary>
+    /// Method used when we want the bot the throw an item
+    /// </summary>
     public async UniTask<bool> ThrowItemAsync(Item toThrow, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();

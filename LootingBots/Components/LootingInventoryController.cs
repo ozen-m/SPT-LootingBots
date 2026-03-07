@@ -471,9 +471,9 @@ public class LootingInventoryController
                         }
                         if (itemsToAdd.Count > 0)
                         {
-                            if (_log.DebugEnabled)
+                            if (_log.WarningEnabled)
                             {
-                                _log.LogDebug($"Trying to strip attachments of weapon: {weapon.Name.Localized()}");
+                                _log.LogWarning($"Trying to strip attachments of weapon: {weapon.Name.Localized()}");
                             }
 
                             // Call TryAddItemsToBot with the filtered items
@@ -486,10 +486,6 @@ public class LootingInventoryController
                     }
                     finally
                     {
-                        if (token.IsCancellationRequested)
-                        {
-                            _log.LogError("TryAddItemsToBotAsync:Cancelled, returning List<Item> to ListPool<Item>");
-                        }
                         ListPool<Item>.Release(itemsToAdd);
                     }
                 }
@@ -497,10 +493,6 @@ public class LootingInventoryController
         }
         finally
         {
-            if (token.IsCancellationRequested)
-            {
-                _log.LogError("TryAddItemsToBotAsync:Cancelled, returning List<LootingAction> to ListActionPool");
-            }
             ListActionPool.Return(lootingActions);
         }
 
@@ -615,6 +607,7 @@ public class LootingInventoryController
         }
         else if (EquipmentTypeUtils.IsChestArmor(lootItem) && ShouldSwapGear(chest, lootItem))
         {
+            // TODO: Add check for chest armor vs equipped armored rig
             GetSwapAction(lootItem, chest, lootingActions);
         }
         else if (EquipmentTypeUtils.IsTacticalRig(lootItem) && ShouldSwapGear(tacVest, lootItem))
@@ -1002,10 +995,6 @@ public class LootingInventoryController
         }
         finally
         {
-            if (token.IsCancellationRequested)
-            {
-                _log.LogError("LootNestedItemsAsync:Cancelled, returning List<Item> to ListPool<Item>");
-            }
             ListPool<Item>.Release(items);
         }
     }
@@ -1077,10 +1066,6 @@ public class LootingInventoryController
         }
         finally
         {
-            if (token.IsCancellationRequested)
-            {
-                _log.LogError("ThrowUndervaluesItemsAsync:Cancelled, returning Dictionary<Item, float> to DictionaryPool<Item, float>");
-            }
             DictionaryPool<Item, float>.Release(itemsToThrow);
         }
     }
