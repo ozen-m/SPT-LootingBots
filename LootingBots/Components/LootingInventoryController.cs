@@ -403,6 +403,12 @@ public class LootingInventoryController
                         {
                             // Ignore thrown loot
                             _lootingBrain.IgnoreLoot(throwAction.Item.Id);
+
+                            // Throw mags of thrown weapon
+                            if (throwAction.Item is Weapon thrownWeapon)
+                            {
+                                await ThrowUselessMagsAsync(thrownWeapon, token);
+                            }
                         }
                     }
 
@@ -732,6 +738,7 @@ public class LootingInventoryController
                     _log.LogDebug($"Thrown {mag.ShortName.Localized()} (-{magPrice:N0}₽)");
                 }
                 Stats.SubtractNetValue(magPrice);
+                _lootingBrain.IgnoreLoot(mag.Id);
             }
         }
 
@@ -1047,14 +1054,17 @@ public class LootingInventoryController
                 {
                     await LootingTransactionController.SimulatePlayerDelayAsync(token: token);
 
-                    if (await _transactionController.ThrowItemAsync(item, token))
+                    if (!await _transactionController.ThrowItemAsync(item, token))
                     {
-                        if (_log.DebugEnabled)
-                        {
-                            _log.LogDebug($"Thrown {item.Name.Localized()} (-{value:N0}₽)");
-                        }
-                        Stats.SubtractNetValue(value);
+                        continue;
                     }
+
+                    if (_log.DebugEnabled)
+                    {
+                        _log.LogDebug($"Thrown {item.Name.Localized()} (-{value:N0}₽)");
+                    }
+                    Stats.SubtractNetValue(value);
+                    _lootingBrain.IgnoreLoot(item.Id);
                 }
 
                 return;
