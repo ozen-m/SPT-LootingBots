@@ -54,9 +54,9 @@ public class LootingSwapAction : LootingAction
     /// </summary>
     public bool TransferItems { get; set; }
 
-    public override async UniTask<bool> ExecuteAsync(LootingTransactionController controller, CancellationToken token)
+    public override UniTask<bool> ExecuteAsync(LootingTransactionController controller, CancellationToken token)
     {
-        return await controller.SwapItemsAsync(Item, ToSwap, token);
+        return controller.SwapItemsAsync(Item, ToSwap, token);
     }
 
     public override void Return()

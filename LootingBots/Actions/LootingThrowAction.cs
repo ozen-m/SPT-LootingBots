@@ -34,9 +34,9 @@ public class LootingThrowAction : LootingAction
         return throwAction;
     }
 
-    public override async UniTask<bool> ExecuteAsync(LootingTransactionController controller, CancellationToken token)
+    public override UniTask<bool> ExecuteAsync(LootingTransactionController controller, CancellationToken token)
     {
-        return await controller.ThrowItemAsync(Item, token);
+        return controller.ThrowItemAsync(Item, token);
     }
 
     public override void Return()

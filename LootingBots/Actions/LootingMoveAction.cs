@@ -41,9 +41,9 @@ public class LootingMoveAction : LootingAction
     /// </summary>
     public ItemAddress Place { get; set; }
 
-    public override async UniTask<bool> ExecuteAsync(LootingTransactionController controller, CancellationToken token)
+    public override UniTask<bool> ExecuteAsync(LootingTransactionController controller, CancellationToken token)
     {
-        return await controller.MoveItemAsync(Item, Place, token);
+        return controller.MoveItemAsync(Item, Place, token);
     }
 
     public override void Return()
