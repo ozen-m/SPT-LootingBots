@@ -11,7 +11,7 @@ namespace LootingBots;
 
 [BepInPlugin(MOD_GUID, MOD_NAME, MOD_VERSION)]
 [BepInDependency("xyz.drakia.bigbrain", "1.4.0")]
-[BepInProcess("EscapeFromTarkov.exe")]
+[BepInDependency("com.arys.unitytoolkit", "2.0.1")]
 public class LootingBots : BaseUnityPlugin
 {
     private PatchManager _patchManager;
