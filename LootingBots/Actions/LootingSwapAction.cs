@@ -27,13 +27,12 @@ public class LootingSwapAction : LootingAction
         return new LootingSwapAction();
     }
 
-    public static LootingSwapAction Rent(Item item, Item toSwap, float netWorthDelta = 0f, bool throwMags = false, bool transferItems = false)
+    public static LootingSwapAction Rent(Item item, Item toSwap, float netWorthDelta = 0f, bool transferItems = false)
     {
         var swapAction = _pool.Get();
         swapAction.Item = item;
         swapAction.ToSwap = toSwap;
         swapAction.NetWorthDelta = netWorthDelta;
-        swapAction.ThrowMags = throwMags;
         swapAction.TransferItems = transferItems;
 
         return swapAction;
@@ -45,18 +44,20 @@ public class LootingSwapAction : LootingAction
     public Item ToSwap { get; set; }
 
     /// <summary>
-    /// Throw unused magazines previously used by ToSwap
-    /// </summary>
-    public bool ThrowMags { get; set; }
-
-    /// <summary>
     /// Loot items from thrown item if true
     /// </summary>
     public bool TransferItems { get; set; }
 
-    public override UniTask<bool> ExecuteAsync(LootingTransactionController controller, CancellationToken token)
+    public override async UniTask<bool> ExecuteAsync(LootingTransactionController controller, CancellationToken token)
     {
-        return controller.SwapItemsAsync(Item, ToSwap, token);
+        if (await controller.SwapItemsAsync(Item, ToSwap, token))
+        {
+            return true;
+        }
+
+        // Cannot swap, try throwing first then equipping after
+        return await controller.ThrowItemAsync(ToSwap, token) &&
+               await controller.MoveItemAsync(Item, null, token);
     }
 
     public override void Return()
@@ -68,7 +69,6 @@ public class LootingSwapAction : LootingAction
     {
         base.Reset();
         ToSwap = null;
-        ThrowMags = false;
         TransferItems = false;
     }
 }
