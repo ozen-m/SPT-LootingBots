@@ -355,7 +355,7 @@ public class LootingInventoryController
                 }
 
                 // Check to see if we need to swap gear
-                lootingActions.Clear();
+                ListActionPool.Reset(lootingActions);
                 var canEquipGear = GetEquipAction(item, lootingActions);
                 if (canEquipGear)
                 {

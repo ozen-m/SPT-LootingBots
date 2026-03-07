@@ -30,6 +30,18 @@ public static class ListActionPool
         _pool.Release(list);
     }
 
+    /// <summary>
+    /// Resets all the elements in the list and clears the list.
+    /// Used when reusing the list before returning.
+    /// </summary>
+    public static void Reset(List<LootingAction> list)
+    {
+        OnRelease(list);
+    }
+
+    /// <summary>
+    /// Return each LootingAction on the list and then clear the list
+    /// </summary>
     private static void OnRelease(List<LootingAction> lootingAction)
     {
         foreach (var action in lootingAction)
