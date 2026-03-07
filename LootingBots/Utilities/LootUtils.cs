@@ -290,6 +290,7 @@ public static class LootUtils
         {
             if (conflictingSlots.TryGetValue(slotNames[i], out var conflictingSlot) &&
                 conflictingSlot.ContainedItem is {} conflictItem &&
+                conflictItem != incomingItem && // Exclude incoming item
                 conflictItem is not ArmorItemClass and not VestItemClass) // Exclude chest armor
             {
                 return true;
