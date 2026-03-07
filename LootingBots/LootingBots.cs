@@ -234,7 +234,7 @@ public class LootingBots : BaseUnityPlugin
         LootScanInterval = Config.Bind(
             "Loot Finder (Timing)",
             "Loot scan interval",
-            10f,
+            15f,
             new ConfigDescription(
                 "The amount of seconds the bot will wait until triggering another loot scan",
                 null,
@@ -244,7 +244,7 @@ public class LootingBots : BaseUnityPlugin
         TransactionDelay = Config.Bind(
             "Loot Finder (Timing)",
             "Delay after taking item (ms)",
-            1500D,
+            3000D,
             new ConfigDescription(
                 "Amount of milliseconds a bot will wait after taking an item into their inventory before attempting to loot another item. Simulates the amount of time it takes for a player to look through loot decide to take something.",
                 null,
