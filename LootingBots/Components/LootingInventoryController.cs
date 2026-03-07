@@ -868,28 +868,37 @@ public class LootingInventoryController
             return false;
         }
 
-        bool foundBiggerContainer = false;
-
-        // If the item is a container, calculate the size and see if its bigger than what is equipped
-        if (equipped.IsContainer)
-        {
-            int equippedSize = (equipped as SearchableItemItemClass).GetContainerSize();
-            int itemToLootSize = (itemToLoot as SearchableItemItemClass).GetContainerSize();
-
-            foundBiggerContainer = equippedSize < itemToLootSize;
-        }
-
-        int armorDifference = GetArmorDifference(equipped, itemToLoot);
-
-        bool foundBetterArmor = armorDifference > 0; // Equip if we found item with a better armor class.
-        bool pickupBiggerContainer = armorDifference == 0 && foundBiggerContainer; // If the item is bigger than what is equipped, only equip it if the armor class is the same
-
-        if (foundBetterArmor || pickupBiggerContainer)
+        // Equip if we found item with a better armor class
+        var armorDifference = GetArmorDifference(equipped, itemToLoot);
+        if (armorDifference > 0)
         {
             return true;
         }
 
-        return armorDifference == 0 && LootIsMoreValuable(equipped); // If the item is more valuable than what is equipped, only equip it if the armor class is the same
+        var foundBiggerContainer = false;
+
+        // If the item is a container, calculate the size and see if its bigger than what is equipped
+        if (equipped.IsContainer)
+        {
+            var equippedSize = (equipped as SearchableItemItemClass).GetContainerSize();
+            var itemToLootSize = (itemToLoot as SearchableItemItemClass).GetContainerSize();
+
+            foundBiggerContainer = itemToLootSize > equippedSize;
+        }
+
+        // If the item is bigger than what is equipped, only equip it if the armor class is the same
+        if (armorDifference == 0 && foundBiggerContainer)
+        {
+            return true;
+        }
+
+        // If the item is more valuable than what is equipped, only equip it if the armor class is the same
+        if (armorDifference == 0 && LootIsMoreValuable(equipped))
+        {
+            return true;
+        }
+
+        return false;
     }
 
     /** Given a piece of armor, compare it against what is curren */
@@ -910,11 +919,52 @@ public class LootingInventoryController
     */
     public static int GetArmorDifference(Item equippedItem, Item itemToLoot)
     {
-        ArmorComponent newArmor = itemToLoot.GetItemComponent<ArmorComponent>();
-        ArmorComponent currentArmor = equippedItem?.GetItemComponent<ArmorComponent>();
+        var currentArmorClass = equippedItem?.GetItemComponent<ArmorComponent>()?.ArmorClass ?? 0;
+        if (equippedItem is ArmoredEquipmentItemClass equippedArmorItem)
+        {
+            // Also check Plates inside armor slots
+            foreach (var slot in equippedArmorItem.Slots)
+            {
+                if (slot is not GClass3125 { ContainedItem: ArmorPlateItemClass armorPlate })
+                {
+                    // Slot is not an armor slot
+                    continue;
+                }
 
-        int currentArmorClass = currentArmor?.ArmorClass ?? 0;
-        int newArmorClass = newArmor?.ArmorClass ?? 0;
+                var armorComponent = armorPlate.Armor;
+                if (armorComponent != null)
+                {
+                    var armorClass = armorComponent.ArmorClass;
+                    if (armorClass > currentArmorClass)
+                    {
+                        currentArmorClass = armorClass;
+                    }
+                }
+            }
+        }
+
+        var newArmorClass = itemToLoot.GetItemComponent<ArmorComponent>()?.ArmorClass ?? 0;
+        if (itemToLoot is ArmoredEquipmentItemClass newArmorItem)
+        {
+            foreach (var slot in newArmorItem.Slots)
+            {
+                if (slot is not GClass3125 { ContainedItem: ArmorPlateItemClass armorPlate })
+                {
+                    // Slot is not an armor slot and/or not containing an armor plate
+                    continue;
+                }
+
+                var armorComponent = armorPlate.Armor;
+                if (armorComponent != null)
+                {
+                    var armorClass = armorComponent.ArmorClass;
+                    if (armorClass > newArmorClass)
+                    {
+                        newArmorClass = armorClass;
+                    }
+                }
+            }
+        }
 
         return newArmorClass - currentArmorClass;
     }
