@@ -623,6 +623,11 @@ public class LootingInventoryController
         return mag != null && HasAcceptableMagazineSlot(_botInventoryController.Inventory.Equipment, mag);
     }
 
+    public bool IsUsableAmmo(AmmoItemClass ammo)
+    {
+        return ammo != null && HasAcceptableAmmoSlot(_botInventoryController.Inventory.Equipment, ammo);
+    }
+
     private static readonly EquipmentSlot[] _weaponSlots = [EquipmentSlot.FirstPrimaryWeapon, EquipmentSlot.SecondPrimaryWeapon, EquipmentSlot.Holster];
 
     private static bool HasAcceptableMagazineSlot(InventoryEquipment equipment, MagazineItemClass mag)
@@ -639,6 +644,28 @@ public class LootingInventoryController
             if (magazineSlot != null && magazineSlot.CanAccept(mag))
             {
                 return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasAcceptableAmmoSlot(InventoryEquipment equipment, AmmoItemClass ammo)
+    {
+        foreach (var weaponSlot in _weaponSlots)
+        {
+            var slot = equipment.GetSlot(weaponSlot);
+            if (slot?.ContainedItem is not Weapon weapon)
+            {
+                continue;
+            }
+
+            foreach (var chamber in weapon.Chambers)
+            {
+                if (chamber.CanAccept(ammo))
+                {
+                    return true;
+                }
             }
         }
 
@@ -1001,7 +1028,7 @@ public class LootingInventoryController
 
             if (_log.DebugEnabled)
             {
-                _log.LogDebug($"No nested items found in {parentItem.Name}");
+                _log.LogDebug($"No nested items found to loot in {parentItem.Name}");
             }
 
             return true;
@@ -1028,8 +1055,9 @@ public class LootingInventoryController
                 // Check the conditions to filter out items
                 if (nestedItem.Id == parentItem.Id ||
                     nestedItem.QuestItem ||
-                    nestedItem.CurrentAddress?.Container is Slot slot && slot.Locked ||  // Slot is locked
-                    nestedItem is MagazineItemClass mag && IsUsableMag(mag)) // Mag can be used
+                    nestedItem.CurrentAddress?.Container is Slot slot && slot.Locked || // Slot is locked
+                    nestedItem is MagazineItemClass mag && IsUsableMag(mag) || // Mag can be used
+                    nestedItem is AmmoItemClass ammo && IsUsableAmmo(ammo)) // Ammo can be used
                 {
                     continue;
                 }
@@ -1074,7 +1102,7 @@ public class LootingInventoryController
 
             if (_log.DebugEnabled)
             {
-                _log.LogDebug($"No nested items found to throw in {parentItem.Name}");
+                _log.LogDebug($"No undervalued items found to throw in {parentItem.Name}");
             }
         }
         finally
@@ -1173,6 +1201,7 @@ public class LootingInventoryController
 
         // All usable mags and money should be considered eligible to loot. Otherwise all other items fall subject to the mod settings for restricting pickup and loot value thresholds
         return IsUsableMag(lootItem as MagazineItemClass)
+               || IsUsableAmmo(lootItem as AmmoItemClass)
                || isMoney
                || (pickupNotRestricted && (EquipmentTypeUtils.IsDogtag(lootItem) || IsValuableEnough(CurrentItemPrice / itemSize /* Divide by slots to get price per slot */)));
     }
