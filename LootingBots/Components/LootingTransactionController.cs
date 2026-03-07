@@ -147,7 +147,7 @@ public class LootingTransactionController(InventoryController inventoryControlle
 
         if (log.DebugEnabled)
         {
-            log.LogDebug($"No valid slot found for: {item.Name.Localized()}");
+            log.LogDebug($"Could not find a place to pickup: {item.Name.Localized()}");
         }
 
         return UniTask.FromResult(false);
@@ -160,9 +160,10 @@ public class LootingTransactionController(InventoryController inventoryControlle
     {
         token.ThrowIfCancellationRequested();
 
+        // No address was given, try equipping or picking up
         if (location == null)
         {
-            return await TryEquipItemAsync(item, token);
+            return await TryEquipItemAsync(item, token) || await TryPickupItemAsync(item, token);
         }
 
         if (log.WarningEnabled)
