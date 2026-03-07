@@ -138,6 +138,7 @@ public class LootingBrain : MonoBehaviour
         IsPlayerScav = BotOwner.Profile.WillBeAPlayerScav();
         _performanceTimer = Time.time + PeformanceTimerInterval;
         ActiveLootCache.Init();
+        ScanScheduler.Init();
 
         if (ActiveBotCache.IsCacheActive)
         {

@@ -83,6 +83,7 @@ public class LootingBots : BaseUnityPlugin
     // Performance Settings
     public static ConfigEntry<int> MaxActiveLootingBots;
     public static ConfigEntry<int> LimitDistanceFromPlayer;
+    public static ConfigEntry<int> MaxConcurrentScans;
 
     public void LootFinderSettings()
     {
@@ -418,6 +419,16 @@ public class LootingBots : BaseUnityPlugin
                 "Any bot farther than the specified distance in meters will not run any looting logic. A value of 0 represents no limit",
                 null,
                 new ConfigurationManagerAttributes { Order = 10 }
+            )
+        );
+        MaxConcurrentScans = Config.Bind(
+            "Performance",
+            "Maximum concurrent scans",
+            3,
+            new ConfigDescription(
+                "Max number of bots that can scan for loot at the same time. Takes effect next raid. A value of 0 represents no limit",
+                new AcceptableValueRange<int>(0, 35),
+                new ConfigurationManagerAttributes { Order = 9 }
             )
         );
     }

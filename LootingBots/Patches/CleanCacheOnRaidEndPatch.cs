@@ -22,5 +22,6 @@ public class CleanCacheOnRaidEndPatch : ModulePatch
 
         ActiveLootCache.Reset();
         ActiveBotCache.Reset();
+        ScanScheduler.Reset();
     }
 }

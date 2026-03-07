@@ -2,29 +2,65 @@
 
 public static class ScanScheduler
 {
-    private const int Capacity = 2;
-    // TODO: Add config
-
     private static readonly Stack<int> _tickets = [];
+    private static bool _init;
+    private static int _capacity;
 
-    static ScanScheduler()
+    public static void Init()
     {
-        for (var i = 1; i <= Capacity; i++)
+        if (_init)
         {
-            _tickets.Push(i);
+            return;
         }
+
+        _capacity = LootingBots.MaxConcurrentScans.Value;
+        if (_capacity > 0)
+        {
+            for (var i = 1; i <= _capacity; i++)
+            {
+                _tickets.Push(i);
+            }
+        }
+        _init = true;
+    }
+
+    public static void Reset()
+    {
+        _init = false;
+        _tickets.Clear();
     }
 
     public static bool CanStartScan(out int ticket)
     {
+        ticket = 0;
+
+        if (_capacity == 0)
+        {
+            return true;
+        }
+
+        if (!_init)
+        {
+            return false;
+        }
+
         return _tickets.TryPop(out ticket);
     }
 
     public static void Return(int ticket)
     {
+        if (_capacity == 0)
+        {
+            return;
+        }
+
+        if (!_init)
+        {
+            return;
+        }
 
 #if DEBUG
-        if (ticket is < 1 or > Capacity)
+        if (ticket < 1 || ticket > _capacity)
         {
             throw new ArgumentOutOfRangeException(nameof(ticket), ticket, $"Ticket is less than 1 or more than the capacity ({Capacity})!");
         }
