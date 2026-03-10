@@ -145,8 +145,6 @@ public static class LootUtils
             return null;
         }
 
-        Item mergeTarget = null;
-
         // Use the item's template id to search for the same item in the inventory
         foreach (Item foundItem in controller.Inventory.GetAllItemByTemplate(item.TemplateId))
         {
@@ -157,6 +155,12 @@ public static class LootUtils
 
             Item rootItem = foundItem.GetRootItem();
 
+            // Do not try to merge with cartridges or weapon chambers
+            if (foundItem.Parent.Container is StackSlot or Slot)
+            {
+                continue;
+            }
+
             if (rootItem.Parent.Container.ID.Equals("securedcontainer", StringComparison.OrdinalIgnoreCase))
             {
                 continue;
@@ -164,12 +168,11 @@ public static class LootUtils
 
             if (item.StackObjectsCount + foundItem.StackObjectsCount <= foundItem.StackMaxSize)
             {
-                mergeTarget = foundItem;
-                break; // Exit early when a valid merge target is found
+                return foundItem;
             }
         }
 
-        return mergeTarget;
+        return null;
     }
 
     /**
