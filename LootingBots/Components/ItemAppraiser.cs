@@ -50,27 +50,22 @@ public class ItemAppraiser(Log _log)
 
                 _log.LogInfo("ShowMeTheMoney flea prices not available, falling back to BE session");
 
-                // Initialize ragfair prices from the BE session
-                var completionClass = new UniTaskCompletionSource<Dictionary<MongoID, float>>();
+                var completionClass = new UniTaskCompletionSourceEx<Result<Dictionary<string, float>>>();
                 Singleton<ClientApplication<ISession>>
                     .Instance.GetClientBackEndSession()
-                    .RagfairGetPrices(
-                        result =>
-                        {
-                            Dictionary<MongoID, float> prices = null;
-                            if (result.Succeed)
-                            {
-                                prices = result.Value.ToDictionary(
-                                    pair => new MongoID(pair.Key),
-                                    pair => pair.Value
-                                );
-                            }
+                    .RagfairGetPrices(completionClass.SetResult);
 
-                            completionClass.TrySetResult(prices);
-                        }
+                Dictionary<MongoID, float> prices = null;
+                var ragfairPrices = await completionClass.Task;
+                if (ragfairPrices.Succeed)
+                {
+                    prices = ragfairPrices.Value.ToDictionary(
+                        pair => new MongoID(pair.Key),
+                        pair => pair.Value
                     );
+                }
 
-                MarketData = await completionClass.Task;
+                MarketData = prices;
                 if (MarketData is null)
                 {
                     _log.LogInfo("Failed to get flea prices from BE session");

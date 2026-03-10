@@ -300,11 +300,11 @@ public class LootingTransactionController(InventoryController inventoryControlle
 
         await SimulatePlayerDelayAsync(token: token);
 
-        var promise = new UniTaskCompletionSource<IResult>();
+        var promise = new UniTaskCompletionSourceEx<IResult>();
         inventoryController.ThrowItem(
             toThrow,
             false,
-            result => promise.TrySetResult(result)
+            promise.SetResult
         );
 
         var throwResult = await promise.Task;
