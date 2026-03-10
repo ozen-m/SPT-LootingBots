@@ -65,6 +65,7 @@ public class LootingBots : BaseUnityPlugin
     public static ConfigEntry<bool> UseExamineTime;
     public static ConfigEntry<bool> ValueFromMods;
     public static ConfigEntry<bool> CanStripAttachments;
+    public static ConfigEntry<int> LootTimeout;
 
     public static ConfigEntry<float> PMCMinLootThreshold;
     public static ConfigEntry<float> PMCMaxLootThreshold;
@@ -273,7 +274,7 @@ public class LootingBots : BaseUnityPlugin
             new ConfigDescription(
                 "When enabled, bots will always try to close a container after they have finished looting. If the bot is inturrupted while looting, the container may remain open.",
                 null,
-                new ConfigurationManagerAttributes { Order = 12 }
+                new ConfigurationManagerAttributes { Order = 13 }
             )
         );
         UseMarketPrices = Config.Bind(
@@ -283,7 +284,7 @@ public class LootingBots : BaseUnityPlugin
             new ConfigDescription(
                 "Bots will query more accurate ragfair prices to do item value checks. Will make a query to get ragfair prices when the client is first started",
                 null,
-                new ConfigurationManagerAttributes { Order = 11 }
+                new ConfigurationManagerAttributes { Order = 12 }
             )
         );
         ValueFromMods = Config.Bind(
@@ -293,7 +294,7 @@ public class LootingBots : BaseUnityPlugin
             new ConfigDescription(
                 "Calculate weapon value by looking up each attachement. More accurate than just looking at the base weapon template but a slightly more expensive check",
                 null,
-                new ConfigurationManagerAttributes { Order = 10 }
+                new ConfigurationManagerAttributes { Order = 11 }
             )
         );
         CanStripAttachments = Config.Bind(
@@ -302,6 +303,16 @@ public class LootingBots : BaseUnityPlugin
             true,
             new ConfigDescription(
                 "Allows bots to take the attachments off of a weapon if they are not able to pick the weapon up into their inventory",
+                null,
+                new ConfigurationManagerAttributes { Order = 10 }
+            )
+        );
+        LootTimeout = Config.Bind(
+            "Loot Settings",
+            "Loot Timeout",
+            180,
+            new ConfigDescription(
+                "Time in seconds before a looting bot is timed out and stops looting",
                 null,
                 new ConfigurationManagerAttributes { Order = 9 }
             )

@@ -166,11 +166,6 @@ public class LootingBrain : MonoBehaviour
      */
     public void Update()
     {
-        if (_lootTimer.IsRunning && _lootTimer.ElapsedMilliseconds > 90000L)
-        {
-            _log.LogWarning($"Loot timer is running for more than 90s: {_lootTimer.Elapsed.TotalSeconds:N0}.");
-        }
-
         try
         {
             if (BotOwner.BotState == EBotState.Active)
@@ -261,7 +256,7 @@ public class LootingBrain : MonoBehaviour
         StopLooting();
 
         LootTaskRunning = true;
-        _lootingCts = new CancellationTokenSource();
+        _lootingCts = new CancellationTokenSource(LootingBots.LootTimeout.Value * 1000);
 
         if (_log.InfoEnabled)
         {
@@ -532,7 +527,14 @@ public class LootingBrain : MonoBehaviour
     {
         if (ex is OperationCanceledException)
         {
-            if (_log.DebugEnabled)
+            if (_lootTimer.ElapsedMilliseconds / 1000L > LootingBots.LootTimeout.Value)
+            {
+                if (_log.WarningEnabled)
+                {
+                    _log.LogWarning($"Looting interrupted due to timeout ({LootingBots.LootTimeout.Value}s)");
+                }
+            }
+            else if (_log.DebugEnabled)
             {
                 _log.LogDebug("Looting interrupted");
             }
