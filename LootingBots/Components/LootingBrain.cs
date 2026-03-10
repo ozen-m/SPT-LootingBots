@@ -282,23 +282,6 @@ public class LootingBrain : MonoBehaviour
         }
     }
 
-    public void ExceptionHandler(Exception ex)
-    {
-        if (ex is OperationCanceledException)
-        {
-            if (_log.DebugEnabled)
-            {
-                _log.LogDebug("Looting interrupted");
-            }
-            return;
-        }
-        if (_log.ErrorEnabled)
-        {
-            _log.LogError("Exception while trying to loot:");
-            _log.LogError(ex.ToString());
-        }
-    }
-
     public void StopLooting()
     {
         if (_lootingCts is null)
@@ -536,13 +519,29 @@ public class LootingBrain : MonoBehaviour
         }
 
         ActiveLootCache.Cleanup(BotOwner);
-        ActiveLoot = null;
-        ActiveLootType = LootFinder.LootType.None;
+        SetLoot(null, LootFinder.LootType.None);
     }
 
     public void SetLoot(InteractableObject loot, LootFinder.LootType type)
     {
         ActiveLoot = loot;
         ActiveLootType = type;
+    }
+
+    private void ExceptionHandler(Exception ex)
+    {
+        if (ex is OperationCanceledException)
+        {
+            if (_log.DebugEnabled)
+            {
+                _log.LogDebug("Looting interrupted");
+            }
+            return;
+        }
+        if (_log.ErrorEnabled)
+        {
+            _log.LogError("Exception while trying to loot:");
+            _log.LogError(ex.ToString());
+        }
     }
 }

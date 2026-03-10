@@ -77,7 +77,7 @@ public class LootFinder : MonoBehaviour
 
         StopFindLootTask();
         _lootFinderCts = new CancellationTokenSource();
-        FindLootAsync(ticket, _lootFinderCts.Token).Forget();
+        FindLootAsync(ticket, _lootFinderCts.Token).Forget(ExceptionHandler);
 
         SetLockUntilNextScan(false);
     }
@@ -93,6 +93,11 @@ public class LootFinder : MonoBehaviour
     {
         _scanTimer = Time.time + scanTime;
         SetLockUntilNextScan(true);
+    }
+
+    public void SetLockUntilNextScan(bool value)
+    {
+        _lockUntilNextScan = value;
     }
 
     public void StopFindLootTask()
@@ -388,8 +393,20 @@ public class LootFinder : MonoBehaviour
         return destination;
     }
 
-    public void SetLockUntilNextScan(bool value)
+    private void ExceptionHandler(Exception ex)
     {
-        _lockUntilNextScan = value;
+        if (ex is OperationCanceledException)
+        {
+            if (_log.DebugEnabled)
+            {
+                _log.LogDebug("Loot scan interrupted");
+            }
+            return;
+        }
+        if (_log.ErrorEnabled)
+        {
+            _log.LogError("Exception while trying to scan for loot:");
+            _log.LogError(ex.ToString());
+        }
     }
 }
