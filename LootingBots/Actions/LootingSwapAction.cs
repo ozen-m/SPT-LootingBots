@@ -55,19 +55,24 @@ public class LootingSwapAction : LootingAction
             return true;
         }
 
-        // Cannot swap, try throwing first then equipping after
-        var throwResult = await controller.ThrowItemAsync(ToSwap, token);
-        var equipResult = await controller.TryEquipItemAsync(Item, token);
-        var shouldRollback =  throwResult && !equipResult;
+        // Swap failed, try throwing first then equipping after.
+        // Check if item can be equipped to ToSwap's address,
+        // then rollback since we're not simulating
+        var toSwapAddress = ToSwap.CurrentAddress;
+        var inventoryController = ToSwap.Owner as InventoryController;
+        var removeResult = InteractionsHandlerClass.Remove(ToSwap, inventoryController, false);
+        var moveResult = InteractionsHandlerClass.Move(Item, toSwapAddress, inventoryController, false);
 
-        // If equipping main item failed, re-equip thrown item
-        if (shouldRollback)
+        moveResult.Value?.RollBack();
+        removeResult.Value?.RollBack();
+
+        if (moveResult.Failed)
         {
-            await controller.MoveItemAsync(ToSwap, null, token);
             return false;
         }
 
-        return throwResult && equipResult;
+        // If throw-equip simulation was successful, run it
+        return await controller.ThrowItemAsync(ToSwap, token) && await controller.TryEquipItemAsync(Item, token);
     }
 
     public override void Return()
