@@ -329,11 +329,12 @@ public class LootFinder : MonoBehaviour
             LootType.Corpse => dist <= DetectCorpseDistance,
             LootType.Container => dist <= DetectContainerDistance,
             LootType.Item => dist <= DetectItemDistance,
+            LootType.None => false,
             _ => throw new ArgumentOutOfRangeException(nameof(lootType), lootType, null)
         };
     }
 
-    public bool IsLootInSight(LootType lootType, Vector3 destination)
+    private bool IsLootInSight(LootType lootType, Vector3 destination)
     {
         var needsSight = lootType switch
         {
@@ -347,13 +348,18 @@ public class LootFinder : MonoBehaviour
             return true;
         }
 
-        if (destination == Vector3.zero || _botOwner.LookSensor == null)
+        if (destination == Vector3.zero)
         {
-            if (_botOwner.LookSensor == null && _log.WarningEnabled)
+            return false;
+        }
+
+        if (_botOwner.LookSensor == null)
+        {
+            if (_log.WarningEnabled)
             {
                 _log.LogWarning("botOwner.LookSensor is null! Cannot perform line of sight check");
             }
-            return true;
+            return false;
         }
 
         Vector3 start = _botOwner.LookSensor.HeadPoint;
