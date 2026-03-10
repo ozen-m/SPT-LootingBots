@@ -319,8 +319,6 @@ public class LootingBrain : MonoBehaviour
             await LootingTransactionController.SimulatePlayerDelayAsync(LootingStartDelay, token);
 
             isSuccessful = await InventoryController.TryAddItemsToBotAsync(_itemsToLoot, token);
-
-            await UniTask.WaitWhile(BotOwner.InventoryController, static invCont => invCont.IsChangingWeapon, cancellationToken: token);
         }
         finally
         {
@@ -373,8 +371,6 @@ public class LootingBrain : MonoBehaviour
             {
                 LootUtils.InteractContainer(container, BotOwner, EInteractionType.Close, _log);
             }
-
-            await UniTask.WaitWhile(BotOwner.InventoryController, static invCont => invCont.IsChangingWeapon, cancellationToken: token);
         }
         finally
         {
@@ -414,9 +410,6 @@ public class LootingBrain : MonoBehaviour
             _itemsToLoot.Clear();
             _itemsToLoot.Add(item);
             isSuccessful = await InventoryController.TryAddItemsToBotAsync(_itemsToLoot, token);
-
-            await UniTask.WaitWhile(BotOwner.InventoryController, static invCont => invCont.IsChangingWeapon, cancellationToken: token);
-
         }
         finally
         {

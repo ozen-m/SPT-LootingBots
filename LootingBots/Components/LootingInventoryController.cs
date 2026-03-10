@@ -1,4 +1,5 @@
 using System.Text;
+using Comfort.Common;
 using Cysharp.Threading.Tasks;
 using EFT;
 using EFT.InventoryLogic;
@@ -366,9 +367,6 @@ public class LootingInventoryController
 
                     foreach (var action in lootingActions)
                     {
-                        // Wait if bot is busy
-                        await UniTask.WaitWhile(_botInventoryController, static invCont => invCont.HasAnyHandsActionNonLinq(), cancellationToken: token);
-
                         var actionResult = await action.ExecuteAsync(_transactionController, token);
                         if (actionResult)
                         {
@@ -428,8 +426,6 @@ public class LootingInventoryController
                     // We looted a weapon, change to primary and calculate gear value
                     if (item is Weapon)
                     {
-                        await ChangeToPrimaryAsync(token);
-                        RefillAndReload();
                         CalculateGearValue();
                     }
 
@@ -490,38 +486,29 @@ public class LootingInventoryController
         );
     }
 
-    /**
-    * Method to make the bot change to its primary weapon. Useful for making sure bots have their weapon out after they have swapped weapons.
-    */
-    public UniTask ChangeToPrimaryAsync(CancellationToken token)
-    {
-        if (_log.DebugEnabled)
-        {
-            _log.LogDebug("Changing to primary");
-        }
-
-        // _botOwner.GetPlayer.HandsController.FastForwardCurrentState();
-        _botOwner.WeaponManager.UpdateWeaponsList();
-        return UniTask.WaitUntil(_botOwner.WeaponManager.Selector, static selector => selector.ChangeToMain(), cancellationToken: token);
-    }
-
-    /**
-    * Updates the bot's known weapon list and tells the bot to switch to its main weapon
-    */
+    /// <summary>
+    /// Updates the bot's known weapon list and tells the bot to switch to the best available weapon
+    /// </summary>
     public void UpdateActiveWeapon()
     {
-        // if (_botOwner != null && _botOwner.WeaponManager?.Selector != null)
-        // {
-        //     if (_log.InfoEnabled)
-        //     {
-        //         _log.LogInfo("Updating weapons");
-        //     }
-        //
-        //     _botOwner.GetPlayer.HandsController.FastForwardCurrentState();
-        //     _botOwner.WeaponManager.UpdateWeaponsList();
-        //     _botOwner.WeaponManager.Selector.TakeMainWeapon();
-        //     RefillAndReload();
-        // }
+        if (_botOwner == null)
+        {
+            return;
+        }
+
+        if (_botOwner.InventoryController.IsChangingWeaponNonLinq())
+        {
+            _botOwner.GetPlayer.HandsController.FastForwardCurrentState();
+        }
+
+        if (_log.InfoEnabled)
+        {
+            _log.LogInfo("Updating weapons");
+        }
+
+        var weaponSelector = _botOwner.WeaponManager.Selector;
+        weaponSelector.UpdateWeaponsList();
+        weaponSelector.SetSlotItem(OnWeaponTaken, true);
     }
 
     /**
@@ -529,9 +516,7 @@ public class LootingInventoryController
     */
     private void RefillAndReload()
     {
-        // Is already done by Selector.ChangeToMain
-        // _botOwner.WeaponManager.Reload?.TryFillMagazines();
-
+        _botOwner.WeaponManager.Reload?.TryFillMagazines();
         _botOwner.WeaponManager.Reload?.TryReload();
     }
 
@@ -1242,5 +1227,54 @@ public class LootingInventoryController
 
         var swapAction = LootingSwapAction.Rent(toEquip, toSwap, toEquipValue - toSwapValue, transferItems);
         lootingActions.Add(swapAction);
+    }
+
+    /// <summary>
+    /// Based on Selector.OnWeaponTaken
+    /// </summary>
+    private void OnWeaponTaken(Result<IHandsController> hands)
+    {
+        var weaponSelector = _botOwner.WeaponManager.Selector;
+        weaponSelector.IsChanging = false;
+        var allFine = false;
+
+        if (hands.Succeed)
+        {
+            _botOwner.WeaponManager.UpdateHandsController(hands.Value, out allFine);
+        }
+
+        if (_botOwner.BotState != EBotState.Active)
+        {
+            if (_botOwner.BotState == EBotState.PreActive)
+            {
+                return;
+            }
+        }
+        else
+        {
+            if (allFine)
+            {
+                RefillAndReload();
+                weaponSelector.ErrorCounter = 0;
+
+                if (_log.DebugEnabled)
+                {
+                    _log.LogDebug($"{_botOwner.Name()} Current weapon is {hands.Value.Item.ToFullString()}");
+                }
+                return;
+            }
+            if (++weaponSelector.ErrorCounter >= 20)
+            {
+                if (_log.DebugEnabled)
+                {
+                    _log.LogWarning("Unable to Selector.TakeMainWeapon");
+                }
+                return;
+            }
+        }
+
+        // Not active, not preactive, not allfine, not reached max errors, hands.failed
+        _botOwner.GetPlayer.HandsController.FastForwardCurrentState();
+        _botOwner.AITaskManager.RegisterDelayedTask(_botOwner, 0.5f, UpdateActiveWeapon);
     }
 }

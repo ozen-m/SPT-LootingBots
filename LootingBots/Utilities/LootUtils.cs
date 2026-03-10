@@ -256,19 +256,6 @@ public static class LootUtils
         };
     }
 
-    public static bool HasAnyHandsActionNonLinq(this TraderControllerClass controller)
-    {
-        foreach (var eventArg in controller.List_0)
-        {
-            if (eventArg is GInterface418)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     /// <summary>
     /// Check if moving an item to a slot is blocked
     /// Except chest armor
