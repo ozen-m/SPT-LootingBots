@@ -1048,10 +1048,19 @@ public class LootingInventoryController
         }
     }
 
-    /** Searches through the child items of a container and attempts to throw them */
-    public async UniTask ThrowUndervaluedItemsAsync(SearchableItemItemClass parentItem, CancellationToken token = default)
+    /// <summary>
+    /// Searches through the child items of a container and attempts to throw them
+    /// </summary>
+    public async UniTask ThrowUndervaluedItemsAsync(Item item, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
+
+        // Limit to only SearchableItemItemClass
+        // As opposed to LootNestedItems, we only need to throw away its children if it's a container
+        if (item is not SearchableItemItemClass parentItem)
+        {
+            return;
+        }
 
         var itemsToThrow = DictionaryPool<Item, float>.Get();
         try
@@ -1064,9 +1073,10 @@ public class LootingInventoryController
                 // Check the conditions to filter out items
                 if (nestedItem.Id == parentItem.Id ||
                     nestedItem.QuestItem ||
-                    nestedItem.CurrentAddress?.Container is Slot slot && slot.Locked || // Slot is locked
-                    nestedItem is MagazineItemClass mag && IsUsableMag(mag) || // Mag can be used
-                    nestedItem is AmmoItemClass ammo && IsUsableAmmo(ammo)) // Ammo can be used
+                    (nestedItem.CurrentAddress?.Container is Slot slot && slot.Locked) || // Slot is locked
+                    (nestedItem is MagazineItemClass mag && IsUsableMag(mag)) || // Mag can be used
+                    (nestedItem is AmmoItemClass ammo && IsUsableAmmo(ammo)) || // Ammo can be used
+                    nestedItem is MedsItemClass) // Do not throw med items
                 {
                     continue;
                 }
@@ -1089,21 +1099,21 @@ public class LootingInventoryController
                     _log.LogDebug($"Throwing {itemsToThrow.Count} undervalued items from {parentItem.Name.Localized()}");
                 }
 
-                foreach ((Item item, float value) in itemsToThrow)
+                foreach (var (toThrow, value) in itemsToThrow)
                 {
                     await LootingTransactionController.SimulatePlayerDelayAsync(token: token);
 
-                    if (!await _transactionController.ThrowItemAsync(item, token))
+                    if (!await _transactionController.ThrowItemAsync(toThrow, token))
                     {
                         continue;
                     }
 
                     if (_log.DebugEnabled)
                     {
-                        _log.LogDebug($"Thrown {item.Name.Localized()} (-{value:N0}₽)");
+                        _log.LogDebug($"Thrown {toThrow.Name.Localized()} (-{value:N0}₽)");
                     }
                     Stats.SubtractNetValue(value);
-                    _lootingBrain.IgnoreLoot(item.Id);
+                    _lootingBrain.IgnoreLoot(toThrow.Id);
                 }
 
                 return;
