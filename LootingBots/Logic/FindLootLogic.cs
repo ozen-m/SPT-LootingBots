@@ -26,7 +26,7 @@ internal class FindLootLogic(BotOwner botOwner) : CustomLogic(botOwner)
         {
             if (_log.DebugEnabled)
             {
-                _log.LogDebug($"Starting scan - free space: {_lootingBrain.HasFreeSpace}. isScanRunning: {_lootFinder.IsScanRunning}");
+                _log.LogDebug($"Starting scan ({ticket}) - free space: {_lootingBrain.HasFreeSpace}. isScanRunning: {_lootFinder.IsScanRunning}");
             }
             _lootFinder.BeginSearch(ticket);
         }

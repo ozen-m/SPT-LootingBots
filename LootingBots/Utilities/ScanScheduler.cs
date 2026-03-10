@@ -39,12 +39,7 @@ public static class ScanScheduler
             return true;
         }
 
-        if (!_init)
-        {
-            return false;
-        }
-
-        return _tickets.TryPop(out ticket);
+        return _init && _tickets.TryPop(out ticket);
     }
 
     public static void Return(int ticket)

@@ -20,11 +20,17 @@ public static class ListActionPool
         return [];
     }
 
+    /// <summary>
+    /// Rent an instance from the pool
+    /// </summary>
     public static List<LootingAction> Rent()
     {
         return _pool.Get();
     }
 
+    /// <summary>
+    /// Return an instance to the pool
+    /// </summary>
     public static void Return(List<LootingAction> list)
     {
         _pool.Release(list);
