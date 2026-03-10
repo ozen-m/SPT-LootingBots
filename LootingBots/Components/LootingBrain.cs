@@ -366,7 +366,7 @@ public class LootingBrain : MonoBehaviour
 
             await LootingTransactionController.SimulatePlayerDelayAsync(LootingStartDelay, token);
 
-            isSuccessful = await InventoryController.LootNestedItemsAsync((SearchableItemItemClass) item, token);
+            isSuccessful = await InventoryController.LootNestedItemsAsync(item, token);
 
             // Close the container if the settings to close containers is checked or if the container was already opened when the bot tried to loot it
             if (isSuccessful && (LootingBots.BotsAlwaysCloseContainers.Value || !didOpen))

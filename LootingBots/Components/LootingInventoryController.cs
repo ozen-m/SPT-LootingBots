@@ -388,15 +388,15 @@ public class LootingInventoryController
                                 if (swapAction.ToSwap is Weapon thrownWeapon)
                                 {
                                     // If we swapped away our previous weapon, throw away its mags and strip the attachments
-                                    await ThrowUselessMagsAsync(thrownWeapon, token);
+                                    await ThrowUndervaluedItemsAsync((SearchableItemItemClass) swapAction.Item, token);
                                     await StripWeaponAsync(thrownWeapon, token);
                                 }
                                 else
                                 {
                                     // To make space we throw undervalued items in our newly equipped item
                                     // Then loot the thrown item
-                                    await ThrowUndervaluedItemsAsync((SearchableItemItemClass) swapAction.Item, token);
-                                    await LootNestedItemsAsync((SearchableItemItemClass) swapAction.ToSwap, token);
+                                    await ThrowUndervaluedItemsAsync(swapAction.Item, token);
+                                    await LootNestedItemsAsync(swapAction.ToSwap, token);
                                 }
                             }
                         }
@@ -996,10 +996,19 @@ public class LootingInventoryController
         return newArmorClass - currentArmorClass;
     }
 
-    /** Searches throught the child items of a container and attempts to loot them */
-    public async UniTask<bool> LootNestedItemsAsync(SearchableItemItemClass parentItem, CancellationToken token = default)
+    /// <summary>
+    /// Searches throughout the children of a compound item and attempts to loot them
+    /// </summary>
+    public async UniTask<bool> LootNestedItemsAsync(Item item, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
+
+        // Do not limit to SearchableItemItemClass
+        // So we can loot thrown/swapped out helmets, etc., they can be valuable
+        if (item is not CompoundItem parentItem)
+        {
+            return true;
+        }
 
         var items = ListPool<Item>.Get();
         try
