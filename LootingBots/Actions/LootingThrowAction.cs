@@ -25,14 +25,20 @@ public class LootingThrowAction : LootingAction
         return new LootingThrowAction();
     }
 
-    public static LootingThrowAction Rent(Item item, float netWorthDelta = 0f)
+    public static LootingThrowAction Rent(Item item, float netWorthDelta = 0f, bool transferItems = true)
     {
         var throwAction = _pool.Get();
         throwAction.Item = item;
         throwAction.NetWorthDelta = netWorthDelta;
+        throwAction.TransferItems = transferItems;
 
         return throwAction;
     }
+
+    /// <summary>
+    /// Loot items from thrown item if true
+    /// </summary>
+    public bool TransferItems { get; set; }
 
     public override UniTask<bool> ExecuteAsync(LootingTransactionController controller, CancellationToken token)
     {
@@ -42,5 +48,11 @@ public class LootingThrowAction : LootingAction
     public override void Return()
     {
         _pool.Release(this);
+    }
+
+    protected override void Reset()
+    {
+        base.Reset();
+        TransferItems = false;
     }
 }
