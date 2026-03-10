@@ -165,7 +165,7 @@ public class LootFinder : MonoBehaviour
             await UniTask.Yield(token);
 
             int rangeCalculations = 0;
-            const int maxRangeCalculations = 30;
+            const int maxRangeCalculations = 15;
 
             // Cache these values to avoid repeated property access
             var containerLootingEnabled = LootingBots.ContainerLootingEnabled.Value.IsBotEnabled(_lootingBrain);
