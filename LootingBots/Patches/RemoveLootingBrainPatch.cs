@@ -16,9 +16,14 @@ public class RemoveLootingBrainPatch : ModulePatch
     [PatchPrefix]
     private static void PatchPrefix(BotOwner __instance)
     {
-        if (__instance.GetPlayer.TryGetComponent<LootingBrain>(out var component))
+        if (__instance.GetPlayer.TryGetComponent<LootingBrain>(out var lootingBrain))
         {
-            UnityEngine.Object.Destroy(component);
+            UnityEngine.Object.Destroy(lootingBrain);
+        }
+
+        if (__instance.GetPlayer.TryGetComponent<LootFinder>(out var lootFinder))
+        {
+            UnityEngine.Object.Destroy(lootFinder);
         }
 
         if (LootingBots.LootLog.DebugEnabled)
