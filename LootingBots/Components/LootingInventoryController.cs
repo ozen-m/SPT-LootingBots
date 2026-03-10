@@ -388,7 +388,7 @@ public class LootingInventoryController
                                 if (swapAction.ToSwap is Weapon thrownWeapon)
                                 {
                                     // If we swapped away our previous weapon, throw away its mags and strip the attachments
-                                    await ThrowUndervaluedItemsAsync((SearchableItemItemClass) swapAction.Item, token);
+                                    await ThrowUselessMagsAsync(thrownWeapon, token);
                                     await StripWeaponAsync(thrownWeapon, token);
                                 }
                                 else
@@ -402,21 +402,24 @@ public class LootingInventoryController
                         }
                         else if (action is LootingThrowAction throwAction)
                         {
-                            var thrownItem = throwAction.Item;
-
-                            // Ignore thrown loot
-                            _lootingBrain.IgnoreLoot(thrownItem.Id);
-
-                            if (thrownItem is Weapon thrownWeapon)
+                            if (throwAction.TransferItems)
                             {
-                                // Throw mags of thrown weapon and strip attachments
-                                await ThrowUselessMagsAsync(thrownWeapon, token);
-                                await StripWeaponAsync(thrownWeapon, token);
-                            }
-                            else if (thrownItem is SearchableItemItemClass searchable)
-                            {
-                                // Loot thrown item if it's a container
-                                await LootNestedItemsAsync(searchable, token);
+                                var thrownItem = throwAction.Item;
+
+                                // Ignore thrown loot
+                                _lootingBrain.IgnoreLoot(thrownItem.Id);
+
+                                if (thrownItem is Weapon thrownWeapon)
+                                {
+                                    // Throw mags of thrown weapon and strip attachments
+                                    await ThrowUselessMagsAsync(thrownWeapon, token);
+                                    await StripWeaponAsync(thrownWeapon, token);
+                                }
+                                else
+                                {
+                                    // Loot thrown item's children
+                                    await LootNestedItemsAsync(thrownItem, token);
+                                }
                             }
                         }
                     }
