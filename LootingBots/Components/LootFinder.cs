@@ -302,10 +302,9 @@ public class LootFinder : MonoBehaviour
             }
 
             _colliderPool.Return(colliders, true);
-            IsScanRunning = false;
-            _lootingBrain.ForceBrainEnabled = false;
-
             ScanScheduler.Return(queue);
+            _lootingBrain.ForceBrainEnabled = false;
+            IsScanRunning = false;
         }
     }
 
