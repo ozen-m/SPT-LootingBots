@@ -568,7 +568,7 @@ public class LootingInventoryController
         }
         else if (EquipmentTypeUtils.IsHelmet(lootItem) && ShouldSwapGear(helmet, lootItem))
         {
-            GetSwapAction(lootItem, helmet, lootingActions, false);
+            GetSwapAction(lootItem, helmet, lootingActions, true);
         }
         else if (EquipmentTypeUtils.IsEarpiece(lootItem) && ShouldSwapGear(earpiece, lootItem))
         {
@@ -589,8 +589,8 @@ public class LootingInventoryController
         }
         else if (EquipmentTypeUtils.IsChestArmor(lootItem) && ShouldSwapGear(chest, lootItem))
         {
-            // TODO: Add check for chest armor vs equipped armored rig
-            GetSwapAction(lootItem, chest, lootingActions, false);
+            // TODO: Add check for chest armor vs equipped armored rig?
+            GetSwapAction(lootItem, chest, lootingActions, true);
         }
         else if (EquipmentTypeUtils.IsTacticalRig(lootItem) && ShouldSwapGear(tacVest, lootItem))
         {
@@ -812,40 +812,37 @@ public class LootingInventoryController
             {
                 if (isBetterThanPrimary)
                 {
-                    // TODO: This breaks the bot somehow... anything that moves the bot's active weapon around
                     // If the weapon is better than the primary and there is no secondary,
-                    // move the primary to secondary and equip the new weapon as the primary
+                    // equip the new weapon to secondary then swap the new weapon with the primary
                     if (secondary == null)
                     {
                         if (_log.DebugEnabled)
                         {
-                            _log.LogDebug($"Trying to move primary {primary.Name.Localized()} (₽{primaryValue}) to secondary, then equip {lootWeapon.Name.Localized()} (₽{lootValue}) to primary slot");
+                            _log.LogDebug($"Trying to equip {lootWeapon.Name.Localized()} (₽{lootValue}) to secondary slot then swapping it with {primary.Name.Localized()} (₽{primaryValue})");
                         }
-
-                        var moveAction = LootingMoveAction.Rent(primary, null);
-                        lootingActions.Add(moveAction);
 
                         var equipAction = LootingMoveAction.Rent(lootWeapon, null, lootValue);
                         lootingActions.Add(equipAction);
+
+                        var swapAction = LootingSwapAction.Rent(lootWeapon, primary, 0f, false);
+                        lootingActions.Add(swapAction);
                     }
 
                     // If the weapon is also better than the secondary
-                    // throw the secondary, then move the primary to secondary, then equip the new weapon as the primary
+                    // swap it with the secondary (effectively throwing the secondary),
+                    // then swap the new weapon with the primary
                     else if (isBetterThanSecondary)
                     {
                         if (_log.DebugEnabled)
                         {
-                            _log.LogDebug($"Trying to throw secondary {secondary.Name.Localized()} (₽{secondaryValue}), then move primary {primary.Name.Localized()} (₽{primaryValue}) to secondary, then equip {lootWeapon.Name.Localized()} (₽{lootValue})");
+                            _log.LogDebug($"Trying to swap {lootWeapon.Name.Localized()} (₽{lootValue}) with secondary {secondary.Name.Localized()} (₽{secondaryValue}) then swapping loot weapon with primary {primary.Name.Localized()} (₽{primaryValue})");
                         }
 
-                        var throwAction = LootingThrowAction.Rent(secondary, -secondaryValue);
-                        lootingActions.Add(throwAction);
-
-                        var moveAction = LootingMoveAction.Rent(primary, null);
-                        lootingActions.Add(moveAction);
-
-                        var equipAction = LootingMoveAction.Rent(lootWeapon, null, lootValue);
+                        var equipAction = LootingSwapAction.Rent(lootWeapon, secondary, lootValue - secondaryValue, true);
                         lootingActions.Add(equipAction);
+
+                        var swapAction = LootingSwapAction.Rent(lootWeapon, primary, 0f, false);
+                        lootingActions.Add(swapAction);
                     }
                 }
                 // If there is no secondary weapon, equip to secondary
@@ -864,7 +861,7 @@ public class LootingInventoryController
                 {
                     if (_log.DebugEnabled)
                     {
-                        _log.LogDebug($"Trying to swap {secondary.Name.Localized()} (₽{secondaryValue}) with {lootWeapon.Name.Localized()} (₽{lootValue}) in secondary");
+                        _log.LogDebug($"Trying to swap {secondary.Name.Localized()} (₽{secondaryValue}) with secondary {lootWeapon.Name.Localized()} (₽{lootValue})");
                     }
 
                     var swapAction = LootingSwapAction.Rent(lootWeapon, secondary, lootValue - secondaryValue, true);
