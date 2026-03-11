@@ -165,7 +165,7 @@ public class LootFinder : MonoBehaviour
             await UniTask.Yield(token);
 
             int rangeCalculations = 0;
-            const int maxRangeCalculations = 15;
+            const int maxRangeCalculations = 3;
 
             // Cache these values to avoid repeated property access
             var containerLootingEnabled = LootingBots.ContainerLootingEnabled.Value.IsBotEnabled(_lootingBrain);
@@ -244,9 +244,30 @@ public class LootFinder : MonoBehaviour
 
                 await UniTask.Yield(token);
 
-                // Check if loot is in range and sight
-                if (!IsLootInRange(lootType, destination, out float dist) || !IsLootInSight(lootType, destination))
+                // Check if we can perform distance and LOS checks
+                if (_botOwner.Mover == null)
                 {
+                    if (_log.WarningEnabled)
+                    {
+                        _log.LogWarning("botOwner.BotMover is null! Cannot perform path distance calculations");
+                    }
+
+                    break;
+                }
+                if (_botOwner.LookSensor == null)
+                {
+                    if (_log.WarningEnabled)
+                    {
+                        _log.LogWarning("botOwner.LookSensor is null! Cannot perform line of sight check");
+                    }
+
+                    break;
+                }
+
+                // Check if loot is in range
+                if (!IsLootInRange(lootType, destination, out var dist))
+                {
+                    // Found path to loot but not within range
                     if (dist != -1f && ++rangeCalculations >= maxRangeCalculations)
                     {
                         if (_log.DebugEnabled)
@@ -256,17 +277,14 @@ public class LootFinder : MonoBehaviour
 
                         break;
                     }
+                    await UniTask.Yield(token);
 
-                    if (dist == -1f && _botOwner.Mover == null)
-                    {
-                        if (_log.DebugEnabled)
-                        {
-                            _log.LogDebug("Mover was null, stopping search");
-                        }
+                    continue;
+                }
 
-                        break;
-                    }
-
+                // Check if loot is in sight
+                if (!IsLootInSight(lootType, destination))
+                {
                     await UniTask.Yield(token);
 
                     continue;
@@ -308,30 +326,28 @@ public class LootFinder : MonoBehaviour
         }
     }
 
-    /**
-    * Checks to see if any of the found lootable items are within their detection range specified in the mod settings.
-    */
+    /// <summary>
+    /// Checks to see if any of the found lootable items are within their detection range specified in the mod settings.
+    /// </summary>
     private bool IsLootInRange(LootType lootType, Vector3 destination, out float dist)
     {
-        if (destination == Vector3.zero || _botOwner.Mover == null)
+        if (destination == Vector3.zero)
         {
-            if (_botOwner.Mover == null && _log.WarningEnabled)
-            {
-                _log.LogWarning("botOwner.BotMover is null! Cannot perform path distance calculations");
-            }
             dist = -1f;
             return false;
         }
 
-        dist = _botOwner.Mover.ComputePathLengthToPoint(destination);
-        return lootType switch
+        var maxRange = lootType switch
         {
-            LootType.Corpse => dist <= DetectCorpseDistance,
-            LootType.Container => dist <= DetectContainerDistance,
-            LootType.Item => dist <= DetectItemDistance,
-            LootType.None => false,
+            LootType.Corpse => DetectCorpseDistance,
+            LootType.Container => DetectContainerDistance,
+            LootType.Item => DetectItemDistance,
+            LootType.None => throw new ArgumentOutOfRangeException(nameof(lootType), lootType, null),
             _ => throw new ArgumentOutOfRangeException(nameof(lootType), lootType, null)
         };
+
+        var path = _botOwner.Mover.CalcPath(destination);
+        return path.CalculatePathLengthWithMaxRange(maxRange, out dist);
     }
 
     private bool IsLootInSight(LootType lootType, Vector3 destination)
@@ -341,6 +357,7 @@ public class LootFinder : MonoBehaviour
             LootType.Corpse => LootingBots.DetectCorpseNeedsSight.Value,
             LootType.Container => LootingBots.DetectContainerNeedsSight.Value,
             LootType.Item => LootingBots.DetectItemNeedsSight.Value,
+            LootType.None => throw new ArgumentOutOfRangeException(nameof(lootType), lootType, null),
             _ => throw new ArgumentOutOfRangeException(nameof(lootType), lootType, null)
         };
         if (!needsSight)
@@ -350,15 +367,6 @@ public class LootFinder : MonoBehaviour
 
         if (destination == Vector3.zero)
         {
-            return false;
-        }
-
-        if (_botOwner.LookSensor == null)
-        {
-            if (_log.WarningEnabled)
-            {
-                _log.LogWarning("botOwner.LookSensor is null! Cannot perform line of sight check");
-            }
             return false;
         }
 
@@ -413,5 +421,39 @@ public class LootFinder : MonoBehaviour
             _log.LogError("Exception while trying to scan for loot:");
             _log.LogError(ex.ToString());
         }
+    }
+}
+
+public static class PathExtensions
+{
+    /// <summary>
+    /// Based on <see cref="GClass371.CalculatePathLength(Vector3[] corners)"/>
+    /// </summary>
+    public static bool CalculatePathLengthWithMaxRange(this Vector3[] corners, float range, out float length)
+    {
+        if (corners == null || corners.Length < 2)
+        {
+            length = -1f;
+            return false;
+        }
+
+        length = 0f;
+        var prevCorner = corners[0];
+        for (int i = 1; i < corners.Length; i++)
+        {
+            Vector3 currentCorner = corners[i];
+            Vector3 vector3 = prevCorner - currentCorner;
+            length += Mathf.Sqrt(vector3.x * vector3.x + vector3.y * vector3.y + vector3.z * vector3.z);
+
+            // Reached max range
+            if (length > range)
+            {
+                return false;
+            }
+
+            prevCorner = currentCorner;
+        }
+
+        return true;
     }
 }
