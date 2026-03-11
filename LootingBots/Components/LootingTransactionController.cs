@@ -186,7 +186,7 @@ public class LootingTransactionController(InventoryController inventoryControlle
             return false;
         }
 
-        var moveNetworkResult = await TryRunNetworkTransactionWithTimeoutAsync(moveResult, token);
+        var moveNetworkResult = await TryRunNetworkTransactionWithTimeoutAsync(moveResult, null, token);
         if (moveNetworkResult.Failed)
         {
             if (log.ErrorEnabled)
@@ -226,7 +226,7 @@ public class LootingTransactionController(InventoryController inventoryControlle
             return false;
         }
 
-        var swapNetworkResult = await TryRunNetworkTransactionWithTimeoutAsync(swapResult, token);
+        var swapNetworkResult = await TryRunNetworkTransactionWithTimeoutAsync(swapResult, null, token);
         if (swapNetworkResult.Failed)
         {
             if (log.ErrorEnabled)
@@ -271,7 +271,7 @@ public class LootingTransactionController(InventoryController inventoryControlle
         }
 
         await SimulatePlayerDelayAsync(token: token);
-        var mergeNetworkResult = await TryRunNetworkTransactionWithTimeoutAsync(mergeResult, token);
+        var mergeNetworkResult = await TryRunNetworkTransactionWithTimeoutAsync(mergeResult, null, token);
         if (mergeNetworkResult.Failed)
         {
             if (log.ErrorEnabled)
@@ -333,7 +333,7 @@ public class LootingTransactionController(InventoryController inventoryControlle
     /// For some odd reason I can't figure out, especially when moving the bot's active weapon around, the method runs indefinitely.
     /// So try to circumvent it by fast forwarding the current state.
     /// </summary>
-    public async UniTask<IResult> TryRunNetworkTransactionWithTimeoutAsync(InventoryControllerResultStruct operationResult, CancellationToken token = default, Callback callback = null)
+    public async UniTask<IResult> TryRunNetworkTransactionWithTimeoutAsync(InventoryControllerResultStruct operationResult, Callback callback = null, CancellationToken token = default)
     {
         var timeoutToken = _networkTransactionTimeoutController.Timeout(NetworkTransactionTimeout);
         try
