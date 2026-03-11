@@ -9,6 +9,9 @@ namespace LootingBots.Components;
 
 public class LootingTransactionController(InventoryController inventoryController, BotLog log)
 {
+    private const int NetworkTransactionTimeout = 5000;
+    private readonly TimeoutController _networkTransactionTimeoutController = new();
+
     /** Tries to add extra spare ammo for the weapon being looted into the bot's secure container so that the bots are able to refill their mags properly in their reload logic */
     public bool AddExtraAmmo(Weapon weapon)
     {
@@ -183,12 +186,12 @@ public class LootingTransactionController(InventoryController inventoryControlle
             return false;
         }
 
-        var moveNetworkResult = await inventoryController.TryRunNetworkTransaction(moveResult).AsUniTask().AttachExternalCancellation(token);
-        if (token.IsCancellationRequested || moveNetworkResult.Failed)
+        var moveNetworkResult = await TryRunNetworkTransactionWithTimeoutAsync(moveResult, token);
+        if (moveNetworkResult.Failed)
         {
             if (log.ErrorEnabled)
             {
-                log.LogError($"Failed to move {item.Name.Localized()} to {location.Container.ID.Localized()} [{location.GetRootItem()?.Name.Localized()}]. Network Error: {moveNetworkResult?.Error}");
+                log.LogError($"Failed to move {item.Name.Localized()} to {location.Container.ID.Localized()} [{location.GetRootItem()?.Name.Localized()}]. Network Error: {moveNetworkResult.Error}");
             }
             return false;
         }
@@ -223,12 +226,12 @@ public class LootingTransactionController(InventoryController inventoryControlle
             return false;
         }
 
-        var swapNetworkResult = await inventoryController.TryRunNetworkTransaction(swapResult).AsUniTask().AttachExternalCancellation(token);
-        if (token.IsCancellationRequested || swapNetworkResult.Failed)
+        var swapNetworkResult = await TryRunNetworkTransactionWithTimeoutAsync(swapResult, token);
+        if (swapNetworkResult.Failed)
         {
             if (log.ErrorEnabled)
             {
-                log.LogError($"Failed to swap {item.Name.Localized()} with {toSwap.Name.Localized()}. Network Error: {swapNetworkResult?.Error}");
+                log.LogError($"Failed to swap {item.Name.Localized()} with {toSwap.Name.Localized()}. Network Error: {swapNetworkResult.Error}");
             }
             return false;
         }
@@ -268,12 +271,12 @@ public class LootingTransactionController(InventoryController inventoryControlle
         }
 
         await SimulatePlayerDelayAsync(token: token);
-        var mergeNetworkResult = await inventoryController.TryRunNetworkTransaction(mergeResult).AsUniTask().AttachExternalCancellation(token);
-        if (token.IsCancellationRequested || mergeNetworkResult.Failed)
+        var mergeNetworkResult = await TryRunNetworkTransactionWithTimeoutAsync(mergeResult, token);
+        if (mergeNetworkResult.Failed)
         {
             if (log.ErrorEnabled)
             {
-                log.LogError($"Failed to merge {toMove.Name.Localized()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount}). Network Error: {mergeNetworkResult?.Error}" );
+                log.LogError($"Failed to merge {toMove.Name.Localized()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount}). Network Error: {mergeNetworkResult.Error}" );
             }
             return false;
         }
@@ -325,9 +328,46 @@ public class LootingTransactionController(InventoryController inventoryControlle
         return true;
     }
 
-    public UniTask<IResult> TryRunNetworkTransactionAsync(InventoryControllerResultStruct operationResult, Callback callback = null)
+    /// <summary>
+    /// Try to run network transaction with timeout.
+    /// For some odd reason I can't figure out, especially when moving the bot's active weapon around, the method runs indefinitely.
+    /// So try to circumvent it by fast forwarding the current state.
+    /// </summary>
+    public async UniTask<IResult> TryRunNetworkTransactionWithTimeoutAsync(InventoryControllerResultStruct operationResult, CancellationToken token = default, Callback callback = null)
     {
-        return inventoryController.TryRunNetworkTransaction(operationResult, callback).AsUniTask();
+        var timeoutToken = _networkTransactionTimeoutController.Timeout(NetworkTransactionTimeout);
+        try
+        {
+            var networkTask = inventoryController.TryRunNetworkTransaction(operationResult, callback).AsUniTask();
+
+            var anyTask = await UniTask.WhenAny(
+                networkTask,
+                UniTask.WaitUntilCanceled(timeoutToken).SuppressCancellationThrow(),
+                UniTask.WaitUntilCanceled(token).SuppressCancellationThrow()
+            );
+
+            switch (anyTask.winArgumentIndex)
+            {
+                case 0:
+                    return anyTask.result1;
+                case 1:
+                    var playerInvCont = (Player.PlayerInventoryController)inventoryController;
+                    if (log.WarningEnabled)
+                    {
+                        log.LogWarning("Timed out on network transaction, trying to fast forward...");
+                    }
+                    playerInvCont.Player_0.FastForwardCurrentOperations();
+                    break;
+                case 2:
+                    throw new OperationCanceledException(token);
+            }
+
+            return await networkTask;
+        }
+        finally
+        {
+            _networkTransactionTimeoutController.Reset();
+        }
     }
 
     public static UniTask SimulatePlayerDelayAsync(double delay = -1f, CancellationToken token = default)

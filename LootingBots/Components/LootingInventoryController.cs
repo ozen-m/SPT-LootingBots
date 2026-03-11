@@ -289,7 +289,7 @@ public class LootingInventoryController
     //         {
     //             try
     //             {
-    //                 await _transactionController.TryRunNetworkTransactionAsync(result);
+    //                 await _transactionController.TryRunNetworkTransactionWithTimeoutAsync(result);
     //             }
     //             catch (Exception ex)
     //             {
