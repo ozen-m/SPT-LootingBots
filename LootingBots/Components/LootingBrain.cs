@@ -289,6 +289,11 @@ public class LootingBrain : MonoBehaviour
         _lootingCts = null;
     }
 
+    public void OnDestroy()
+    {
+        StopLooting();
+    }
+
     private readonly Stopwatch _lootTimer = new();
     private readonly List<Item> _itemsToLoot = new(13);
 

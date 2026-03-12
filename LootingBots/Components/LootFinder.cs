@@ -75,7 +75,7 @@ public class LootFinder : MonoBehaviour
     {
         IsScanRunning = true;
 
-        StopFindLootTask();
+        StopFindingLoot();
         _lootFinderCts = new CancellationTokenSource();
         FindLootAsync(ticket, _lootFinderCts.Token).Forget(ExceptionHandler);
 
@@ -100,7 +100,7 @@ public class LootFinder : MonoBehaviour
         _lockUntilNextScan = value;
     }
 
-    public void StopFindLootTask()
+    public void StopFindingLoot()
     {
         if (_lootFinderCts is null)
         {
@@ -110,6 +110,11 @@ public class LootFinder : MonoBehaviour
         _lootFinderCts.Cancel();
         _lootFinderCts.Dispose();
         _lootFinderCts = null;
+    }
+
+    public void OnDestroy()
+    {
+        StopFindingLoot();
     }
 
     private async UniTask FindLootAsync(int queue, CancellationToken token)

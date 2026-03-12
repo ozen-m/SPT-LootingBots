@@ -49,6 +49,7 @@ internal class LootingLayer : CustomLayer
 
     public override void Stop()
     {
+        _lootFinder.StopFindingLoot();
         _lootingBrain.StopLooting();
         _lootingBrain.UpdateGridStats();
         BotOwner.PatrollingData.Unpause();

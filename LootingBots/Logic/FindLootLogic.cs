@@ -35,7 +35,7 @@ internal class FindLootLogic(BotOwner botOwner) : CustomLogic(botOwner)
     public override void Stop()
     {
         _lootFinder.ResetScanTimer();
-        _lootFinder.StopFindLootTask();
+        _lootFinder.StopFindingLoot();
         base.Stop();
     }
 }
