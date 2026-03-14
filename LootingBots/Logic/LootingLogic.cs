@@ -35,7 +35,7 @@ internal class LootingLogic(BotOwner botOwner) : CustomLogic(botOwner)
     public override void Stop()
     {
         _destination = Vector3.zero;
-        _lootingBrain.DistanceToLoot = -1f;
+        _lootingBrain.DistanceToLoot = float.MaxValue;
         _stuckCount = 0;
         _navigationAttempts = 0;
         _lootingBrain.StopLooting();
@@ -54,7 +54,7 @@ internal class LootingLogic(BotOwner botOwner) : CustomLogic(botOwner)
                 bool isCloseEnough = IsCloseEnough();
 
                 // If the bot is closer than 4m from the loot, they should slow down and not sprint to prevent powersliding
-                bool slowDown = _lootingBrain.DistanceToLoot != -1f && _lootingBrain.DistanceToLoot < 6f;
+                bool slowDown = _lootingBrain.DistanceToLoot < 6f;
 
                 // If the bot has not just looted something, loot the current item since we are now close enough
                 if (!_lootingBrain.LootTaskRunning && isCloseEnough && _lootingBrain.HasActiveLootable)
@@ -210,13 +210,13 @@ internal class LootingLogic(BotOwner botOwner) : CustomLogic(botOwner)
         }
 
         // Calculate distance from bot to destination
-        float distance;
-        Vector3 vector = BotOwner.Position - _destination;
-        float y = vector.y;
+        var vector = BotOwner.Position - _destination;
+        var y = vector.y;
         vector.y = 0f;
-        distance = vector.sqrMagnitude;
+        var distance = vector.sqrMagnitude;
 
-        bool isCloseEnough = distance < 0.85f && Math.Abs(y) < 0.5f;
+        // Within a radius of 0.92 (sqr 0.85), and ±0.5 vertically
+        var isCloseEnough = distance < 0.85f && Math.Abs(y) < 0.5f;
 
         // Check to see if the bot is stuck
         if (!IsBotStuck(distance))

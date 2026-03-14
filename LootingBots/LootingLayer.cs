@@ -101,11 +101,11 @@ internal class LootingLayer : CustomLayer
             : string.Empty,
             Color.green
         );
-        debugPanel.AppendLabeledValue($"Target Loot", $" {lootName} ({_lootingBrain.ActiveLootType.ToString()})", Color.yellow, Color.yellow);
+        debugPanel.AppendLabeledValue("Target Loot", $" {lootName} ({_lootingBrain.ActiveLootType.ToString()})", Color.yellow, Color.yellow);
 
         debugPanel.AppendLabeledValue(
-            $"Distance to Loot",
-            $" {(_lootingBrain.ActiveLootType is LootFinder.LootType.None || _lootingBrain.DistanceToLoot == -1f ? "Calculating path..." : $"{Mathf.Sqrt(_lootingBrain.DistanceToLoot):0.##}m")}",
+            "Distance to Loot",
+            $" {(_lootingBrain.ActiveLootType is LootFinder.LootType.None || _lootingBrain.DistanceToLoot != float.MaxValue ? "Calculating path..." : $"{Mathf.Sqrt(_lootingBrain.DistanceToLoot):0.##}m")}",
             Color.grey,
             Color.grey
         );

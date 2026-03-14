@@ -169,8 +169,8 @@ public class LootFinder : MonoBehaviour
 
             await UniTask.Yield(token);
 
-            int rangeCalculations = 0;
             const int maxRangeCalculations = 3;
+            var rangeCalculations = 0;
 
             // Cache these values to avoid repeated property access
             var containerLootingEnabled = LootingBots.ContainerLootingEnabled.Value.IsBotEnabled(_lootingBrain);
@@ -303,11 +303,7 @@ public class LootFinder : MonoBehaviour
                     continue;
                 }
 
-                _lootingBrain.DistanceToLoot = dist;
-                _lootingBrain.Destination = destination;
-                _lootingBrain.LootObjectPosition = interactableObject.transform.position;
-                _lootingBrain.SetLoot(interactableObject, lootType);
-
+                _lootingBrain.SetLoot(interactableObject, lootType, interactableObject.transform.position, destination, dist);
                 _emptyAttempts = 0;
                 break;
             }

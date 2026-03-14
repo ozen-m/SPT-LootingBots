@@ -78,7 +78,7 @@ public class LootingBrain : MonoBehaviour
 
     // Boolean showing when the looting coroutine is running
     public bool LootTaskRunning { get; private set; }
-    public float DistanceToLoot = -1f;
+    public float DistanceToLoot = float.MaxValue;
 
     // Delay simulating the time it takes for the UI to open and start searching a container
     public const double LootingStartDelay = 2500D;
@@ -509,16 +509,19 @@ public class LootingBrain : MonoBehaviour
 
         if (ignore || clear)
         {
-            SetLoot(null, LootFinder.LootType.None);
+            SetLoot(null, LootFinder.LootType.None, Vector3.zero, Vector3.zero);
         }
 
         ActiveLootCache.Cleanup(BotOwner);
     }
 
-    public void SetLoot(InteractableObject loot, LootFinder.LootType type)
+    public void SetLoot(InteractableObject interactableObject, LootFinder.LootType lootType, Vector3 position, Vector3 destination, float dist = float.MaxValue)
     {
-        ActiveLoot = loot;
-        ActiveLootType = type;
+        ActiveLoot = interactableObject;
+        ActiveLootType = lootType;
+        LootObjectPosition = position;
+        Destination = destination;
+        DistanceToLoot = dist;
     }
 
     private void ExceptionHandler(Exception ex)
