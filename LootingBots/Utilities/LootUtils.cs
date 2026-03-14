@@ -1,6 +1,7 @@
 using EFT;
 using EFT.Interactive;
 using EFT.InventoryLogic;
+using HarmonyLib;
 using UnityEngine;
 
 namespace LootingBots.Utilities;
@@ -10,6 +11,7 @@ public static class LootUtils
     public const int RESERVED_SLOT_COUNT = 2;
     public static readonly int LowPolyMask = LayerMask.GetMask("LowPolyCollider");
     public static readonly int LootMask = LayerMask.GetMask("Interactive", "Loot", "Deadbody");
+    public static readonly AccessTools.FieldRef<Player, Corpse> _playerCorpseField = AccessTools.FieldRefAccess<Player, Corpse>("Corpse");
 
     private static readonly EquipmentSlot[] WeaponSlots =
     [

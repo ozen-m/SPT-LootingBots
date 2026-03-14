@@ -1,4 +1,5 @@
 using System.Buffers;
+using Comfort.Common;
 using Cysharp.Threading.Tasks;
 using EFT;
 using EFT.Interactive;
@@ -54,12 +55,20 @@ public class LootFinder : MonoBehaviour
     public bool IsScanRunning { get; private set; }
     private CancellationTokenSource _lootFinderCts;
 
+    private readonly Queue<Player> _priorityCorpses = [];
+
     public void Init(BotOwner botOwner)
     {
         _scanTimer = Time.time + LootingBots.InitialStartTimer.Value;
         _botOwner = botOwner;
         _lootingBrain = _botOwner.GetPlayer.gameObject.GetComponent<LootingBrain>();
         _log = new BotLog(LootingBots.LootLog, _botOwner);
+
+        var corpseLootingEnabled = LootingBots.CorpseLootingEnabled.Value.IsBotEnabled(_lootingBrain);
+        if (corpseLootingEnabled)
+        {
+            botOwner.BotPersonalStats.OnKillTarget += OnKilledEnemyPlayer;
+        }
     }
 
     public void ResetScanTimer()
@@ -77,7 +86,10 @@ public class LootFinder : MonoBehaviour
 
         StopFindingLoot();
         _lootFinderCts = new CancellationTokenSource();
-        FindLootAsync(ticket, _lootFinderCts.Token).Forget(ExceptionHandler);
+        if (!FindPrioritizedCorpse(ticket))
+        {
+            FindLootAsync(ticket, _lootFinderCts.Token).Forget(ExceptionHandler);
+        }
 
         SetLockUntilNextScan(false);
     }
@@ -115,6 +127,11 @@ public class LootFinder : MonoBehaviour
     public void OnDestroy()
     {
         StopFindingLoot();
+        var corpseLootingEnabled = LootingBots.CorpseLootingEnabled.Value.IsBotEnabled(_lootingBrain);
+        if (corpseLootingEnabled)
+        {
+            _botOwner.BotPersonalStats.OnKillTarget -= OnKilledEnemyPlayer;
+        }
     }
 
     private async UniTask FindLootAsync(int queue, CancellationToken token)
@@ -327,6 +344,63 @@ public class LootFinder : MonoBehaviour
         }
     }
 
+    public bool FindPrioritizedCorpse(int ticket)
+    {
+        var corpseLootingEnabled = LootingBots.CorpseLootingEnabled.Value.IsBotEnabled(_lootingBrain);
+        if (!corpseLootingEnabled)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < _priorityCorpses.Count; i++)
+        {
+            var player = _priorityCorpses.Dequeue();
+            if (_log.DebugEnabled)
+            {
+                _log.LogDebug($"Trying to find prioritized corpse: {player.AIData?.BotOwner.Name()}");
+            }
+
+            var corpse = LootUtils._playerCorpseField(player);
+            if (corpse == null)
+            {
+                if (_log.DebugEnabled)
+                {
+                    _log.LogDebug($"Removing prioritized player, corpse not found for killed player [{player.AIData?.BotOwner.Name()}]");
+                }
+
+                continue;
+            }
+
+            var position = corpse.TrackableTransform.position;
+            var destination = GetDestination(position);
+
+            // Check if loot is in range
+            // No need to check LOS since technically it's their kill
+            if (IsLootInRange(LootType.Corpse, destination, out var dist))
+            {
+                _lootingBrain.SetLoot(corpse, LootType.Corpse, position, destination, dist);
+
+                if (_log.DebugEnabled)
+                {
+                    _log.LogDebug($"Setting Corpse [{corpse.GetLootName()}] as active loot. Dist: {dist}");
+                }
+
+                ScanScheduler.Return(ticket);
+                _lootingBrain.ForceBrainEnabled = false;
+                IsScanRunning = false;
+                return true;
+            }
+
+            if (_log.DebugEnabled)
+            {
+                _log.LogDebug($"Skipping corpse [{corpse.GetLootName()}] not in range. Dist: {dist}");
+            }
+            _priorityCorpses.Enqueue(player);
+        }
+
+        return false;
+    }
+
     /// <summary>
     /// Checks to see if any of the found lootable items are within their detection range specified in the mod settings.
     /// </summary>
@@ -405,6 +479,22 @@ public class LootFinder : MonoBehaviour
         }
 
         return destination;
+    }
+
+    private void OnKilledEnemyPlayer(string victimProfileId, DamageInfoStruct damageInfo)
+    {
+        var playerOwner = Singleton<GameWorld>.Instance.GetEverExistedBridgeByProfileID(victimProfileId);
+        if (playerOwner?.iPlayer is Player victimPlayer)
+        {
+            _priorityCorpses.Enqueue(victimPlayer);
+        }
+        else
+        {
+            if (_log.ErrorEnabled)
+            {
+                _log.LogError($"Killed player not found! Victim ProfileId: {victimProfileId}");
+            }
+        }
     }
 
     private void ExceptionHandler(Exception ex)

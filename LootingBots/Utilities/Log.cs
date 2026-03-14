@@ -73,7 +73,7 @@ public class BotLog
     {
         _log = log;
         _botOwner = botOwner;
-        _botString = $"([{_botOwner.Profile.Info.Settings.Role}] [{_botOwner.name}] {_botOwner.GetPlayer.Profile.GetCorrectedNickname()})";
+        _botString = $"([{_botOwner.Profile.Info.Settings.Role}] {_botOwner.Name()})";
     }
 
     public void LogDebug(object msg)
@@ -166,5 +166,10 @@ public static class LogUtils
     public static bool HasDebug(this LogLevel logLevel)
     {
         return (logLevel & LogLevel.Debug) != 0;
+    }
+
+    public static string Name(this BotOwner botOwner)
+    {
+        return $"[{botOwner.name}] {botOwner.Profile.GetCorrectedNickname()}";
     }
 }
