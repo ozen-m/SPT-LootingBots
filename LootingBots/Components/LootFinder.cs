@@ -348,12 +348,6 @@ public class LootFinder : MonoBehaviour
 
     public bool FindPrioritizedCorpse(int ticket)
     {
-        var corpseLootingEnabled = LootingBots.CorpseLootingEnabled.Value.IsBotEnabled(_lootingBrain);
-        if (!corpseLootingEnabled)
-        {
-            return false;
-        }
-
         for (int i = 0; i < _priorityCorpses.Count; i++)
         {
             var player = _priorityCorpses.Dequeue();
@@ -373,31 +367,50 @@ public class LootFinder : MonoBehaviour
                 continue;
             }
 
+            // If corpse has been ignored, skip to the next prioritized corpse
+            var rootItemId = corpse.GetRootItemId();
+            if (_lootingBrain.IsLootIgnored(rootItemId))
+            {
+                continue;
+            }
+
             var position = corpse.TrackableTransform.position;
             var destination = GetDestination(position);
 
             // Check if loot is in range
             // No need to check LOS since technically it's their kill
-            if (IsLootInRange(LootType.Corpse, destination, out var dist))
+            if (!IsLootInRange(LootType.Corpse, destination, out var dist))
             {
-                _lootingBrain.SetLoot(corpse, LootType.Corpse, position, destination, dist);
-
                 if (_log.DebugEnabled)
                 {
-                    _log.LogDebug($"Setting Corpse [{corpse.GetLootName()}] as active loot. Dist: {dist}");
+                    _log.LogDebug($"Skipping corpse [{corpse.GetLootName()}], not in range. Dist: {dist}");
                 }
-
-                ScanScheduler.Return(ticket);
-                _lootingBrain.ForceBrainEnabled = false;
-                IsScanRunning = false;
-                return true;
+                _priorityCorpses.Enqueue(player);
+                continue;
             }
+
+            // Cache the loot and set active target
+            if (!ActiveLootCache.CacheActiveLootId(rootItemId, _botOwner))
+            {
+                if (_log.DebugEnabled)
+                {
+                    _log.LogDebug($"Skipping corpse [{corpse.GetLootName()}], is currently being looted by someone else");
+                }
+                _priorityCorpses.Enqueue(player);
+                continue;
+            }
+
+            _lootingBrain.SetLoot(corpse, LootType.Corpse, position, destination, dist);
 
             if (_log.DebugEnabled)
             {
-                _log.LogDebug($"Skipping corpse [{corpse.GetLootName()}] not in range. Dist: {dist}");
+                _log.LogDebug($"Setting Corpse [{corpse.GetLootName()}] as active loot. Dist: {dist}");
             }
-            _priorityCorpses.Enqueue(player);
+
+            ScanScheduler.Return(ticket);
+            _lootingBrain.ForceBrainEnabled = false;
+            IsScanRunning = false;
+            return true;
         }
 
         return false;
