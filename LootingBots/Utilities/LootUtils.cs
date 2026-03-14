@@ -8,8 +8,8 @@ namespace LootingBots.Utilities;
 public static class LootUtils
 {
     public const int RESERVED_SLOT_COUNT = 2;
-    public static readonly LayerMask LowPolyMask = LayerMask.GetMask(["LowPolyCollider"]);
-    public static readonly LayerMask LootMask = LayerMask.GetMask(["Interactive", "Loot", "Deadbody"]);
+    public static readonly int LowPolyMask = LayerMask.GetMask("LowPolyCollider");
+    public static readonly int LootMask = LayerMask.GetMask("Interactive", "Loot", "Deadbody");
 
     private static readonly EquipmentSlot[] WeaponSlots =
     [
