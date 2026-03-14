@@ -93,7 +93,7 @@ public class LootingBots : BaseUnityPlugin
             "Enable corpse looting",
             SettingsDefaults,
             new ConfigDescription(
-                "Enables corpse looting for the selected bot types",
+                "Enables corpse looting for the selected bot types. Takes effect next raid", // Technically takes effect for next bot spawns
                 null,
                 new ConfigurationManagerAttributes { Order = 10 }
             )
@@ -124,7 +124,7 @@ public class LootingBots : BaseUnityPlugin
             "Enable container looting",
             SettingsDefaults,
             new ConfigDescription(
-                "Enables container looting for the selected bot types",
+                "Enables container looting for the selected bot types. Takes effect next raid",
                 null,
                 new ConfigurationManagerAttributes { Order = 7 }
             )
@@ -155,7 +155,7 @@ public class LootingBots : BaseUnityPlugin
             "Enable loose item looting",
             SettingsDefaults,
             new ConfigDescription(
-                "Enables loose item looting for the selected bot types",
+                "Enables loose item looting for the selected bot types. Takes effect next raid",
                 null,
                 new ConfigurationManagerAttributes { Order = 4 }
             )

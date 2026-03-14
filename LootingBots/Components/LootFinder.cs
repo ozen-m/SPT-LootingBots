@@ -26,6 +26,11 @@ public class LootFinder : MonoBehaviour
     private int _emptyAttempts;
     // TODO: Add config
 
+    // Bot specific config
+    private bool _containerLootingEnabled;
+    private bool _itemLootingEnabled;
+    private bool _corpseLootingEnabled;
+
     public bool IsScheduledScan
     {
         get { return _scanTimer < Time.time; }
@@ -64,8 +69,11 @@ public class LootFinder : MonoBehaviour
         _lootingBrain = _botOwner.GetPlayer.gameObject.GetComponent<LootingBrain>();
         _log = new BotLog(LootingBots.LootLog, _botOwner);
 
-        var corpseLootingEnabled = LootingBots.CorpseLootingEnabled.Value.IsBotEnabled(_lootingBrain);
-        if (corpseLootingEnabled)
+        _containerLootingEnabled = LootingBots.ContainerLootingEnabled.Value.IsBotEnabled(_lootingBrain);
+        _itemLootingEnabled = LootingBots.LooseItemLootingEnabled.Value.IsBotEnabled(_lootingBrain);
+        _corpseLootingEnabled = LootingBots.CorpseLootingEnabled.Value.IsBotEnabled(_lootingBrain);
+
+        if (_corpseLootingEnabled)
         {
             botOwner.BotPersonalStats.OnKillTarget += OnKilledEnemyPlayer;
         }
@@ -127,8 +135,7 @@ public class LootFinder : MonoBehaviour
     public void OnDestroy()
     {
         StopFindingLoot();
-        var corpseLootingEnabled = LootingBots.CorpseLootingEnabled.Value.IsBotEnabled(_lootingBrain);
-        if (corpseLootingEnabled)
+        if (_corpseLootingEnabled)
         {
             _botOwner.BotPersonalStats.OnKillTarget -= OnKilledEnemyPlayer;
         }
@@ -188,11 +195,6 @@ public class LootFinder : MonoBehaviour
 
             const int maxRangeCalculations = 3;
             var rangeCalculations = 0;
-
-            // Cache these values to avoid repeated property access
-            var containerLootingEnabled = LootingBots.ContainerLootingEnabled.Value.IsBotEnabled(_lootingBrain);
-            var itemLootingEnabled = LootingBots.LooseItemLootingEnabled.Value.IsBotEnabled(_lootingBrain);
-            var corpseLootingEnabled = LootingBots.CorpseLootingEnabled.Value.IsBotEnabled(_lootingBrain);
             var availableGridSpaces = _lootingBrain.Stats.AvailableGridSpaces;
 
             // Process sorted colliders
@@ -207,7 +209,7 @@ public class LootFinder : MonoBehaviour
 
                 // Get InteractableObject once and check derived type
                 var interactableObject = collider.gameObject.GetComponentInParent<InteractableObject>();
-                if (corpseLootingEnabled && interactableObject is Corpse corpse)
+                if (_corpseLootingEnabled && interactableObject is Corpse corpse)
                 {
                     var player = collider.gameObject.GetComponentInParent<Player>();
                     if (player != null && // Corpse is a bot corpse and not a static "Dead scav"
@@ -217,7 +219,7 @@ public class LootFinder : MonoBehaviour
                         lootType = LootType.Corpse;
                     }
                 }
-                else if (containerLootingEnabled && interactableObject is LootableContainer container)
+                else if (_containerLootingEnabled && interactableObject is LootableContainer container)
                 {
                     rootItem = container.ItemOwner?.RootItem;
                     if (container.isActiveAndEnabled // Container is marked as active and enabled
@@ -226,7 +228,7 @@ public class LootFinder : MonoBehaviour
                         lootType = LootType.Container;
                     }
                 }
-                else if (itemLootingEnabled && interactableObject is LootItem lootItem && lootItem is not Corpse)
+                else if (_itemLootingEnabled && interactableObject is LootItem lootItem && lootItem is not Corpse)
                 {
                     rootItem = lootItem.ItemOwner?.RootItem;
                     if (rootItem is not null
