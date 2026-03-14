@@ -236,7 +236,7 @@ public class LootingBrain : MonoBehaviour
                         case LootItem lootItem when lootItem.ItemOwner?.RootItem != null:
                             return;
                         default:
-                            CleanupLoot(false);
+                            CleanupLoot(false, true);
                             break;
                     }
                 }
@@ -327,10 +327,6 @@ public class LootingBrain : MonoBehaviour
         }
         finally
         {
-            InventoryController.UpdateActiveWeapon();
-
-            // Only ignore the corpse if looting was not interrupted
-            CleanupLoot(isSuccessful);
             OnLootTaskEnd(isSuccessful);
 
             if (_log.DebugEnabled)
@@ -379,10 +375,6 @@ public class LootingBrain : MonoBehaviour
         }
         finally
         {
-            InventoryController.UpdateActiveWeapon();
-
-            // Only ignore the container if looting was not interrupted
-            CleanupLoot(isSuccessful);
             OnLootTaskEnd(isSuccessful);
 
             if (_log.DebugEnabled)
@@ -418,10 +410,6 @@ public class LootingBrain : MonoBehaviour
         }
         finally
         {
-            InventoryController.UpdateActiveWeapon();
-
-            // Need to manually cleanup item because the ItemOwner on the original object changes. Only ignore if looting was not interrupted
-            CleanupLoot(isSuccessful);
             OnLootTaskEnd(isSuccessful);
 
             if (_log.DebugEnabled)
@@ -435,8 +423,13 @@ public class LootingBrain : MonoBehaviour
     {
         _lootTimer.Stop();
 
-        Destination = Vector3.zero;
-        UpdateGridStats();
+        // Need to manually cleanup item because the ItemOwner on the original object changes.
+        // Only ignore and clear if looting was successful.
+        // TODO: Failed loot attempts? Only fails if interrupted by another bot (i.e. combat)
+        CleanupLoot(lootingSuccessful);
+
+        InventoryController.UpdateActiveWeapon();
+        InventoryController.UpdateGridStats();
         BotOwner.AIData.CalcPower();
         LootTaskRunning = false;
     }
@@ -486,21 +479,24 @@ public class LootingBrain : MonoBehaviour
         IgnoredLootIds.Add(id);
     }
 
-    /**
-    * Removes all active lootables from LootFinder and cleans them from the active loot cache
-    */
-    public void Cleanup(bool ignore = true)
+    /// <summary>
+    /// Adds the ActiveLoot to ignore list for the LootFinder ignore and cleans them from the active loot cache
+    /// </summary>
+    public void Cleanup()
     {
         if (ActiveLoot != null)
         {
-            CleanupLoot(ignore);
+            CleanupLoot();
         }
     }
 
-    /**
-    * Removes the ActiveItem from the LootFinder and ActiveLootCache. Can optionally add the item to the ignore list after cleaning
-    */
-    public void CleanupLoot(bool ignore = true)
+    /// <summary>
+    /// Cleans the ActiveLoot from the active loot cache.
+    /// Can optionally add the item to the ignore list after cleaning, or force the bot to find new loot if item is not ignored.
+    /// </summary>
+    /// <param name="ignore">Add the active loot to the bot's ignore list and clears the bot's active loot</param>
+    /// <param name="clear">Clears the bot's active loot to force it to find a new one.</param>
+    public void CleanupLoot(bool ignore = true, bool clear = false)
     {
         var item = ActiveLoot.GetRootItem();
         if (item != null)
@@ -511,8 +507,12 @@ public class LootingBrain : MonoBehaviour
             }
         }
 
+        if (ignore || clear)
+        {
+            SetLoot(null, LootFinder.LootType.None);
+        }
+
         ActiveLootCache.Cleanup(BotOwner);
-        SetLoot(null, LootFinder.LootType.None);
     }
 
     public void SetLoot(InteractableObject loot, LootFinder.LootType type)
