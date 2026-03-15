@@ -423,10 +423,15 @@ public class LootingInventoryController
                     }
 
                     // Do post-equip actions
-                    // We looted a weapon, change to primary and calculate gear value
+                    // We looted a weapon, calculate gear value
                     if (item is Weapon)
                     {
                         CalculateGearValue();
+                    }
+
+                    if (_log.DebugEnabled)
+                    {
+                        _log.LogDebug($"Finished equip action for: {itemName}");
                     }
 
                     continue;
@@ -875,8 +880,12 @@ public class LootingInventoryController
             return false;
         }
 
-        if (equipped.Parent.Container is Slot equippedSlot && equippedSlot.HasBlockingItem(itemToLoot))
+        if (equipped.Parent.Container is Slot equippedSlot && equippedSlot.HasBlockingItem(itemToLoot, out var conflictingItem))
         {
+            if (_log.DebugEnabled)
+            {
+                _log.LogDebug($"Cannot swap {itemToLoot.Name.Localized()} with {equipped.Name.Localized()} because of conflicting item {conflictingItem.Name.Localized()}");
+            }
             return false;
         }
 
@@ -884,6 +893,10 @@ public class LootingInventoryController
         var armorDifference = GetArmorDifference(equipped, itemToLoot);
         if (armorDifference > 0)
         {
+            if (_log.DebugEnabled)
+            {
+                _log.LogDebug($"Found better armor {itemToLoot.Name.Localized()} versus {equipped.Name.Localized()}. Difference: {armorDifference}");
+            }
             return true;
         }
 
@@ -901,12 +914,20 @@ public class LootingInventoryController
         // If the item is bigger than what is equipped, only equip it if the armor class is the same
         if (armorDifference == 0 && foundBiggerContainer)
         {
+            if (_log.DebugEnabled)
+            {
+                _log.LogDebug($"Found bigger container {itemToLoot.Name.Localized()} versus {equipped.Name.Localized()}");
+            }
             return true;
         }
 
         // If the item is more valuable than what is equipped, only equip it if the armor class is the same
         if (armorDifference == 0 && LootIsMoreValuable(equipped))
         {
+            if (_log.DebugEnabled)
+            {
+                _log.LogDebug($"Found more valuable gear {itemToLoot.Name.Localized()} versus {equipped.Name.Localized()}");
+            }
             return true;
         }
 

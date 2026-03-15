@@ -332,6 +332,8 @@ public class LootingTransactionController(InventoryController inventoryControlle
     /// Try to run network transaction with timeout.
     /// For some odd reason I can't figure out, especially when moving the bot's active weapon around, the method runs indefinitely.
     /// So try to circumvent it by fast forwarding the current state.
+    ///
+    /// It's GClass2053 Operation (RemoveWeaponOperation) running indefinitely.
     /// </summary>
     public async UniTask<IResult> TryRunNetworkTransactionWithTimeoutAsync(InventoryControllerResultStruct operationResult, Callback callback = null, CancellationToken token = default)
     {

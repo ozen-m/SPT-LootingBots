@@ -263,8 +263,10 @@ public static class LootUtils
     /// Except chest armor
     /// Based on Slot.method_3
     /// </summary>
-    public static bool HasBlockingItem(this Slot slot, Item incomingItem)
+    public static bool HasBlockingItem(this Slot slot, Item incomingItem, out Item conflictingItem)
     {
+        conflictingItem = null;
+
         var conflictingSlots = slot.ConflictingSlots;
         if (conflictingSlots is null)
         {
@@ -284,6 +286,7 @@ public static class LootUtils
                 conflictingSlot.ContainedItem is {} conflictItem &&
                 conflictItem is not ArmorItemClass and not VestItemClass) // Exclude chest armor
             {
+                conflictingItem = conflictItem;
                 return true;
             }
         }
