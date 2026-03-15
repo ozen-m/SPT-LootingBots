@@ -5,8 +5,6 @@ using EFT;
 using EFT.HandBook;
 using EFT.InventoryLogic;
 using LootingBots.Utilities;
-using Newtonsoft.Json;
-using SPT.Common.Http;
 using UnityEngine;
 
 namespace LootingBots.Components;
@@ -23,55 +21,40 @@ public class ItemAppraiser(Log _log)
     public async UniTask UpdatePricesAsync()
     {
         IsUpdatingPrices = true;
-
         try
         {
             if (LootingBots.UseMarketPrices.Value)
             {
-                // ShowMeTheMoney flea prices
-                var json = await RequestHandler.GetJsonAsync("/showMeTheMoney/getFleaPrices").AsUniTask();
-                if (!json.IsNullOrEmpty())
-                {
-                    try
-                    {
-                        MarketData = JsonConvert.DeserializeObject<Dictionary<MongoID, float>>(json);
-                    }
-                    catch
-                    {
-                        // Ignore
-                    }
-                }
-                if (MarketData is not null)
-                {
-                    _log.LogInfo("ShowMeTheMoney flea prices successfully fetched!");
-                    LastPriceUpdate.Restart();
-                    return;
-                }
-
-                _log.LogInfo("ShowMeTheMoney flea prices not available, falling back to BE session");
-
-                var completionClass = new UniTaskCompletionSourceEx<Result<Dictionary<string, float>>>();
-                Singleton<ClientApplication<ISession>>.Instance.GetClientBackEndSession().RagfairGetPrices(completionClass.SetResult);
-
-                var ragfairPrices = await completionClass.Task;
+                var tcs = new UniTaskCompletionSourceEx<Result<Dictionary<string, float>>>();
+                Singleton<ClientApplication<ISession>>.Instance.GetClientBackEndSession().RagfairGetPrices(tcs.SetResult);
+                var ragfairPrices = await tcs.Task;
                 if (ragfairPrices.Succeed)
                 {
                     MarketData = ragfairPrices.Value.ToDictionary(pair => new MongoID(pair.Key), pair => pair.Value);
                 }
-
                 if (MarketData is null)
                 {
-                    _log.LogInfo("Failed to get flea prices from BE session");
+                    _log.LogError("Failed to get flea prices from BE session");
                 }
             }
             else
             {
                 // This is the handbook instance which is initialized when the client first starts.
                 HandbookData = Singleton<HandbookClass>.Instance.Items.ToDictionary(item => new MongoID(item.Id));
+                if (HandbookData is null)
+                {
+                    _log.LogError("Failed to get handbook data");
+                }
             }
+        }
+        catch (Exception ex)
+        {
+            _log.LogError(ex.ToString());
+            _log.LogError("Failed to get item prices");
         }
         finally
         {
+            LastPriceUpdate.Restart();
             IsUpdatingPrices = false;
         }
     }
