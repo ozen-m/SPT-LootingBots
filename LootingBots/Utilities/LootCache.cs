@@ -45,9 +45,7 @@ public static class ActiveLootCache
 
     public static bool CacheActiveLootId(string containerId, BotOwner botOwner)
     {
-        return !string.IsNullOrEmpty(botOwner.name)
-               && !string.IsNullOrEmpty(containerId)
-               && ActiveLoot.TryAdd(containerId, botOwner);
+        return !string.IsNullOrEmpty(botOwner.name) && !string.IsNullOrEmpty(containerId) && ActiveLoot.TryAdd(containerId, botOwner);
     }
 
     public static bool IsLootInUse(string lootId)
