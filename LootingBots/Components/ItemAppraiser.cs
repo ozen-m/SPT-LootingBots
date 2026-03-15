@@ -53,14 +53,12 @@ public class ItemAppraiser(Log _log)
                 var completionClass = new UniTaskCompletionSourceEx<Result<Dictionary<string, float>>>();
                 Singleton<ClientApplication<ISession>>.Instance.GetClientBackEndSession().RagfairGetPrices(completionClass.SetResult);
 
-                Dictionary<MongoID, float> prices = null;
                 var ragfairPrices = await completionClass.Task;
                 if (ragfairPrices.Succeed)
                 {
-                    prices = ragfairPrices.Value.ToDictionary(pair => new MongoID(pair.Key), pair => pair.Value);
+                    MarketData = ragfairPrices.Value.ToDictionary(pair => new MongoID(pair.Key), pair => pair.Value);
                 }
 
-                MarketData = prices;
                 if (MarketData is null)
                 {
                     _log.LogInfo("Failed to get flea prices from BE session");
