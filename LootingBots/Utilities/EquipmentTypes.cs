@@ -19,7 +19,20 @@ public enum EquipmentType
     Eyewear = 2048,
     Armband = 4096,
 
-    All = Backpack | TacticalRig | ArmoredRig | Chest | Weapon | Helmet | Grenade | Dogtag | ArmorPlate | Earpiece | FaceCover | Eyewear | Armband,
+    All =
+        Backpack
+        | TacticalRig
+        | ArmoredRig
+        | Chest
+        | Weapon
+        | Helmet
+        | Grenade
+        | Dogtag
+        | ArmorPlate
+        | Earpiece
+        | FaceCover
+        | Eyewear
+        | Armband,
 }
 
 [Flags]
@@ -37,7 +50,7 @@ public enum CanEquipEquipmentType
     Eyewear = EquipmentType.Eyewear,
     Armband = EquipmentType.Armband,
 
-    All = Backpack | TacticalRig | ArmoredRig | Chest | Weapon | Helmet | Grenade | Earpiece | FaceCover | Eyewear | Armband
+    All = Backpack | TacticalRig | ArmoredRig | Chest | Weapon | Helmet | Grenade | Earpiece | FaceCover | Eyewear | Armband,
 }
 
 public static class EquipmentTypeUtils

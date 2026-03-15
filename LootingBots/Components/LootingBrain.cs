@@ -45,14 +45,14 @@ public class LootingBrain : MonoBehaviour
         get
         {
             return ForceBrainEnabled
-                   || (
-                       !_isDisabledForPerformance
-                       && (
-                           LootingBots.ContainerLootingEnabled.Value.IsBotEnabled(this)
-                           || LootingBots.LooseItemLootingEnabled.Value.IsBotEnabled(this)
-                           || LootingBots.CorpseLootingEnabled.Value.IsBotEnabled(this)
-                       )
-                   );
+                || (
+                    !_isDisabledForPerformance
+                    && (
+                        LootingBots.ContainerLootingEnabled.Value.IsBotEnabled(this)
+                        || LootingBots.LooseItemLootingEnabled.Value.IsBotEnabled(this)
+                        || LootingBots.CorpseLootingEnabled.Value.IsBotEnabled(this)
+                    )
+                );
         }
     }
 
@@ -97,7 +97,7 @@ public class LootingBrain : MonoBehaviour
     {
         get
         {
-            IPlayer closestPlayer = ActiveLootCache.ActivePlayers.GetClosestPlayer(BotOwner);
+            var closestPlayer = ActiveLootCache.ActivePlayers.GetClosestPlayer(BotOwner);
 
             if (closestPlayer == null)
             {
@@ -172,7 +172,7 @@ public class LootingBrain : MonoBehaviour
             {
                 if (ActiveBotCache.IsCacheActive && _performanceTimer < Time.time)
                 {
-                    bool closeEnoughToPlayer = IsCloseToPlayer;
+                    var closeEnoughToPlayer = IsCloseToPlayer;
                     // For a disabled bot to be allowed to loot they must meet the following criteria:
                     // 1. The bot has been manually flagged for looting
                     //              OR
@@ -331,7 +331,9 @@ public class LootingBrain : MonoBehaviour
 
             if (_log.DebugEnabled)
             {
-                _log.LogDebug($"Corpse loot time: {_lootTimer.ElapsedMilliseconds / 1000f:F0}s. Looted: {Stats.Looted:N0}₽. Was successful: {isSuccessful}");
+                _log.LogDebug(
+                    $"Corpse loot time: {_lootTimer.ElapsedMilliseconds / 1000f:F0}s. Looted: {Stats.Looted:N0}₽. Was successful: {isSuccessful}"
+                );
             }
         }
     }
@@ -356,7 +358,7 @@ public class LootingBrain : MonoBehaviour
             }
 
             // If a container was closed, open it before looting
-            bool didOpen = false;
+            var didOpen = false;
             if (container.DoorState == EDoorState.Shut)
             {
                 LootUtils.InteractContainer(container, BotOwner, EInteractionType.Open, _log);
@@ -379,7 +381,9 @@ public class LootingBrain : MonoBehaviour
 
             if (_log.DebugEnabled)
             {
-                _log.LogDebug($"Container loot time: {_lootTimer.ElapsedMilliseconds / 1000f:F0}s. Looted: {Stats.Looted:N0}₽. Was successful: {isSuccessful}");
+                _log.LogDebug(
+                    $"Container loot time: {_lootTimer.ElapsedMilliseconds / 1000f:F0}s. Looted: {Stats.Looted:N0}₽. Was successful: {isSuccessful}"
+                );
             }
         }
     }
@@ -414,7 +418,9 @@ public class LootingBrain : MonoBehaviour
 
             if (_log.DebugEnabled)
             {
-                _log.LogDebug($"Loose item loot time: {_lootTimer.ElapsedMilliseconds / 1000f:F0}s. Looted: {Stats.Looted:N0}₽. Was successful: {isSuccessful}");
+                _log.LogDebug(
+                    $"Loose item loot time: {_lootTimer.ElapsedMilliseconds / 1000f:F0}s. Looted: {Stats.Looted:N0}₽. Was successful: {isSuccessful}"
+                );
             }
         }
     }
@@ -444,7 +450,7 @@ public class LootingBrain : MonoBehaviour
     */
     public bool IsLootIgnored(string lootId)
     {
-        bool alreadyTried = NonNavigableLootIds.Contains(lootId) || IgnoredLootIds.Contains(lootId);
+        var alreadyTried = NonNavigableLootIds.Contains(lootId) || IgnoredLootIds.Contains(lootId);
 
         return lootId == null || alreadyTried || ActiveLootCache.IsLootInUse(lootId);
     }
@@ -452,8 +458,10 @@ public class LootingBrain : MonoBehaviour
     /** Check if the item being looted meets the loot value threshold specified in the mod settings. PMC bots use the PMC loot threshold, all other bots such as scavs, bosses, and raiders will use the scav threshold */
     public bool IsValuableEnough(Item lootItem)
     {
-        float itemValue = LootingBots.ItemAppraiser.GetItemPrice(lootItem, _log);
-        return InventoryController.IsValuableEnough(itemValue / lootItem.GetItemSize() /* Divide by slots to get price per slot */);
+        var itemValue = LootingBots.ItemAppraiser.GetItemPrice(lootItem, _log);
+        return InventoryController.IsValuableEnough(
+            itemValue / lootItem.GetItemSize() /* Divide by slots to get price per slot */
+        );
     }
 
     /**
@@ -461,7 +469,7 @@ public class LootingBrain : MonoBehaviour
     */
     public void HandleNonNavigableLoot()
     {
-        string lootId = ActiveLoot.GetRootItemId();
+        var lootId = ActiveLoot.GetRootItemId();
 
         if (lootId != null)
         {
@@ -515,7 +523,13 @@ public class LootingBrain : MonoBehaviour
         ActiveLootCache.Cleanup(BotOwner);
     }
 
-    public void SetLoot(InteractableObject interactableObject, LootFinder.LootType lootType, Vector3 position, Vector3 destination, float dist = float.MaxValue)
+    public void SetLoot(
+        InteractableObject interactableObject,
+        LootFinder.LootType lootType,
+        Vector3 position,
+        Vector3 destination,
+        float dist = float.MaxValue
+    )
     {
         ActiveLoot = interactableObject;
         ActiveLootType = lootType;

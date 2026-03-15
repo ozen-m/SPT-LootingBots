@@ -40,10 +40,10 @@ public static class LootUtils
     /** Calculate the size of a container */
     public static int GetContainerSize(this SearchableItemItemClass container)
     {
-        StashGridClass[] grids = container.Grids;
-        int gridSize = 0;
+        var grids = container.Grids;
+        var gridSize = 0;
 
-        foreach (StashGridClass grid in grids)
+        foreach (var grid in grids)
         {
             gridSize += grid.GridHeight * grid.GridWidth;
         }
@@ -58,13 +58,18 @@ public static class LootUtils
     /// <returns>returns true if it's single use, false otherwise</returns>
     public static bool IsSingleUseKey(this Item item)
     {
-        KeyComponent key = item.GetItemComponent<KeyComponent>();
+        var key = item.GetItemComponent<KeyComponent>();
         return key != null && key.Template.MaximumNumberOfUsage == 1;
     }
 
     /** Triggers a container to open/close **/
     /** Borrowed from Questing Bots, needed for Fika **/
-    public static void InteractContainer(WorldInteractiveObject worldInteractiveObject, BotOwner botOwner, EInteractionType action, BotLog log)
+    public static void InteractContainer(
+        WorldInteractiveObject worldInteractiveObject,
+        BotOwner botOwner,
+        EInteractionType action,
+        BotLog log
+    )
     {
         if (worldInteractiveObject == null)
         {
@@ -75,7 +80,7 @@ public static class LootUtils
             return;
         }
 
-        InteractionResult interactionResult = new InteractionResult(action);
+        var interactionResult = new InteractionResult(action);
         if (worldInteractiveObject is Door)
         {
             // NOTE: This method MUST be used for Fika compatibility
@@ -97,13 +102,13 @@ public static class LootUtils
         }
 
         // Initialize freeSpaces to 0
-        int freeSpaces = 0;
+        var freeSpaces = 0;
 
         // Loop through each grid and calculate the free spaces
-        foreach (StashGridClass grid in grids)
+        foreach (var grid in grids)
         {
-            int gridSize = grid.GridHeight * grid.GridWidth;
-            int containedItemSize = grid.GetSizeOfContainedItems();
+            var gridSize = grid.GridHeight * grid.GridWidth;
+            var containedItemSize = grid.GetSizeOfContainedItems();
             freeSpaces += gridSize - containedItemSize;
         }
 
@@ -117,10 +122,10 @@ public static class LootUtils
     /// <returns>Returns the item size as an integer</returns>
     public static int GetSizeOfContainedItems(this StashGridClass grid)
     {
-        int containedItemSize = 0;
+        var containedItemSize = 0;
 
         // Loop through each item in grid.Items and accumulate the item size
-        foreach (Item item in grid.Items)
+        foreach (var item in grid.Items)
         {
             containedItemSize += item.GetItemSize();
         }
@@ -148,14 +153,14 @@ public static class LootUtils
         }
 
         // Use the item's template id to search for the same item in the inventory
-        foreach (Item foundItem in controller.Inventory.GetAllItemByTemplate(item.TemplateId))
+        foreach (var foundItem in controller.Inventory.GetAllItemByTemplate(item.TemplateId))
         {
             if (foundItem == null)
             {
                 continue;
             }
 
-            Item rootItem = foundItem.GetRootItem();
+            var rootItem = foundItem.GetRootItem();
 
             // Do not try to merge with cartridges or weapon chambers
             if (foundItem.Parent.Container is StackSlot or Slot)
@@ -180,10 +185,14 @@ public static class LootUtils
     /**
    *   Returns the list of slots to loot from a corpse in priority order. When a bot already has a backpack/rig, they will attempt to loot the weapons off the bot first. Otherwise they will loot the equipement first and loot the weapons afterwards.
    */
-    public static void GetPriorityItems(this InventoryEquipment corpseEquipment, InventoryEquipment botEquipment, List<Item> preallocatedList)
+    public static void GetPriorityItems(
+        this InventoryEquipment corpseEquipment,
+        InventoryEquipment botEquipment,
+        List<Item> preallocatedList
+    )
     {
-        bool hasBackpack = botEquipment.GetSlot(EquipmentSlot.Backpack).ContainedItem != null;
-        bool hasTacVest = botEquipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem != null;
+        var hasBackpack = botEquipment.GetSlot(EquipmentSlot.Backpack).ContainedItem != null;
+        var hasTacVest = botEquipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem != null;
 
         // Add slots in priority order
         if (hasBackpack || hasTacVest)
@@ -200,13 +209,18 @@ public static class LootUtils
         GetItemInSlotsNonAlloc(corpseEquipment, botEquipment, preallocatedList, OtherSlots);
     }
 
-    private static void GetItemInSlotsNonAlloc(InventoryEquipment equipment, InventoryEquipment botEquipment, List<Item> preallocatedList, EquipmentSlot[] slots)
+    private static void GetItemInSlotsNonAlloc(
+        InventoryEquipment equipment,
+        InventoryEquipment botEquipment,
+        List<Item> preallocatedList,
+        EquipmentSlot[] slots
+    )
     {
         var equipmentOwner = equipment.Parent.GetOwner();
         var botOwner = botEquipment.Parent.GetOwner();
-        foreach (EquipmentSlot slotName in slots)
+        foreach (var slotName in slots)
         {
-            var slot =  equipment.GetSlot(slotName);
+            var slot = equipment.GetSlot(slotName);
             var item = slot.ContainedItem;
             if (item == null)
             {
@@ -215,10 +229,12 @@ public static class LootUtils
 
             // Check if item is unlootable
             var unlootableComponent = item.GetItemComponent<UnlootableComponent>();
-            if (unlootableComponent != null &&
-                equipmentOwner != botOwner &&
-                unlootableComponent.IsUnlootableFrom(item.Parent.Container) &&
-                item is not PocketsItemClass) // Include pockets to loot list
+            if (
+                unlootableComponent != null
+                && equipmentOwner != botOwner
+                && unlootableComponent.IsUnlootableFrom(item.Parent.Container)
+                && item is not PocketsItemClass // Include pockets to loot list
+            )
             {
                 continue;
             }
@@ -233,7 +249,7 @@ public static class LootUtils
         {
             LootableContainer container => container.ItemOwner?.RootItem,
             LootItem lootItem => lootItem.ItemOwner?.RootItem,
-            _ => null
+            _ => null,
         };
     }
 
@@ -243,7 +259,7 @@ public static class LootUtils
         {
             LootableContainer container => container.ItemOwner?.RootItem.Id,
             LootItem lootItem => lootItem.ItemOwner?.RootItem.Id,
-            _ => null
+            _ => null,
         };
     }
 
@@ -254,7 +270,7 @@ public static class LootUtils
             LootableContainer container => container.ItemOwner?.RootItem.Name.Localized(),
             Corpse corpse => corpse.name,
             LootItem lootItem => lootItem.ItemOwner?.RootItem.Name.Localized(),
-            _ => "-"
+            _ => "-",
         };
     }
 
@@ -281,10 +297,12 @@ public static class LootUtils
         var slotNames = slotBlocker.ConflictingSlotNames;
         for (var i = 0; i < slotNames.Length; i++)
         {
-            if (conflictingSlots.TryGetValue(slotNames[i], out var conflictingSlot) &&
-                conflictingSlot != slot && // Exclude checking the same slot
-                conflictingSlot.ContainedItem is {} conflictItem &&
-                conflictItem is not ArmorItemClass and not VestItemClass) // Exclude chest armor
+            if (
+                conflictingSlots.TryGetValue(slotNames[i], out var conflictingSlot)
+                && conflictingSlot != slot // Exclude checking the same slot
+                && conflictingSlot.ContainedItem is { } conflictItem
+                && conflictItem is not ArmorItemClass and not VestItemClass // Exclude chest/rig armor
+            )
             {
                 conflictingItem = conflictItem;
                 return true;

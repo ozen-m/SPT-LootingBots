@@ -10,7 +10,10 @@ public class LootDataHaveActionsPatch : ModulePatch
 {
     protected override MethodBase GetTargetMethod()
     {
-        return typeof(PatrolLootPointsData).GetMethod(nameof(PatrolLootPointsData.HaveActions), [typeof(Vector3), typeof(float), typeof(int)]);
+        return typeof(PatrolLootPointsData).GetMethod(
+            nameof(PatrolLootPointsData.HaveActions),
+            [typeof(Vector3), typeof(float), typeof(int)]
+        );
     }
 
     [PatchTranspiler]

@@ -13,9 +13,9 @@ public static class External
     /** Forces a bot to scan for loot as soon as they are able to. */
     public static bool ForceBotToScanLoot(BotOwner bot)
     {
-        if (GetAllComponents(bot, out LootingBrain lootingBrain, out LootFinder lootFinder))
+        if (GetAllComponents(bot, out var lootingBrain, out var lootFinder))
         {
-            BotLog log = GetOrCreateInteropLog(bot);
+            var log = GetOrCreateInteropLog(bot);
 
             if (!lootingBrain.HasFreeSpace)
             {
@@ -38,9 +38,9 @@ public static class External
     /** Stops a bot from looting if it is currently looting something and prevents loot scans for the amount of seconds specified by duration */
     public static bool PreventBotFromLooting(BotOwner bot, float duration)
     {
-        if (GetAllComponents(bot, out LootingBrain lootingBrain, out LootFinder lootFinder))
+        if (GetAllComponents(bot, out var lootingBrain, out var lootFinder))
         {
-            BotLog log = GetOrCreateInteropLog(bot);
+            var log = GetOrCreateInteropLog(bot);
 
             if (log.DebugEnabled)
             {
@@ -64,9 +64,9 @@ public static class External
      */
     public static bool CheckIfInventoryFull(BotOwner bot)
     {
-        if (GetLootingBrain(bot, out LootingBrain lootingBrain))
+        if (GetLootingBrain(bot, out var lootingBrain))
         {
-            BotLog log = GetOrCreateInteropLog(bot);
+            var log = GetOrCreateInteropLog(bot);
 
             if (log.DebugEnabled)
             {
@@ -83,9 +83,9 @@ public static class External
      */
     public static float GetNetLootValue(BotOwner bot)
     {
-        if (GetLootingBrain(bot, out LootingBrain lootingBrain))
+        if (GetLootingBrain(bot, out var lootingBrain))
         {
-            BotLog log = GetOrCreateInteropLog(bot);
+            var log = GetOrCreateInteropLog(bot);
 
             if (log.DebugEnabled)
             {
@@ -107,8 +107,8 @@ public static class External
 
     private static bool GetAllComponents(BotOwner bot, out LootingBrain lootingBrain, out LootFinder lootFinder)
     {
-        bool hasLootFinder = GetLootFinder(bot, out lootFinder);
-        bool hasLootingBrain = GetLootingBrain(bot, out lootingBrain);
+        var hasLootFinder = GetLootFinder(bot, out lootFinder);
+        var hasLootingBrain = GetLootingBrain(bot, out lootingBrain);
         return hasLootingBrain && hasLootFinder;
     }
 
@@ -126,7 +126,7 @@ public static class External
 
     private static BotLog GetOrCreateInteropLog(BotOwner bot)
     {
-        if (_interopLogs.TryGetValue(bot, out BotLog log))
+        if (_interopLogs.TryGetValue(bot, out var log))
         {
             return log;
         }

@@ -19,9 +19,9 @@ public class EnableWeaponSwitchingPatch : ModulePatch
         ref WildSpawnType ___WildSpawnType_0
     )
     {
-        bool corpseLootEnabled = LootingBots.CorpseLootingEnabled.Value.IsBotEnabled(___WildSpawnType_0);
-        bool containerLootEnabled = LootingBots.ContainerLootingEnabled.Value.IsBotEnabled(___WildSpawnType_0);
-        bool itemLootEnabled = LootingBots.LooseItemLootingEnabled.Value.IsBotEnabled(___WildSpawnType_0);
+        var corpseLootEnabled = LootingBots.CorpseLootingEnabled.Value.IsBotEnabled(___WildSpawnType_0);
+        var containerLootEnabled = LootingBots.ContainerLootingEnabled.Value.IsBotEnabled(___WildSpawnType_0);
+        var itemLootEnabled = LootingBots.LooseItemLootingEnabled.Value.IsBotEnabled(___WildSpawnType_0);
 
         if (corpseLootEnabled || containerLootEnabled || itemLootEnabled)
         {

@@ -6,8 +6,8 @@ public class ColliderDistanceComparer(Vector3 referencePosition) : IComparer<Col
 {
     public int Compare(Collider x, Collider y)
     {
-        float distX = Vector3.SqrMagnitude(x.bounds.center - referencePosition);
-        float distY = Vector3.SqrMagnitude(y.bounds.center - referencePosition);
+        var distX = Vector3.SqrMagnitude(x.bounds.center - referencePosition);
+        var distY = Vector3.SqrMagnitude(y.bounds.center - referencePosition);
         return distX.CompareTo(distY);
     }
 }

@@ -12,7 +12,6 @@ internal class PeacefulLogic(BotOwner botOwner) : CustomLogic(botOwner)
 {
     private readonly PeacefulNodeClass _baseLogic = new(botOwner);
 
-
     public override void Update(CustomLayer.ActionData data)
     {
         _baseLogic.UpdateNodeByBrain(data);

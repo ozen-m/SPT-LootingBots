@@ -66,7 +66,7 @@ public static class BotTypeUtils
         {
             return enabledTypes.HasPlayerScav();
         }
-        WildSpawnType role = brain.BotOwner.Profile.Info.Settings.Role;
+        var role = brain.BotOwner.Profile.Info.Settings.Role;
         return enabledTypes.IsBotEnabled(role);
     }
 
@@ -86,9 +86,9 @@ public static class BotTypeUtils
         {
             case WildSpawnType.assault:
             case WildSpawnType.assaultGroup:
-                {
-                    return enabledTypes.HasScav();
-                }
+            {
+                return enabledTypes.HasScav();
+            }
             case WildSpawnType.followerBigPipe:
             case WildSpawnType.followerBirdEye:
             case WildSpawnType.followerBully:
@@ -107,26 +107,26 @@ public static class BotTypeUtils
             case WildSpawnType.followerBoarClose1:
             case WildSpawnType.followerBoarClose2:
             case WildSpawnType.followerBoar:
-                {
-                    return enabledTypes.HasFollower();
-                }
+            {
+                return enabledTypes.HasFollower();
+            }
             case WildSpawnType.exUsec:
             case WildSpawnType.pmcBot:
-                {
-                    return enabledTypes.HasRaider();
-                }
+            {
+                return enabledTypes.HasRaider();
+            }
             case WildSpawnType.sectantPriest:
             case WildSpawnType.sectantWarrior:
             case WildSpawnType.cursedAssault:
-                {
-                    return enabledTypes.HasCultist();
-                }
+            {
+                return enabledTypes.HasCultist();
+            }
             case WildSpawnType.arenaFighter:
             case WildSpawnType.arenaFighterEvent:
             case WildSpawnType.crazyAssaultEvent:
-                {
-                    return enabledTypes.HasBloodhound();
-                }
+            {
+                return enabledTypes.HasBloodhound();
+            }
             default:
                 return false;
         }
@@ -144,7 +144,7 @@ public static class BotTypeUtils
 
     public static bool IsBoss(WildSpawnType wildSpawnType)
     {
-        List<WildSpawnType> bosses = new List<WildSpawnType>
+        var bosses = new List<WildSpawnType>
         {
             WildSpawnType.bossBully,
             WildSpawnType.bossGluhar,
