@@ -50,18 +50,13 @@ public class ItemAppraiser(Log _log)
                 _log.LogInfo("ShowMeTheMoney flea prices not available, falling back to BE session");
 
                 var completionClass = new TaskCompletionSource<Result<Dictionary<string, float>>>();
-                Singleton<ClientApplication<ISession>>
-                    .Instance.GetClientBackEndSession()
-                    .RagfairGetPrices(completionClass.SetResult);
+                Singleton<ClientApplication<ISession>>.Instance.GetClientBackEndSession().RagfairGetPrices(completionClass.SetResult);
 
                 Dictionary<MongoID, float> prices = null;
                 var ragfairPrices = await completionClass.Task;
                 if (ragfairPrices.Succeed)
                 {
-                    prices = ragfairPrices.Value.ToDictionary(
-                        pair => new MongoID(pair.Key),
-                        pair => pair.Value
-                    );
+                    prices = ragfairPrices.Value.ToDictionary(pair => new MongoID(pair.Key), pair => pair.Value);
                 }
 
                 MarketData = prices;
@@ -95,7 +90,7 @@ public class ItemAppraiser(Log _log)
             }
         }
 
-        bool valueFromMods = LootingBots.ValueFromMods.Value;
+        var valueFromMods = LootingBots.ValueFromMods.Value;
         if (LootingBots.UseMarketPrices.Value && MarketData != null)
         {
             return lootItem is Weapon weapon && valueFromMods ? GetWeaponMarketPrice(weapon, log) : GetItemMarketPrice(lootItem, log);
@@ -138,9 +133,9 @@ public class ItemAppraiser(Log _log)
             }
         }
 
-        float finalPrice = 0f;
+        var finalPrice = 0f;
 
-        foreach (Mod weaponMod in lootWeapon.Mods)
+        foreach (var weaponMod in lootWeapon.Mods)
         {
             finalPrice += GetItemHandbookPrice(weaponMod, log);
         }
@@ -163,8 +158,8 @@ public class ItemAppraiser(Log _log)
     /** Gets the price of the item as stated from the beSession handbook values */
     public float GetItemHandbookPrice(Item lootItem, BotLog log)
     {
-        HandbookData.TryGetValue(lootItem.TemplateId, out HandbookData value);
-        float price = value?.Price ?? 0f;
+        HandbookData.TryGetValue(lootItem.TemplateId, out var value);
+        var price = value?.Price ?? 0f;
         price *= lootItem.StackObjectsCount;
 
         // if (_log.DebugEnabled)
@@ -199,10 +194,10 @@ public class ItemAppraiser(Log _log)
             }
         }
 
-        float finalPrice = 0f;
+        var finalPrice = 0f;
 
         // Iterate over each weapon mod and accumulate the price
-        foreach (Mod weaponMod in lootWeapon.Mods)
+        foreach (var weaponMod in lootWeapon.Mods)
         {
             finalPrice += GetItemMarketPrice(weaponMod, log);
         }

@@ -15,22 +15,22 @@ public class LootingTransactionController(InventoryController inventoryControlle
     {
         try
         {
-            SearchableItemItemClass secureContainer = (SearchableItemItemClass)
+            var secureContainer = (SearchableItemItemClass)
                 inventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.SecuredContainer).ContainedItem;
 
-            StashGridClass container = secureContainer.Grids.FirstOrDefault();
+            var container = secureContainer.Grids.FirstOrDefault();
 
             // Try to get the current ammo used by the weapon by checking the contents of the magazine. If its empty, try to create an instance of the ammo using the Weapon's CurrentAmmoTemplate
-            Item ammoToAdd =
+            var ammoToAdd =
                 weapon.GetCurrentMagazine()?.FirstRealAmmo()
                 ?? Singleton<ItemFactoryClass>.Instance.CreateItem(MongoID.Generate(), weapon.CurrentAmmoTemplate._id, null);
 
             // Check to see if there already is ammo that meets the weapon's caliber in the secure container
-            bool alreadyHasAmmo = false;
+            var alreadyHasAmmo = false;
 
             foreach (var item in secureContainer.GetAllItems())
             {
-                if (item is AmmoItemClass bullet && bullet.Caliber.Equals(((AmmoItemClass) ammoToAdd).Caliber))
+                if (item is AmmoItemClass bullet && bullet.Caliber.Equals(((AmmoItemClass)ammoToAdd).Caliber))
                 {
                     alreadyHasAmmo = true;
                     break; // Early exit as soon as a match is found
@@ -45,18 +45,18 @@ public class LootingTransactionController(InventoryController inventoryControlle
                     log.LogDebug($"Trying to add ammo");
                 }
 
-                int ammoAdded = 0;
+                var ammoAdded = 0;
 
-                for (int i = 0; i < 10; i++)
+                for (var i = 0; i < 10; i++)
                 {
-                    Item ammo = ammoToAdd.CloneItem();
+                    var ammo = ammoToAdd.CloneItem();
                     ammo.StackObjectsCount = ammo.StackMaxSize;
 
-                    LocationInGrid location = container.FindFreeSpace(ammo);
+                    var location = container.FindFreeSpace(ammo);
 
                     if (location != null)
                     {
-                        GStruct154<GClass3415> result = container.AddItemWithoutRestrictions(ammo, location);
+                        var result = container.AddItemWithoutRestrictions(ammo, location);
                         if (result.Succeeded)
                         {
                             ammoAdded += ammo.StackObjectsCount;
@@ -136,7 +136,10 @@ public class LootingTransactionController(InventoryController inventoryControlle
         // Otherwise, find an empty grid slot to put the item in
         var gridAddress = inventoryController.FindGridToPickUp(item);
 
-        if (gridAddress != null && !string.Equals(gridAddress.GetRootItem()?.Parent?.Container?.ID, "securedcontainer", StringComparison.OrdinalIgnoreCase))
+        if (
+            gridAddress != null
+            && !string.Equals(gridAddress.GetRootItem()?.Parent?.Container?.ID, "securedcontainer", StringComparison.OrdinalIgnoreCase)
+        )
         {
             if (log.WarningEnabled)
             {
@@ -169,7 +172,9 @@ public class LootingTransactionController(InventoryController inventoryControlle
 
         if (log.WarningEnabled)
         {
-            log.LogWarning($"Moving {item.Name.Localized()} to: {location.Container.ID.Localized()} [{location.GetRootItem()?.Name.Localized()}]...");
+            log.LogWarning(
+                $"Moving {item.Name.Localized()} to: {location.Container.ID.Localized()} [{location.GetRootItem()?.Name.Localized()}]..."
+            );
         }
 
         await SimulatePlayerDelayAsync(token: token);
@@ -179,7 +184,9 @@ public class LootingTransactionController(InventoryController inventoryControlle
         {
             if (log.ErrorEnabled)
             {
-                log.LogWarning($"Failed to move {item.Name.Localized()} to {location.Container.ID.Localized()} [{location.GetRootItem()?.Name.Localized()}]. Error: {moveResult.Error}");
+                log.LogWarning(
+                    $"Failed to move {item.Name.Localized()} to {location.Container.ID.Localized()} [{location.GetRootItem()?.Name.Localized()}]. Error: {moveResult.Error}"
+                );
             }
             return false;
         }
@@ -189,14 +196,18 @@ public class LootingTransactionController(InventoryController inventoryControlle
         {
             if (log.ErrorEnabled)
             {
-                log.LogError($"Failed to move {item.Name.Localized()} to {location.Container.ID.Localized()} [{location.GetRootItem()?.Name.Localized()}]. Network Error: {moveNetworkResult.Error}");
+                log.LogError(
+                    $"Failed to move {item.Name.Localized()} to {location.Container.ID.Localized()} [{location.GetRootItem()?.Name.Localized()}]. Network Error: {moveNetworkResult.Error}"
+                );
             }
             return false;
         }
 
         if (log.DebugEnabled)
         {
-            log.LogDebug($"Moving {item.Name.Localized()} to: {location.Container.ID.Localized()} [{location.GetRootItem()?.Name.Localized()}]...done");
+            log.LogDebug(
+                $"Moving {item.Name.Localized()} to: {location.Container.ID.Localized()} [{location.GetRootItem()?.Name.Localized()}]...done"
+            );
         }
 
         return true;
@@ -229,7 +240,9 @@ public class LootingTransactionController(InventoryController inventoryControlle
         {
             if (log.ErrorEnabled)
             {
-                log.LogError($"Failed to swap {item.Name.Localized()} with {toSwap.Name.Localized()}. Network Error: {swapNetworkResult.Error}");
+                log.LogError(
+                    $"Failed to swap {item.Name.Localized()} with {toSwap.Name.Localized()}. Network Error: {swapNetworkResult.Error}"
+                );
             }
             return false;
         }
@@ -255,7 +268,9 @@ public class LootingTransactionController(InventoryController inventoryControlle
 
         if (log.WarningEnabled)
         {
-            log.LogWarning($"Merging {toMove.Name?.Localized()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount})...");
+            log.LogWarning(
+                $"Merging {toMove.Name?.Localized()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount})..."
+            );
         }
 
         var mergeResult = InteractionsHandlerClass.Merge(toMove, toItem, inventoryController, true);
@@ -263,7 +278,9 @@ public class LootingTransactionController(InventoryController inventoryControlle
         {
             if (log.ErrorEnabled)
             {
-                log.LogError($"Failed to merge {toMove.Name.Localized()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount}). Error: {mergeResult.Error}" );
+                log.LogError(
+                    $"Failed to merge {toMove.Name.Localized()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount}). Error: {mergeResult.Error}"
+                );
             }
             return false;
         }
@@ -274,14 +291,18 @@ public class LootingTransactionController(InventoryController inventoryControlle
         {
             if (log.ErrorEnabled)
             {
-                log.LogError($"Failed to merge {toMove.Name.Localized()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount}). Network Error: {mergeNetworkResult.Error}" );
+                log.LogError(
+                    $"Failed to merge {toMove.Name.Localized()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount}). Network Error: {mergeNetworkResult.Error}"
+                );
             }
             return false;
         }
 
         if (log.DebugEnabled)
         {
-            log.LogDebug($"Merging {toMove.Name?.Localized()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount})...done");
+            log.LogDebug(
+                $"Merging {toMove.Name?.Localized()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount})...done"
+            );
         }
 
         return true;
@@ -302,11 +323,7 @@ public class LootingTransactionController(InventoryController inventoryControlle
         await SimulatePlayerDelayAsync(token: token);
 
         var promise = new TaskCompletionSource<IResult>();
-        inventoryController.ThrowItem(
-            toThrow,
-            false,
-            promise.SetResult
-        );
+        inventoryController.ThrowItem(toThrow, false, promise.SetResult);
 
         var throwResult = await promise.Task;
         if (throwResult.Failed)
@@ -333,17 +350,17 @@ public class LootingTransactionController(InventoryController inventoryControlle
     ///
     /// It's GClass2053 Operation (RemoveWeaponOperation) running indefinitely.
     /// </summary>
-    public async Task<IResult> TryRunNetworkTransactionWithTimeoutAsync(InventoryControllerResultStruct operationResult, Callback callback = null, CancellationToken token = default)
+    public async Task<IResult> TryRunNetworkTransactionWithTimeoutAsync(
+        InventoryControllerResultStruct operationResult,
+        Callback callback = null,
+        CancellationToken token = default
+    )
     {
         using var timeoutSource = new CancellationTokenSource(TimeSpan.FromMilliseconds(NetworkTransactionTimeout));
 
         var networkTask = inventoryController.TryRunNetworkTransaction(operationResult, callback);
 
-        await Task.WhenAny(
-            networkTask,
-            Task.Delay(Timeout.Infinite, timeoutSource.Token),
-            Task.Delay(Timeout.Infinite, token)
-        );
+        await Task.WhenAny(networkTask, Task.Delay(Timeout.Infinite, timeoutSource.Token), Task.Delay(Timeout.Infinite, token));
 
         if (timeoutSource.Token.IsCancellationRequested)
         {

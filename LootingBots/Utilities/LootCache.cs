@@ -54,7 +54,7 @@ public static class ActiveLootCache
 
     public static bool IsLootInUse(string lootId)
     {
-        return ActiveLoot.TryGetValue(lootId, out BotOwner _);
+        return ActiveLoot.TryGetValue(lootId, out _);
     }
 
     private static readonly List<string> _keysToRemoveScratch = [];
@@ -76,7 +76,7 @@ public static class ActiveLootCache
             _keysToRemoveScratch.Clear();
 
             // Look through the entries in the dictionary and remove any that match the specified bot owner
-            foreach (KeyValuePair<string, BotOwner> keyValue in ActiveLoot)
+            foreach (var keyValue in ActiveLoot)
             {
                 // Check to make sure the BotOwner saved in the dictionary has a valid name before comparing
                 if (keyValue.Value == null || keyValue.Value.name == null)
@@ -98,7 +98,7 @@ public static class ActiveLootCache
                 }
             }
 
-            foreach (string key in _keysToRemoveScratch)
+            foreach (var key in _keysToRemoveScratch)
             {
                 ActiveLoot.Remove(key);
             }

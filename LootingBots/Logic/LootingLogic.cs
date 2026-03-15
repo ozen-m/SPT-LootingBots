@@ -51,10 +51,10 @@ internal class LootingLogic(BotOwner botOwner) : CustomLogic(botOwner)
             {
                 _closeEnoughTimer = Time.time + 2f;
 
-                bool isCloseEnough = IsCloseEnough();
+                var isCloseEnough = IsCloseEnough();
 
                 // If the bot is closer than 4m from the loot, they should slow down and not sprint to prevent powersliding
-                bool slowDown = _lootingBrain.DistanceToLoot < 6f;
+                var slowDown = _lootingBrain.DistanceToLoot < 6f;
 
                 // If the bot has not just looted something, loot the current item since we are now close enough
                 if (!_lootingBrain.LootTaskRunning && isCloseEnough && _lootingBrain.HasActiveLootable)
@@ -87,7 +87,7 @@ internal class LootingLogic(BotOwner botOwner) : CustomLogic(botOwner)
                 _moveTimer = Time.time + 4f;
 
                 // Initiate move to loot. Will return false if the bot is not able to navigate using a NavMesh
-                bool canMove = TryMoveToLoot();
+                var canMove = TryMoveToLoot();
 
                 // If there is not a valid path to the loot, ignore the loot forever
                 if (!canMove)
@@ -109,9 +109,9 @@ internal class LootingLogic(BotOwner botOwner) : CustomLogic(botOwner)
     */
     public bool HasLOS()
     {
-        Vector3 rayDirection = _lootingBrain.LootObjectPosition - _destination;
+        var rayDirection = _lootingBrain.LootObjectPosition - _destination;
 
-        if (Physics.Raycast(_destination, rayDirection, out RaycastHit hit) && hit.collider.gameObject.layer == LootUtils.LowPolyMask)
+        if (Physics.Raycast(_destination, rayDirection, out var hit) && hit.collider.gameObject.layer == LootUtils.LowPolyMask)
         {
             if (_log.ErrorEnabled)
             {
@@ -129,18 +129,17 @@ internal class LootingLogic(BotOwner botOwner) : CustomLogic(botOwner)
     */
     public bool TryMoveToLoot()
     {
-        bool canMove = true;
+        var canMove = true;
         try
         {
-            //Increment navigation attempt counter
+            // Increment navigation attempt counter
             _navigationAttempts++;
 
-            // TODO: Check lootable names
-            string lootableName = _lootingBrain.ActiveLoot.GetLootName();
+            var lootableName = _lootingBrain.ActiveLoot.GetLootName();
 
             // If the bot has not been stuck for more than 2 navigation checks, attempt to navigate to the lootable otherwise ignore the container forever
-            bool isBotStuck = _stuckCount > 1;
-            bool isNavigationLimit = _navigationAttempts > 30;
+            var isBotStuck = _stuckCount > 1;
+            var isNavigationLimit = _navigationAttempts > 30;
 
             // Log every 5 movement attempts to reduce noise
             if (_navigationAttempts % 5 == 1 && _log.DebugEnabled)
@@ -154,7 +153,7 @@ internal class LootingLogic(BotOwner botOwner) : CustomLogic(botOwner)
 
                 if (_navigationAttempts == 1)
                 {
-                    NavMeshPathStatus pathStatus = BotOwner.GoToPoint(_destination, true, -1f, false, false);
+                    var pathStatus = BotOwner.GoToPoint(_destination, true, -1f, false, false);
 
                     if (pathStatus == NavMeshPathStatus.PathInvalid)
                     {
@@ -238,8 +237,8 @@ internal class LootingLogic(BotOwner botOwner) : CustomLogic(botOwner)
     private bool IsBotStuck(float dist)
     {
         // Calculate change in distance and assume any change less than .25f means the bot hasnt moved.
-        float changeInDist = Math.Abs(_lootingBrain.DistanceToLoot - dist);
-        bool isStuck = changeInDist < 0.3f;
+        var changeInDist = Math.Abs(_lootingBrain.DistanceToLoot - dist);
+        var isStuck = changeInDist < 0.3f;
 
         if (isStuck)
         {

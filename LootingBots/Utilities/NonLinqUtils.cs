@@ -6,7 +6,7 @@ public static class NonLinqUtils
 {
     public static bool IsChangingWeaponNonLinq(this InventoryController controller)
     {
-        foreach (GEventArgs1 activeEvent in controller.List_0)
+        foreach (var activeEvent in controller.List_0)
         {
             if (activeEvent is GEventArgs10 or GEventArgs9)
             {

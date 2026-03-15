@@ -16,8 +16,8 @@ internal class LootingLayer : CustomLayer
     public LootingLayer(BotOwner botOwner, int priority)
         : base(botOwner, priority)
     {
-        LootingBrain lootingBrain = botOwner.GetPlayer.gameObject.AddComponent<LootingBrain>();
-        LootFinder lootFinder = botOwner.GetPlayer.gameObject.AddComponent<LootFinder>();
+        var lootingBrain = botOwner.GetPlayer.gameObject.AddComponent<LootingBrain>();
+        var lootFinder = botOwner.GetPlayer.gameObject.AddComponent<LootFinder>();
         lootingBrain.Init(botOwner);
         lootFinder.Init(botOwner);
 
@@ -32,12 +32,9 @@ internal class LootingLayer : CustomLayer
 
     public override bool IsActive()
     {
-        bool isBotActive = BotOwner.BotState == EBotState.Active;
-        bool isNotHealing = !BotOwner.Medecine.FirstAid.Have2Do && !BotOwner.Medecine.SurgicalKit.HaveWork;
-        return isBotActive
-               && isNotHealing
-               && _lootingBrain.IsBrainEnabled
-               && (_lootFinder.IsScheduledScan || _lootingBrain.IsBotLooting);
+        var isBotActive = BotOwner.BotState == EBotState.Active;
+        var isNotHealing = !BotOwner.Medecine.FirstAid.Have2Do && !BotOwner.Medecine.SurgicalKit.HaveWork;
+        return isBotActive && isNotHealing && _lootingBrain.IsBrainEnabled && (_lootFinder.IsScheduledScan || _lootingBrain.IsBotLooting);
     }
 
     public override void Start()
@@ -73,14 +70,14 @@ internal class LootingLayer : CustomLayer
 
     public override bool IsCurrentActionEnding()
     {
-        Type currentActionType = CurrentAction?.Type;
+        var currentActionType = CurrentAction?.Type;
 
         if (currentActionType == typeof(FindLootLogic))
         {
             return !_lootFinder.IsScanRunning;
         }
 
-        bool notLooting = !_lootingBrain.IsBotLooting;
+        var notLooting = !_lootingBrain.IsBotLooting;
 
         if (currentActionType == typeof(LootingLogic) && notLooting)
         {
@@ -93,15 +90,20 @@ internal class LootingLayer : CustomLayer
 
     public override void BuildDebugText(StringBuilder debugPanel)
     {
-        string lootName = _lootingBrain.ActiveLoot != null ? _lootingBrain.ActiveLoot.GetLootName() : "-";
+        var lootName = _lootingBrain.ActiveLoot != null ? _lootingBrain.ActiveLoot.GetLootName() : "-";
 
         debugPanel.AppendLine(
             _lootingBrain.LootTaskRunning ? "Looting in progress..."
-            : _lootFinder.IsScanRunning ? "Scan in progress..."
-            : string.Empty,
+                : _lootFinder.IsScanRunning ? "Scan in progress..."
+                : string.Empty,
             Color.green
         );
-        debugPanel.AppendLabeledValue("Target Loot", $" {lootName} ({_lootingBrain.ActiveLootType.ToString()})", Color.yellow, Color.yellow);
+        debugPanel.AppendLabeledValue(
+            "Target Loot",
+            $" {lootName} ({_lootingBrain.ActiveLootType.ToString()})",
+            Color.yellow,
+            Color.yellow
+        );
 
         debugPanel.AppendLabeledValue(
             "Distance to Loot",

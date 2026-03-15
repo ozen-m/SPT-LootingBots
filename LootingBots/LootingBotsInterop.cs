@@ -40,7 +40,9 @@ internal static class LootingBotsInterop
     public static bool Init()
     {
         if (!IsLootingBotsLoaded())
+        {
             return false;
+        }
 
         // Only check for the External class once
         if (!_LootingBotsInteropInited)
@@ -70,11 +72,15 @@ internal static class LootingBotsInterop
     public static bool TryForceBotToScanLoot(BotOwner botOwner)
     {
         if (!Init())
+        {
             return false;
+        }
         if (_ForceBotToScanLootMethod == null)
+        {
             return false;
+        }
 
-        return (bool) _ForceBotToScanLootMethod.Invoke(null, new object[] { botOwner });
+        return (bool)_ForceBotToScanLootMethod.Invoke(null, new object[] { botOwner });
     }
 
     /**
@@ -83,11 +89,15 @@ internal static class LootingBotsInterop
     public static bool TryPreventBotFromLooting(BotOwner botOwner, float duration)
     {
         if (!Init())
+        {
             return false;
+        }
         if (_PreventBotFromLootingMethod == null)
+        {
             return false;
+        }
 
-        return (bool) _PreventBotFromLootingMethod.Invoke(null, new object[] { botOwner, duration });
+        return (bool)_PreventBotFromLootingMethod.Invoke(null, new object[] { botOwner, duration });
     }
 
     /**
@@ -96,11 +106,15 @@ internal static class LootingBotsInterop
     public static bool CheckIfInventoryFull(BotOwner botOwner)
     {
         if (!Init())
+        {
             return false;
+        }
         if (_CheckIfInventoryFullMethod == null)
+        {
             return false;
+        }
 
-        return (bool) _CheckIfInventoryFullMethod.Invoke(null, new object[] { botOwner });
+        return (bool)_CheckIfInventoryFullMethod.Invoke(null, new object[] { botOwner });
     }
 
     /**
@@ -109,11 +123,15 @@ internal static class LootingBotsInterop
     public static float GetNetLootValue(BotOwner botOwner)
     {
         if (!Init())
+        {
             return 0f;
+        }
         if (_GetNetLootValueMethod == null)
+        {
             return 0f;
+        }
 
-        return (float) _GetNetLootValueMethod.Invoke(null, new object[] { botOwner });
+        return (float)_GetNetLootValueMethod.Invoke(null, new object[] { botOwner });
     }
 
     /**
@@ -122,10 +140,14 @@ internal static class LootingBotsInterop
     public static float GetItemPrice(LootItem item)
     {
         if (!Init())
+        {
             return 0f;
+        }
         if (_GetItemPriceMethod == null)
+        {
             return 0f;
+        }
 
-        return (float) _GetItemPriceMethod.Invoke(null, new object[] { item });
+        return (float)_GetItemPriceMethod.Invoke(null, new object[] { item });
     }
 }

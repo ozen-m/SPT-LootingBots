@@ -23,7 +23,8 @@ public class LootFinder : MonoBehaviour
     private const int MaxEmptyAttempts = 3;
     private const float EmptyAttemptsCooldown = 180f;
     private int _emptyAttempts;
-    // TODO: Add config
+
+    // TODO: Add empty attempts config?
 
     // Bot specific config
     private bool _containerLootingEnabled;
@@ -39,10 +40,12 @@ public class LootFinder : MonoBehaviour
     {
         get { return LootingBots.DetectCorpseDistance.Value; }
     }
+
     private static float DetectContainerDistance
     {
         get { return LootingBots.DetectContainerDistance.Value; }
     }
+
     private static float DetectItemDistance
     {
         get { return LootingBots.DetectItemDistance.Value; }
@@ -144,7 +147,7 @@ public class LootFinder : MonoBehaviour
     {
         IsScanRunning = true;
 
-        Collider[] colliders = _colliderPool.Rent(3000);
+        var colliders = _colliderPool.Rent(3000);
 
         try
         {
@@ -158,7 +161,7 @@ public class LootFinder : MonoBehaviour
             }
 
             // Use the largest detection radius specified in the settings as the main Sphere radius
-            float detectionRadius = Mathf.Max(DetectItemDistance, DetectContainerDistance);
+            var detectionRadius = Mathf.Max(DetectItemDistance, DetectContainerDistance);
             detectionRadius = Mathf.Max(detectionRadius, DetectCorpseDistance);
             var botPosition = _botOwner.Position;
 
@@ -197,22 +200,24 @@ public class LootFinder : MonoBehaviour
             var availableGridSpaces = _lootingBrain.Stats.AvailableGridSpaces;
 
             // Process sorted colliders
-            for (int i = 0; i < hits; i++)
+            for (var i = 0; i < hits; i++)
             {
                 token.ThrowIfCancellationRequested();
 
                 var collider = colliders[i];
 
                 Item rootItem = null;
-                LootType lootType = LootType.None;
+                var lootType = LootType.None;
 
                 // Get InteractableObject once and check derived type
                 var interactableObject = collider.gameObject.GetComponentInParent<InteractableObject>();
                 if (_corpseLootingEnabled && interactableObject is Corpse corpse)
                 {
                     var player = collider.gameObject.GetComponentInParent<Player>();
-                    if (player != null && // Corpse is a bot corpse and not a static "Dead scav"
-                        corpse.ItemOwner?.RootItem is InventoryEquipment equipment)
+                    if (
+                        player != null // Corpse is a bot corpse and not a static "Dead scav"
+                        && corpse.ItemOwner?.RootItem is InventoryEquipment equipment
+                    )
                     {
                         rootItem = equipment;
                         lootType = LootType.Corpse;
@@ -221,8 +226,10 @@ public class LootFinder : MonoBehaviour
                 else if (_containerLootingEnabled && interactableObject is LootableContainer container)
                 {
                     rootItem = container.ItemOwner?.RootItem;
-                    if (container.isActiveAndEnabled // Container is marked as active and enabled
-                        && container.DoorState is not EDoorState.Locked) // Container is not locked)
+                    if (
+                        container.isActiveAndEnabled // Container is marked as active and enabled
+                        && container.DoorState is not EDoorState.Locked // Container is not locked
+                    )
                     {
                         lootType = LootType.Container;
                     }
@@ -230,7 +237,8 @@ public class LootFinder : MonoBehaviour
                 else if (_itemLootingEnabled && interactableObject is LootItem lootItem && lootItem is not Corpse)
                 {
                     rootItem = lootItem.ItemOwner?.RootItem;
-                    if (rootItem is not null
+                    if (
+                        rootItem is not null
                         && !rootItem.QuestItem // Item is not a quest item
                         && (
                             rootItem is SearchableItemItemClass // If the item is something that can be searched, consider it lootable
@@ -238,7 +246,9 @@ public class LootFinder : MonoBehaviour
                                 rootItem is ArmoredEquipmentItemClass armor
                                 && _lootingBrain.InventoryController.IsBetterArmorThanEquipped(armor)
                             )
-                            || (_lootingBrain.IsValuableEnough(rootItem) && availableGridSpaces > rootItem.GetItemSize())))
+                            || (_lootingBrain.IsValuableEnough(rootItem) && availableGridSpaces > rootItem.GetItemSize())
+                        )
+                    )
                     {
                         lootType = LootType.Item;
                     }
@@ -347,7 +357,7 @@ public class LootFinder : MonoBehaviour
 
     public bool FindPrioritizedCorpse(int ticket)
     {
-        for (int i = 0; i < _priorityCorpses.Count; i++)
+        for (var i = 0; i < _priorityCorpses.Count; i++)
         {
             var player = _priorityCorpses.Dequeue();
             if (_log.DebugEnabled)
@@ -432,7 +442,7 @@ public class LootFinder : MonoBehaviour
             LootType.Container => DetectContainerDistance,
             LootType.Item => DetectItemDistance,
             LootType.None => throw new ArgumentOutOfRangeException(nameof(lootType), lootType, null),
-            _ => throw new ArgumentOutOfRangeException(nameof(lootType), lootType, null)
+            _ => throw new ArgumentOutOfRangeException(nameof(lootType), lootType, null),
         };
 
         var path = _botOwner.Mover.CalcPath(destination);
@@ -447,7 +457,7 @@ public class LootFinder : MonoBehaviour
             LootType.Container => LootingBots.DetectContainerNeedsSight.Value,
             LootType.Item => LootingBots.DetectItemNeedsSight.Value,
             LootType.None => throw new ArgumentOutOfRangeException(nameof(lootType), lootType, null),
-            _ => throw new ArgumentOutOfRangeException(nameof(lootType), lootType, null)
+            _ => throw new ArgumentOutOfRangeException(nameof(lootType), lootType, null),
         };
         if (!needsSight)
         {
@@ -459,10 +469,10 @@ public class LootFinder : MonoBehaviour
             return false;
         }
 
-        Vector3 start = _botOwner.LookSensor.HeadPoint;
-        Vector3 directionOfLoot = destination - start;
+        var start = _botOwner.LookSensor.HeadPoint;
+        var directionOfLoot = destination - start;
 
-        bool sightBlocked = Physics.Raycast(start, directionOfLoot, directionOfLoot.magnitude, LayerMaskClass.HighPolyWithTerrainMask);
+        var sightBlocked = Physics.Raycast(start, directionOfLoot, directionOfLoot.magnitude, LayerMaskClass.HighPolyWithTerrainMask);
 
         return !sightBlocked;
     }
@@ -470,18 +480,18 @@ public class LootFinder : MonoBehaviour
     private static Vector3 GetDestination(Vector3 center)
     {
         // Try to snap the desired destination point to the nearest NavMesh to ensure the bot can draw a navigable path to the point
-        Vector3 pointNearbyContainer = NavMesh.SamplePosition(center, out NavMeshHit navMeshAlignedPoint, 1f, NavMesh.AllAreas)
+        var pointNearbyContainer = NavMesh.SamplePosition(center, out var navMeshAlignedPoint, 1f, NavMesh.AllAreas)
             ? navMeshAlignedPoint.position
             : Vector3.zero;
 
         // Since SamplePosition always snaps to the closest point on the NavMesh, sometimes this point is a little too close to the loot and causes the bot to shake violently while looting.
         // Add a small amount of padding by pushing the point away from the nearbyPoint
-        Vector3 padding = center - pointNearbyContainer;
+        var padding = center - pointNearbyContainer;
         padding.y = 0;
         padding.Normalize();
 
         // Make sure the point is still snapped to the NavMesh after its been pushed
-        Vector3 destination = NavMesh.SamplePosition(center - (padding * 1.5f), out navMeshAlignedPoint, 1f, navMeshAlignedPoint.mask)
+        var destination = NavMesh.SamplePosition(center - (padding * 1.5f), out navMeshAlignedPoint, 1f, navMeshAlignedPoint.mask)
             ? navMeshAlignedPoint.position
             : pointNearbyContainer;
 
@@ -548,10 +558,10 @@ public static class PathExtensions
 
         length = 0f;
         var prevCorner = corners[0];
-        for (int i = 1; i < corners.Length; i++)
+        for (var i = 1; i < corners.Length; i++)
         {
-            Vector3 currentCorner = corners[i];
-            Vector3 vector3 = prevCorner - currentCorner;
+            var currentCorner = corners[i];
+            var vector3 = prevCorner - currentCorner;
             length += Mathf.Sqrt(vector3.x * vector3.x + vector3.y * vector3.y + vector3.z * vector3.z);
 
             // Reached max range

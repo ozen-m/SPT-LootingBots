@@ -13,7 +13,7 @@ public static class LootingBotsExtensions
         }
 
         IPlayer closestPlayer = null;
-        float closestDistance = float.MaxValue;
+        var closestDistance = float.MaxValue;
 
         foreach (var player in players)
         {
@@ -22,7 +22,7 @@ public static class LootingBotsExtensions
                 continue;
             }
 
-            float distance = (botOwner.Position - player.Position).sqrMagnitude;
+            var distance = (botOwner.Position - player.Position).sqrMagnitude;
 
             if (distance < closestDistance)
             {
@@ -37,7 +37,9 @@ public static class LootingBotsExtensions
     public static Item GetFirstItem(this IEnumerable<Item> items)
     {
         if (items == null)
+        {
             return null;
+        }
 
         using var enumerator = items.GetEnumerator();
         return enumerator.MoveNext() ? enumerator.Current : null;

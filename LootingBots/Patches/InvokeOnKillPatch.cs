@@ -12,7 +12,13 @@ public class InvokeOnKillPatch : ModulePatch
     }
 
     [PatchPostfix]
-    protected static void Postfix(LocalPlayer __instance, IPlayer aggressor, DamageInfoStruct damageInfo, EBodyPart bodyPart, EDamageType lethalDamageType)
+    protected static void Postfix(
+        LocalPlayer __instance,
+        IPlayer aggressor,
+        DamageInfoStruct damageInfo,
+        EBodyPart bodyPart,
+        EDamageType lethalDamageType
+    )
     {
         // Skip if the aggressor is a human player
         var aggressorBotOwner = aggressor.AIData?.BotOwner;

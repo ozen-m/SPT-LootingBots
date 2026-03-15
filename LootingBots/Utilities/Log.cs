@@ -79,25 +79,33 @@ public class BotLog
     public void LogDebug(object msg)
     {
         if (_isLogShown)
+        {
             _log.LogDebug(FormatMessage(msg));
+        }
     }
 
     public void LogInfo(object msg)
     {
         if (_isLogShown)
+        {
             _log.LogInfo(FormatMessage(msg));
+        }
     }
 
     public void LogWarning(object msg)
     {
         if (_isLogShown)
+        {
             _log.LogWarning(FormatMessage(msg));
+        }
     }
 
     public void LogError(object msg)
     {
         if (_isLogShown)
+        {
             _log.LogError(FormatMessage(msg));
+        }
     }
 
     private string FormatMessage(object data)
