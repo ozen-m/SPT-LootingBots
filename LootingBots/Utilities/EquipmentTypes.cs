@@ -120,7 +120,9 @@ public static class EquipmentTypeUtils
         return (equipmentType & EquipmentType.Armband) != 0;
     }
 
-    // GClasses based off GClass3373.FindSlotToPickUp
+    /// <summary>
+    /// GClasses based off GClass3373.FindSlotToPickUp
+    /// </summary>
     public static bool IsItemEligible(this EquipmentType allowedGear, Item item, bool toPickup = false)
     {
         if (IsChestArmor(item))

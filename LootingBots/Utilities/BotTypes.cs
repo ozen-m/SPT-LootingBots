@@ -162,9 +162,9 @@ public static class BotTypeUtils
         return bosses.Contains(wildSpawnType);
     }
 
-    /**
-    * Determines if the bot with the given profile will be a player Scav
-    */
+    /// <summary>
+    /// Determines if the bot with the given profile will be a player Scav
+    /// </summary>
     public static bool WillBeAPlayerScav(this Profile profile)
     {
         // Handle the old version of creating player Scavs

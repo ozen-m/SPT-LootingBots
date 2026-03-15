@@ -10,7 +10,9 @@ public static class External
 {
     private static readonly ConditionalWeakTable<BotOwner, BotLog> _interopLogs = [];
 
-    /** Forces a bot to scan for loot as soon as they are able to. */
+    /// <summary>
+    /// Forces a bot to scan for loot as soon as they are able to.
+    /// </summary>
     public static bool ForceBotToScanLoot(BotOwner bot)
     {
         if (GetAllComponents(bot, out var lootingBrain, out var lootFinder))
@@ -35,7 +37,10 @@ public static class External
         return false;
     }
 
-    /** Stops a bot from looting if it is currently looting something and prevents loot scans for the amount of seconds specified by duration */
+    /// <summary>
+    /// Stops a bot from looting if it is currently looting something and prevent loot scans.
+    /// </summary>
+    /// <param name="duration">The duration, in seconds, to prevent a bot from looting</param>
     public static bool PreventBotFromLooting(BotOwner bot, float duration)
     {
         if (GetAllComponents(bot, out var lootingBrain, out var lootFinder))
@@ -59,9 +64,9 @@ public static class External
         return false;
     }
 
-    /**
-     * Checks if a bot's inventory is full or not
-     */
+    /// <summary>
+    /// Checks if a bot's inventory is full or not.
+    /// </summary>
     public static bool CheckIfInventoryFull(BotOwner bot)
     {
         if (GetLootingBrain(bot, out var lootingBrain))
@@ -78,9 +83,9 @@ public static class External
         return false;
     }
 
-    /**
-     * Gets the total value looted by a bot in this raid
-     */
+    /// <summary>
+    /// Gets the total value looted by a bot in this raid.
+    /// </summary>
     public static float GetNetLootValue(BotOwner bot)
     {
         if (GetLootingBrain(bot, out var lootingBrain))
@@ -97,9 +102,10 @@ public static class External
         return 0f;
     }
 
-    /**
-     * Checks the price of a loot item using LB ItemAppraiser
-     */
+    /// <summary>
+    /// Checks the price of a loot item using LB ItemAppraiser.
+    /// Note: Not per slot pricing.
+    /// </summary>
     public static float GetItemPrice(Item item)
     {
         return LootingBots.ItemAppraiser != null ? LootingBots.ItemAppraiser.GetItemPrice(item, null) : 0;

@@ -37,7 +37,9 @@ public static class LootUtils
         EquipmentSlot.FaceCover,
     ];
 
-    /** Calculate the size of a container */
+    /// <summary>
+    /// Calculate the size of a container
+    /// </summary>
     public static int GetContainerSize(this SearchableItemItemClass container)
     {
         var grids = container.Grids;
@@ -62,8 +64,10 @@ public static class LootUtils
         return key != null && key.Template.MaximumNumberOfUsage == 1;
     }
 
-    /** Triggers a container to open/close **/
-    /** Borrowed from Questing Bots, needed for Fika **/
+    /// <summary>
+    /// Triggers a container to open/close. Borrowed from Questing Bots, needed for Fika
+    /// </summary>
+    /// <seealso href="https://github.com/dwesterwick/SPTQuestingBots/blob/0.10.3/bepinex_dev/SPTQuestingBots/Helpers/InteractiveObjectHelpers.cs#L111"/>
     public static void InteractContainer(
         WorldInteractiveObject worldInteractiveObject,
         BotOwner botOwner,
@@ -71,6 +75,7 @@ public static class LootUtils
         BotLog log
     )
     {
+        // TODO: Null check is probably no longer needed!
         if (worldInteractiveObject == null)
         {
             if (log.DebugEnabled)
@@ -91,9 +96,9 @@ public static class LootUtils
         botOwner.GetPlayer.vmethod_1(worldInteractiveObject, interactionResult);
     }
 
-    /**
-    * Calculates the amount of empty grid slots in the container
-    */
+    /// <summary>
+    /// Calculates the amount of empty grid slots in the container
+    /// </summary>
     public static int GetAvailableGridSlots(StashGridClass[] grids)
     {
         if (grids is null)
@@ -143,7 +148,10 @@ public static class LootUtils
         return dimensions.X * dimensions.Y;
     }
 
-    /** Given an item that is stackable and can be merged, search through the inventory and find any matches of that item that are not in a secure container. */
+    /// <summary>
+    /// Given an item that is stackable and can be merged,
+    /// search through the inventory and find any matches of that item that are not in a secure container.
+    /// </summary>
     public static Item FindItemToMerge(this InventoryController controller, Item item)
     {
         // Return null if item cannot be stacked
@@ -182,9 +190,11 @@ public static class LootUtils
         return null;
     }
 
-    /**
-   *   Returns the list of slots to loot from a corpse in priority order. When a bot already has a backpack/rig, they will attempt to loot the weapons off the bot first. Otherwise they will loot the equipement first and loot the weapons afterwards.
-   */
+    /// <summary>
+    /// Returns the list of slots to loot from a corpse in priority order.
+    /// When a bot already has a backpack/rig, it will attempt to loot the weapons off the bot first.
+    /// Otherwise, it will loot the equipment first and loot the weapons afterward.
+    /// </summary>
     public static void GetPriorityItems(
         this InventoryEquipment corpseEquipment,
         InventoryEquipment botEquipment,
@@ -243,6 +253,9 @@ public static class LootUtils
         }
     }
 
+    /// <summary>
+    ///  Helper to get the root item of an InteractableObject
+    /// </summary>
     public static Item GetRootItem(this InteractableObject interactableObject)
     {
         return interactableObject switch
@@ -253,6 +266,9 @@ public static class LootUtils
         };
     }
 
+    /// <summary>
+    ///  Helper to get the root item ID of an InteractableObject
+    /// </summary>
     public static string GetRootItemId(this InteractableObject interactableObject)
     {
         return interactableObject switch
@@ -263,6 +279,9 @@ public static class LootUtils
         };
     }
 
+    /// <summary>
+    ///  Helper to get the loot name of an InteractableObject, depending on the type.
+    /// </summary>
     public static string GetLootName(this InteractableObject interactableObject)
     {
         return interactableObject switch
@@ -275,9 +294,9 @@ public static class LootUtils
     }
 
     /// <summary>
-    /// Check if moving an item to a slot is blocked
-    /// Except chest armor
-    /// Based on Slot.method_3
+    /// Check if moving an item to a slot is blocked.
+    /// Except chest/rig armor.
+    /// Based on <see cref="Slot.method_3"/>
     /// </summary>
     public static bool HasBlockingItem(this Slot slot, Item incomingItem, out Item conflictingItem)
     {

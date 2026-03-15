@@ -4,6 +4,9 @@ using SPT.Reflection.Patching;
 
 namespace LootingBots.Patches;
 
+/// <summary>
+/// Used in prioritizing looting corpses killed by a bot
+/// </summary>
 public class InvokeOnKillPatch : ModulePatch
 {
     protected override MethodBase GetTargetMethod()
@@ -28,7 +31,7 @@ public class InvokeOnKillPatch : ModulePatch
         }
 
         // Call KillTarget where OnKillTarget invokes which we can subscribe to,
-        // for the aggressor to prioritize the victim's corpse
+        // where the aggressor's loot finder will prioritize the victim's corpse
         aggressorBotOwner.BotPersonalStats.KillTarget(__instance.ProfileId, damageInfo);
     }
 }

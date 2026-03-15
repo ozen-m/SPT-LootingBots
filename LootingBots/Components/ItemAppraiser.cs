@@ -77,7 +77,10 @@ public class ItemAppraiser(Log _log)
         }
     }
 
-    /** Will either get the lootItem's price using the ragfair service or the handbook depending on the option selected in the mod menu. If the item is a weapon, will calculate its value based off its attachments if the mod setting is enabled */
+    /// <summary>
+    /// Will either get the lootItem's price using the ragfair service or the handbook depending on the option selected in the mod menu.
+    /// If the item is a weapon, will calculate its value based off its attachments if the mod setting is enabled.
+    /// </summary>
     public float GetItemPrice(Item lootItem, BotLog log)
     {
         // Get the price of an ammo box by its ammo
@@ -116,9 +119,9 @@ public class ItemAppraiser(Log _log)
         return 0f;
     }
 
-    /**
-    * Get the price of a weapon from the sum of its attachments mods, using the default handbook prices to appraise each mod.
-    */
+    /// <summary>
+    /// Get the price of a weapon from the sum of its attachments mods, using the default handbook prices to appraise each mod.
+    /// </summary>
     public float GetWeaponHandbookPrice(Weapon lootWeapon, BotLog log)
     {
         if (_log.DebugEnabled)
@@ -155,7 +158,9 @@ public class ItemAppraiser(Log _log)
         return finalPrice;
     }
 
-    /** Gets the price of the item as stated from the beSession handbook values */
+    /// <summary>
+    /// Gets the price of the item as stated from the beSession handbook values.
+    /// </summary>
     public float GetItemHandbookPrice(Item lootItem, BotLog log)
     {
         HandbookData.TryGetValue(lootItem.TemplateId, out var value);
@@ -177,9 +182,9 @@ public class ItemAppraiser(Log _log)
         return Mathf.Max(0f, price);
     }
 
-    /**
-    * Get the price of a weapon from the sum of its attachments mods, using the ragfair prices to appraise each mod.
-    */
+    /// <summary>
+    /// Get the price of a weapon from the sum of its attachments mods, using the ragfair prices to appraise each mod.
+    /// </summary>
     public float GetWeaponMarketPrice(Weapon lootWeapon, BotLog log)
     {
         if (_log.DebugEnabled)
@@ -217,7 +222,9 @@ public class ItemAppraiser(Log _log)
         return finalPrice;
     }
 
-    /** Gets the price of the item as stated from the ragfair values */
+    /// <summary>
+    /// Gets the price of the item as stated from the ragfair values
+    /// </summary>
     public float GetItemMarketPrice(Item lootItem, BotLog log)
     {
         if (MarketData.TryGetValue(lootItem.TemplateId, out var price))

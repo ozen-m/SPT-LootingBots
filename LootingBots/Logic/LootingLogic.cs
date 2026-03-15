@@ -103,10 +103,11 @@ internal class LootingLogic(BotOwner botOwner) : CustomLogic(botOwner)
         }
     }
 
-    /*
-        Check to see if the destination point and the loot object do not have a wall between them by casting a Ray between the two points.
-        Walls should be on the LowPolyCollider LayerMask, so we can assume if we see one of these then we cannot properly loot
-    */
+    /// <summary>
+    /// Check to see if the destination point and the loot object do not have a wall between them by casting a Ray between the two points.
+    /// Walls should be on the LowPolyCollider LayerMask, so we can assume if we see one of these then we cannot properly loot.
+    /// </summary>
+    /// <returns></returns>
     public bool HasLOS()
     {
         var rayDirection = _lootingBrain.LootObjectPosition - _destination;
@@ -123,10 +124,13 @@ internal class LootingLogic(BotOwner botOwner) : CustomLogic(botOwner)
         return true;
     }
 
-    /**
-    * Makes the bot look towards the target destination and begin moving towards it. Navigation will be cancelled if the bot has not moved in more than 2 navigation calls, if the destination cannot be snapped to a mesh,
-    * or if the NavPathStatus is anything other than Completed
-    */
+    /// <summary>
+    /// Makes the bot look towards the target destination and begin moving towards it.
+    /// Navigation will be canceled if:
+    /// - The bot has not moved in more than 2 navigation calls
+    /// - If the destination cannot be snapped to a mesh,
+    /// - If the NavPathStatus is Invalid
+    /// </summary>
     public bool TryMoveToLoot()
     {
         var canMove = true;
@@ -198,9 +202,9 @@ internal class LootingLogic(BotOwner botOwner) : CustomLogic(botOwner)
         return canMove;
     }
 
-    /**
-    * Check to see if the bot is close enough to the destination so that they can stop moving and start looting
-    */
+    /// <summary>
+    /// Check to see if the bot is close enough to the destination so that they can stop moving and start looting.
+    /// </summary>
     private bool IsCloseEnough()
     {
         if (_destination == Vector3.zero)
@@ -233,10 +237,13 @@ internal class LootingLogic(BotOwner botOwner) : CustomLogic(botOwner)
         return isCloseEnough;
     }
 
-    // Checks if the bot is stuck moving and increments the stuck counter.
+    /// <summary>
+    /// Checks if the bot is stuck moving and increments the stuck counter.
+    /// </summary>
+    /// <param name="dist">Current distance</param>
     private bool IsBotStuck(float dist)
     {
-        // Calculate change in distance and assume any change less than .25f means the bot hasnt moved.
+        // Calculate change in distance and assume any change less than .25f means the bot hasn't moved.
         var changeInDist = Math.Abs(_lootingBrain.DistanceToLoot - dist);
         var isStuck = changeInDist < 0.3f;
 

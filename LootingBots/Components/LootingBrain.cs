@@ -127,11 +127,11 @@ public class LootingBrain : MonoBehaviour
         NonNavigableLootIds = [];
     }
 
-    /*
-     * Automatically called as this MonoBehaviour begins running.
-     *
-     * IMPORTANT: IsPlayerScav MUST be updated after Init() because SPT changes the WildSpawnType for player Scavs after that method is called.
-     */
+    /// <summary>
+    /// Automatically called as this MonoBehaviour begins running. <br/><br/>
+    ///
+    /// IMPORTANT: IsPlayerScav MUST be updated after Init() because SPT changes the WildSpawnType for player Scavs after that method is called.
+    /// </summary>
     public void Start()
     {
         IsPlayerScav = BotOwner.Profile.WillBeAPlayerScav();
@@ -160,9 +160,9 @@ public class LootingBrain : MonoBehaviour
         }
     }
 
-    /*
-     * LootFinder update should only be running if one of the looting settings is enabled and the bot is in an active state
-     */
+    /// <summary>
+    /// LootFinder update should only be running if one of the looting settings is enabled and the bot is in an active state.
+    /// </summary>
     public void Update()
     {
         try
@@ -247,9 +247,9 @@ public class LootingBrain : MonoBehaviour
         }
     }
 
-    /**
-    * Determines the looting action to take depending on the current Active object in the LootFinder. There can only be one Active object at a time
-    */
+    /// <summary>
+    /// Determines the looting action to take depending on the current loot type.
+    /// </summary>
     public void StartLooting()
     {
         StopLooting();
@@ -296,9 +296,9 @@ public class LootingBrain : MonoBehaviour
     private readonly Stopwatch _lootTimer = new();
     private readonly List<Item> _itemsToLoot = new(13);
 
-    /**
-    * Handles looting a corpse found on the map.
-    */
+    /// <summary>
+    /// Handles looting a corpse found on the map.
+    /// </summary>
     private async Task LootCorpseAsync(CancellationToken token)
     {
         var isSuccessful = false;
@@ -337,9 +337,9 @@ public class LootingBrain : MonoBehaviour
         }
     }
 
-    /**
-    * Handles looting a container found on the map.
-    */
+    /// <summary>
+    /// Handles looting a container found on the map.
+    /// </summary>
     private async Task LootContainerAsync(CancellationToken token)
     {
         var isSuccessful = false;
@@ -387,9 +387,9 @@ public class LootingBrain : MonoBehaviour
         }
     }
 
-    /**
-    * Handles looting a loose item found on the map.
-    */
+    /// <summary>
+    /// Handles looting a loose item found on the map.
+    /// </summary>
     public async Task LootItemAsync(CancellationToken token)
     {
         var isSuccessful = false;
@@ -444,9 +444,10 @@ public class LootingBrain : MonoBehaviour
         InventoryController.UpdateGridStats();
     }
 
-    /**
-    *  Check to see if the object being looted has been ignored due to bad navigation, being looted already, or if its in use by another bot
-    */
+    /// <summary>
+    /// Check to see if the object being looted has been
+    /// ignored due to bad navigation, looted already, or if its in use by another bot.
+    /// </summary>
     public bool IsLootIgnored(string lootId)
     {
         var alreadyTried = NonNavigableLootIds.Contains(lootId) || IgnoredLootIds.Contains(lootId);
@@ -454,7 +455,10 @@ public class LootingBrain : MonoBehaviour
         return lootId == null || alreadyTried || ActiveLootCache.IsLootInUse(lootId);
     }
 
-    /** Check if the item being looted meets the loot value threshold specified in the mod settings. PMC bots use the PMC loot threshold, all other bots such as scavs, bosses, and raiders will use the scav threshold */
+    /// <summary>
+    /// Check if the item being looted meets the loot value threshold specified in the mod settings.
+    /// PMC bots use the PMC loot threshold, all other bots such as scavs, bosses, and raiders will use the scav threshold.
+    /// </summary>
     public bool IsValuableEnough(Item lootItem)
     {
         var itemValue = LootingBots.ItemAppraiser.GetItemPrice(lootItem, _log);
@@ -463,9 +467,10 @@ public class LootingBrain : MonoBehaviour
         );
     }
 
-    /**
-    *  Handles adding non navigable loot to the list of non-navigable ids for use in the ignore logic. Additionaly removes the object from the active loot cache
-    */
+    /// <summary>
+    /// Handles adding non-navigable loot to the list of non-navigable ids for use in the ignore logic.
+    /// Additionally, removes the object from the active loot cache.
+    /// </summary>
     public void HandleNonNavigableLoot()
     {
         var lootId = ActiveLoot.GetRootItemId();
@@ -478,9 +483,9 @@ public class LootingBrain : MonoBehaviour
         Cleanup();
     }
 
-    /**
-    * Adds a loot id to the list of loot items to ignore for a specific bot
-    */
+    /// <summary>
+    /// Adds a loot id to the list of loot items to ignore for a specific bot
+    /// </summary>
     public void IgnoreLoot(string id)
     {
         IgnoredLootIds.Add(id);
