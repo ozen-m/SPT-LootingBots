@@ -12,7 +12,12 @@ public class LootingTransactionController(InventoryController inventoryControlle
     private const int NetworkTransactionTimeout = 5000;
     private readonly TimeoutController _networkTransactionTimeoutController = new();
 
-    /** Tries to add extra spare ammo for the weapon being looted into the bot's secure container so that the bots are able to refill their mags properly in their reload logic */
+    /// <summary>
+    /// Tries to add extra spare ammo for the weapon being looted into the bot's secure container,
+    /// so that the bots are able to refill their mags properly in their reload logic.
+    ///
+    /// Incompatible with Fika.
+    /// </summary>
     public bool AddExtraAmmo(Weapon weapon)
     {
         try
@@ -22,7 +27,8 @@ public class LootingTransactionController(InventoryController inventoryControlle
 
             var container = secureContainer.Grids.FirstOrDefault();
 
-            // Try to get the current ammo used by the weapon by checking the contents of the magazine. If its empty, try to create an instance of the ammo using the Weapon's CurrentAmmoTemplate
+            // Try to get the current ammo used by the weapon by checking the contents of the magazine.
+            // If it's empty, try to create an instance of the ammo using the Weapon's CurrentAmmoTemplate
             var ammoToAdd =
                 weapon.GetCurrentMagazine()?.FirstRealAmmo()
                 ?? Singleton<ItemFactoryClass>.Instance.CreateItem(MongoID.Generate(), weapon.CurrentAmmoTemplate._id, null);
@@ -39,7 +45,8 @@ public class LootingTransactionController(InventoryController inventoryControlle
                 }
             }
 
-            // If we dont have any ammo, attempt to add 10 max ammo stacks into the bot's secure container for use in the bot's internal reloading code
+            // If we don't have any ammo,
+            // attempt to add 10 max ammo stacks into the bot's secure container for use in the bot's internal reloading code
             if (!alreadyHasAmmo)
             {
                 if (log.DebugEnabled)
@@ -93,7 +100,9 @@ public class LootingTransactionController(InventoryController inventoryControlle
         return true;
     }
 
-    /** Tries to find an open Slot to equip the current item to. If a slot is found, issue a move action to equip the item */
+    /// <summary>
+    /// Tries to find an open Slot to equip the current item to. If a slot is found, issue a move action to equip the item.
+    /// </summary>
     public UniTask<bool> TryEquipItemAsync(Item item, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
@@ -117,7 +126,10 @@ public class LootingTransactionController(InventoryController inventoryControlle
         return MoveItemAsync(item, ableToEquip, token);
     }
 
-    /** Tries to find a valid grid for the item being looted. Checks all containers currently equipped to the bot. If there is a valid grid to place the item inside of, issue a move action to pick up the item */
+    /// <summary>
+    /// Tries to find a valid grid for the item being looted. Checks all containers currently equipped to the bot.
+    /// If there is a valid grid to place the item inside, issue a merge/move action to pick up the item.
+    /// </summary>
     public UniTask<bool> TryPickupItemAsync(Item item, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
@@ -162,6 +174,7 @@ public class LootingTransactionController(InventoryController inventoryControlle
     /// <summary>
     /// Moves an item to a specified item address
     /// </summary>
+    /// <param name="location">If address is null, try to equip if a slot is available, or pickup if a grid is available</param>
     public async UniTask<bool> MoveItemAsync(Item item, ItemAddress location, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
@@ -215,7 +228,11 @@ public class LootingTransactionController(InventoryController inventoryControlle
         return true;
     }
 
-    /** Moves an item to a specified item address. Supports executing a callback */
+    /// <summary>
+    /// Swaps an item with another item.
+    /// </summary>
+    /// <param name="item">Is almost always the incoming item</param>
+    /// <param name="toSwap">Is almost always the swapped out/thrown out item</param>
     public async UniTask<bool> SwapItemsAsync(Item item, Item toSwap, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
@@ -257,7 +274,9 @@ public class LootingTransactionController(InventoryController inventoryControlle
         return true;
     }
 
-    /** Attempts to merge an item stack with another specified item stack. Supports executing a callback */
+    /// <summary>
+    /// Attempts to merge an item stack with another specified item stack.
+    /// </summary>
     public async UniTask<bool> MergeItemAsync(Item toMove, Item toItem, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
@@ -311,7 +330,7 @@ public class LootingTransactionController(InventoryController inventoryControlle
     }
 
     /// <summary>
-    /// Method used when we want the bot the throw an item
+    /// Throw an item.
     /// </summary>
     public async UniTask<bool> ThrowItemAsync(Item toThrow, CancellationToken token = default)
     {
@@ -393,6 +412,9 @@ public class LootingTransactionController(InventoryController inventoryControlle
         }
     }
 
+    /// <summary>
+    /// Simulate decisions while looting by performing a delay.
+    /// </summary>
     public static UniTask SimulatePlayerDelayAsync(double delay = -1f, CancellationToken token = default)
     {
         if (delay == -1D)

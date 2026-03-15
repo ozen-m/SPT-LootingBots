@@ -2,7 +2,10 @@
 
 namespace LootingBots.Utilities;
 
-// Debug spheres from DrakiaXYZ Waypoints https://github.com/DrakiaXYZ/SPT-Waypoints/blob/master/Helpers/GameObjectHelper.cs
+/// <summary>
+/// Debug spheres from DrakiaXYZ Waypoints.
+/// </summary>
+/// <seealso href="https://github.com/DrakiaXYZ/SPT-Waypoints/blob/master/Helpers/GameObjectHelper.cs"/>
 public static class GameObjectHelper
 {
     public static GameObject DrawSphere(Vector3 position, float size, Color color)

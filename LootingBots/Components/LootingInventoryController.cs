@@ -161,9 +161,9 @@ public class LootingInventoryController
         }
     }
 
-    /**
-    * Calculates the value of the bot's current weapons to use in weapon swap comparison checks
-    */
+    /// <summary>
+    /// Calculates the value of the bot's current weapons to use in weapon swap comparison checks
+    /// </summary>
     public void CalculateGearValue()
     {
         if (_log.DebugEnabled)
@@ -250,9 +250,9 @@ public class LootingInventoryController
         Stats.InitialNetWorth = Stats.NetWorth;
     }
 
-    /**
-    * Updates stats for AvailableGridSpaces and TotalGridSpaces based off the bots current gear
-    */
+    /// <summary>
+    /// Updates stats for AvailableGridSpaces and TotalGridSpaces based off the bots current gear.
+    /// </summary>
     public void UpdateGridStats()
     {
         var tacVest = (SearchableItemItemClass)
@@ -268,12 +268,13 @@ public class LootingInventoryController
         Stats.TotalGridSpaces = (tacVest?.Grids?.Length ?? 0) + (backpack?.Grids?.Length ?? 0) + (pockets?.Grids?.Length ?? 0);
     }
 
-    // /**
-    // * Sorts the items in the tactical vest so that items prefer to be in slots that match their size. I.E a 1x1 item will be placed in a 1x1 slot instead of a 1x2 slot
-    // */
+    // /// <summary>
+    // /// Sorts the items in the tactical vest so that items prefer to be in slots that match their size.
+    // /// i.e a 1x1 item will be placed in a 1x1 slot instead of a 1x2 slot
+    // /// </summary>
     // public async UniTask SortTacVestAsync()
     // {
-    //     SearchableItemItemClass tacVest = (SearchableItemItemClass)
+    //     var tacVest = (SearchableItemItemClass)
     //         _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem;
     //
     //     ShouldSort = false;
@@ -281,7 +282,8 @@ public class LootingInventoryController
     //     if (tacVest != null)
     //     {
     //         var result = InteractionsHandlerClass.Sort(tacVest, _botInventoryController, true);
-    //         await UniTask.Yield();
+    //
+    //         await UniTask.Yield(); // Sorting can be expensive
     //
     //         if (result.Succeeded)
     //         {
@@ -301,11 +303,11 @@ public class LootingInventoryController
     //     }
     // }
 
-    /**
-    * Main driving method which kicks off the logic for what a bot will do with the loot found.
-    * If bots are looting something that is equippable and they have nothing equipped in that slot, they will always equip it.
-    * If the bot decides not to equip the item then it will attempt to put in an available container slot
-    */
+    /// <summary>
+    /// Main driving method which kicks off the logic for what a bot will do with the loot found.
+    /// If bots are looting something that is equippable, and they have nothing equipped in that slot, they will always equip it.
+    /// If the bot decides not to equip the item then it will attempt to put in an available container slot.
+    /// </summary>
     public async UniTask<bool> TryAddItemsToBotAsync(List<Item> items, CancellationToken token = default)
     {
         var lootingActions = ListActionPool.Rent();
@@ -478,10 +480,12 @@ public class LootingInventoryController
         return true;
     }
 
-    /** Use the ExamineTime of an object and the AttentionExamineValue of the bot to calculate the delay for discovering an item while looting */
+    /// <summary>
+    /// Use the ExamineTime of an object and the AttentionExamineValue of the bot to calculate the delay for discovering an item while looting.
+    /// Taken from ExamineOperationClass constructor
+    /// </summary>
     public UniTask SimulateExamineTimeAsync(Item item, CancellationToken token = default)
     {
-        // Taken from ExamineOperationClass constructor
         return LootingTransactionController.SimulatePlayerDelayAsync(
             item.ExamineTime * 1000f / (1f + _botOwner.Profile.Skills.AttentionExamineValue),
             token
@@ -513,20 +517,22 @@ public class LootingInventoryController
         weaponSelector.SetSlotItem(OnWeaponTaken, true);
     }
 
-    /**
-    * Method to refill magazines with ammo and also reload the current weapon with a new magazine
-    */
+    /// <summary>
+    /// Method to refill magazines with ammo and also reload the current weapon with a new magazine
+    /// </summary>
     private void RefillAndReload()
     {
         _botOwner.WeaponManager.Reload?.TryFillMagazines();
         _botOwner.WeaponManager.Reload?.TryReload();
     }
 
-    /**
-    * Checks certain slots to see if the item we are looting is "better" than what is currently equipped. View shouldSwapGear for criteria.
-    * Gear is checked in a specific order so that bots will try to swap gear that is a "container" first like backpacks and tacVests to make sure
-    * they arent putting loot in an item they will ultimately decide to drop
-    */
+    /// <summary>
+    /// Checks certain slots to see if the item we are looting is "better" than what is currently equipped.
+    /// View <see cref="ShouldSwapGear"/> for criteria.
+    /// Gear is checked in a specific order so that bots will try to swap gear that is a "container" first
+    /// like backpacks and tac vests. This is to make sure they aren't putting loot in an item they will ultimately decide to drop.
+    /// </summary>
+    /// <returns>True if equip actions were found</returns>
     public bool GetEquipAction(Item lootItem, List<LootingAction> lootingActions)
     {
         if (!AllowedToEquip(lootItem))
@@ -669,10 +675,10 @@ public class LootingInventoryController
 
     private readonly List<MagazineItemClass> _throwUselessMagsScratch = [];
 
-    /**
-    * Throws all magazines from the rig that are not used by any of the weapons that the bot currently has equipped.
-    * Also records thrown mag value.
-    */
+    /// <summary>
+    /// Throws all magazines from the rig that are not used by any of the weapons that the bot currently has equipped.
+    /// Also records thrown mag value.
+    /// </summary>
     public async UniTask ThrowUselessMagsAsync(Weapon thrownWeapon, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
@@ -742,9 +748,10 @@ public class LootingInventoryController
         }
     }
 
-    /**
-    * Determines the kind of equip action the bot should take when encountering a weapon. Bots will always prefer to replace weapons that have lower value when encountering a higher value weapon.
-    */
+    /// <summary>
+    /// Determines the kind of equip action the bot should take when encountering a weapon.
+    /// Bots will always prefer to replace weapons that have lower value when encountering a higher value weapon.
+    /// </summary>
     public void GetWeaponEquipAction(Weapon lootWeapon, List<LootingAction> lootingActions)
     {
         var primary = (Weapon)_botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.FirstPrimaryWeapon).ContainedItem;
@@ -870,12 +877,17 @@ public class LootingInventoryController
         }
     }
 
-    /**
-    * Checks to see if the bot should swap its currently equipped gear with the item to loot. Bot will swap under the following criteria:
-    * 1. The item is a container and its larger than what is equipped.
-    *   - Tactical rigs have an additional check, will not switch out if the rig we are looting is lower armor class than what is equipped
-    * 2. The item has an armor rating, and its higher than what is currently equipped.
-    */
+    /// <summary>
+    /// Checks to see if the bot should swap its currently equipped gear with the item to loot.<br/>
+    /// Bot will swap under the following criteria:<br/>
+    /// 1. The item has an armor rating, and it's higher than what is currently equipped.<br/>
+    ///
+    /// 2. The item is a container, and it's larger than what is equipped.<br/>
+    /// - Will not switch out if the item we are looting is lower armor class than what is equipped<br/>
+    ///
+    /// 3. The item is more valuable<br/>
+    /// - Will not switch out if the item we are looting is lower armor class than what is equipped<br/>
+    /// </summary>
     public bool ShouldSwapGear(Item equipped, Item itemToLoot)
     {
         if (equipped == null)
@@ -915,7 +927,7 @@ public class LootingInventoryController
 
         var foundBiggerContainer = false;
 
-        // If the item is a container, calculate the size and see if its bigger than what is equipped
+        // If the item is a container, calculate the size and see if it's bigger than what is equipped
         if (equipped.IsContainer)
         {
             var equippedSize = (equipped as SearchableItemItemClass).GetContainerSize();
@@ -947,22 +959,27 @@ public class LootingInventoryController
         return false;
     }
 
-    /** Given a piece of armor, compare it against what is curren */
+    /// <summary>
+    /// Given a piece of armor, compare it against what is current
+    /// </summary>
     public bool IsBetterArmorThanEquipped(ArmoredEquipmentItemClass newArmor)
     {
         var equippedArmor = EquipmentTypeUtils.IsHelmet(newArmor) ? CurrentHeadArmor : CurrentTorsoArmor;
         return GetArmorDifference(equippedArmor?.Item, newArmor) > 0;
     }
 
-    /** Compare equipped value with current item price (itemToLoot) */
+    /// <summary>
+    /// Compare current item value (Item to loot price) with equipped value
+    /// </summary>
     private bool LootIsMoreValuable(Item equippedItem)
     {
         return CurrentItemPrice > LootingBots.ItemAppraiser.GetItemPrice(equippedItem, _log);
     }
 
-    /**
-    * Returns an integer representing the difference between the armor classes of the itemToLoot and the currently equippedItem
-    */
+    /// <summary>
+    /// Calculate the difference between the armor classes of the item to loot and the currently equipped item
+    /// </summary>
+    /// <returns>Returns a positive integer if the item to loot has a higher armor class than what is currently equipped</returns>
     public static int GetArmorDifference(Item equippedItem, Item itemToLoot)
     {
         var currentArmorClass = equippedItem?.GetItemComponent<ArmorComponent>()?.ArmorClass ?? 0;
@@ -1023,7 +1040,7 @@ public class LootingInventoryController
         token.ThrowIfCancellationRequested();
 
         // Do not limit to SearchableItemItemClass
-        // So we can loot thrown/swapped out helmets, etc., they can be valuable
+        // So we can loot slots of thrown/swapped out helmets, etc., they can be valuable
         if (item is not CompoundItem parentItem)
         {
             return true;
@@ -1070,6 +1087,7 @@ public class LootingInventoryController
     /// <summary>
     /// Searches through the child items of a container and attempts to throw them
     /// </summary>
+    /// <param name="item">Only throws items of a container of type <see cref="SearchableItemItemClass"/></param>
     public async UniTask ThrowUndervaluedItemsAsync(Item item, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
@@ -1151,6 +1169,9 @@ public class LootingInventoryController
         }
     }
 
+    /// <summary>
+    /// Strip and loot a weapon's attachments.
+    /// </summary>
     public async UniTask<bool> StripWeaponAsync(Weapon weapon, CancellationToken token = default)
     {
         var itemsToAdd = ListPool<Item>.Get();
@@ -1201,10 +1222,10 @@ public class LootingInventoryController
         }
     }
 
-    /**
-        Check if the item being looted meets the loot value threshold specified in the mod settings and saves its value in CurrentItemPrice.
-        PMC bots use the PMC loot threshold, all other bots such as scavs, bosses, and raiders will use the scav threshold
-    */
+    /// <summary>
+    /// Check if the item being looted meets the loot value threshold specified in the mod settings.
+    /// PMC bots use the PMC loot threshold, all other bots such as scavs, bosses, and raiders will use the scav threshold.
+    /// </summary>
     public bool IsValuableEnough(float itemPrice)
     {
         var botType = _botOwner.Profile.Info.Settings.Role;
@@ -1214,10 +1235,14 @@ public class LootingInventoryController
         var min = (isPmc ? LootingBots.PMCMinLootThreshold : LootingBots.ScavMinLootThreshold).Value;
         var max = (isPmc ? LootingBots.PMCMaxLootThreshold : LootingBots.ScavMaxLootThreshold).Value;
 
-        // If max is set to 0, do not check agains max threshold
+        // If max is set to 0, do not check against max threshold
         return itemPrice >= min && (max == 0f || itemPrice <= max);
     }
 
+    /// <summary>
+    /// Check if the item being looted is allowed to be equipped by the bot as specified in the mod settings.
+    /// PMC bots use the PMC allowed gear to equip config, all other bots such as scavs, bosses, and raiders will use the scav equip config.
+    /// </summary>
     public bool AllowedToEquip(Item lootItem)
     {
         var eligiblePmcGear = (EquipmentType)LootingBots.PMCGearToEquip.Value;
@@ -1230,6 +1255,11 @@ public class LootingInventoryController
         return allowedToEquip;
     }
 
+    /// <summary>
+    /// Check if the item being looted is allowed to be picked up by the bot as specified in the mod settings.
+    /// PMC bots use the PMC allowed items to pick up config,
+    /// all other bots such as scavs, bosses, and raiders will use the scav allowed items to pick up config.
+    /// </summary>
     public bool AllowedToPickup(Item lootItem, int itemSize = 1)
     {
         var botType = _botOwner.Profile.Info.Settings.Role;
@@ -1251,7 +1281,9 @@ public class LootingInventoryController
             );
     }
 
-    /** Generates a SwapAction to send to the transaction controller*/
+    /// <summary>
+    /// Generates a SwapAction to be executed by the transaction controller.
+    /// </summary>
     public void GetSwapAction(Item toEquip, Item toSwap, List<LootingAction> lootingActions, bool transferItems = false)
     {
         var toEquipValue = CurrentItemPrice;
@@ -1268,7 +1300,7 @@ public class LootingInventoryController
     }
 
     /// <summary>
-    /// Based on Selector.OnWeaponTaken
+    /// Based on <see cref="BotWeaponSelector.OnWeaponTaken"/>
     /// </summary>
     private void OnWeaponTaken(Result<IHandsController> hands)
     {
@@ -1311,7 +1343,7 @@ public class LootingInventoryController
             }
         }
 
-        // Not active, not preactive, not allfine, not reached max errors, hands.failed
+        // Not active, not preactive, not allFine, not reached max errors, hands.failed
         _botOwner.GetPlayer.HandsController.FastForwardCurrentState();
         _botOwner.AITaskManager.RegisterDelayedTask(_botOwner, 0.5f, UpdateActiveWeapon);
     }

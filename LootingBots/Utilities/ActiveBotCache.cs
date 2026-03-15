@@ -2,8 +2,9 @@ using EFT;
 
 namespace LootingBots.Utilities;
 
-// Cached used to keep track of what lootable are currently being targeted by a bot so that multiple bots
-// dont try and path to the same lootable
+/// <summary>
+/// Cached used to keep track of which bots are able to loot
+/// </summary>
 public static class ActiveBotCache
 {
     public static readonly List<BotOwner> ActiveBots = [];
