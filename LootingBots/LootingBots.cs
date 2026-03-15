@@ -1,6 +1,8 @@
 using BepInEx;
 using BepInEx.Configuration;
+using Comfort.Common;
 using DrakiaXYZ.BigBrain.Brains;
+using EFT;
 using LootingBots.Components;
 using LootingBots.Utilities;
 using SPT.Reflection.Patching;
@@ -511,6 +513,13 @@ public class LootingBots : BaseUnityPlugin
             return;
         }
 
+#pragma warning disable CS0618 // Type or member is obsolete
+        if (GClass2340.InRaid)
+#pragma warning restore CS0618 // Type or member is obsolete
+        {
+            return;
+        }
+
         if (UseMarketPrices.Value)
         {
             // 30 minutes
@@ -527,7 +536,12 @@ public class LootingBots : BaseUnityPlugin
             }
         }
 
+        if (Singleton<HandbookClass>.Instance == null || Singleton<ClientApplication<ISession>>.Instance == null)
+        {
+            return;
+        }
+
         ItemAppraiserLog.LogInfo("Updating item appraiser");
-        ItemAppraiser.UpdatePricesAsync().HandleExceptions("Exception while updating prices");
+        _ = ItemAppraiser.UpdatePricesAsync();
     }
 }
