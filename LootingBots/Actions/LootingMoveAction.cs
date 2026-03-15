@@ -1,5 +1,4 @@
-﻿using Cysharp.Threading.Tasks;
-using EFT.InventoryLogic;
+﻿using EFT.InventoryLogic;
 using LootingBots.Components;
 using LootingBots.Utilities;
 using UnityEngine.Pool;
@@ -41,7 +40,7 @@ public class LootingMoveAction : LootingAction
     /// </summary>
     public ItemAddress Place { get; set; }
 
-    public override UniTask<bool> ExecuteAsync(LootingTransactionController controller, CancellationToken token)
+    public override Task<bool> ExecuteAsync(LootingTransactionController controller, CancellationToken token)
     {
         return controller.MoveItemAsync(Item, Place, token);
     }

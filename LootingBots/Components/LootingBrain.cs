@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using Cysharp.Threading.Tasks;
 using EFT;
 using EFT.Interactive;
 using EFT.InventoryLogic;
@@ -266,13 +265,13 @@ public class LootingBrain : MonoBehaviour
         switch (ActiveLootType)
         {
             case LootFinder.LootType.Corpse:
-                LootCorpseAsync(_lootingCts.Token).Forget(ExceptionHandler);
+                _ = LootCorpseAsync(_lootingCts.Token).ContinueWith(ExceptionHandler, TaskScheduler.Current);
                 break;
             case LootFinder.LootType.Container:
-                LootContainerAsync(_lootingCts.Token).Forget(ExceptionHandler);
+                _ = LootContainerAsync(_lootingCts.Token).ContinueWith(ExceptionHandler, TaskScheduler.Current);
                 break;
             case LootFinder.LootType.Item:
-                LootItemAsync(_lootingCts.Token).Forget(ExceptionHandler);
+                _ = LootItemAsync(_lootingCts.Token).ContinueWith(ExceptionHandler, TaskScheduler.Current);
                 break;
         }
     }
@@ -300,7 +299,7 @@ public class LootingBrain : MonoBehaviour
     /**
     * Handles looting a corpse found on the map.
     */
-    private async UniTask LootCorpseAsync(CancellationToken token)
+    private async Task LootCorpseAsync(CancellationToken token)
     {
         var isSuccessful = false;
         try
@@ -339,7 +338,7 @@ public class LootingBrain : MonoBehaviour
     /**
     * Handles looting a container found on the map.
     */
-    private async UniTask LootContainerAsync(CancellationToken token)
+    private async Task LootContainerAsync(CancellationToken token)
     {
         var isSuccessful = false;
         try
@@ -387,7 +386,7 @@ public class LootingBrain : MonoBehaviour
     /**
     * Handles looting a loose item found on the map.
     */
-    public async UniTask LootItemAsync(CancellationToken token)
+    public async Task LootItemAsync(CancellationToken token)
     {
         var isSuccessful = false;
         try
@@ -524,9 +523,9 @@ public class LootingBrain : MonoBehaviour
         DistanceToLoot = dist;
     }
 
-    private void ExceptionHandler(Exception ex)
+    private void ExceptionHandler(Task task)
     {
-        if (ex is OperationCanceledException)
+        if (task.IsCanceled)
         {
             if (_lootTimer.ElapsedMilliseconds / 1000L > LootingBots.LootTimeout.Value)
             {
@@ -541,10 +540,11 @@ public class LootingBrain : MonoBehaviour
             }
             return;
         }
-        if (_log.ErrorEnabled)
+
+        if (task.IsFaulted)
         {
             _log.LogError("Exception while trying to loot:");
-            _log.LogError(ex.ToString());
+            _log.LogError(task.Exception!.ToString());
         }
     }
 }

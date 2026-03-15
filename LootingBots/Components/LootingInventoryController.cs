@@ -1,6 +1,5 @@
 using System.Text;
 using Comfort.Common;
-using Cysharp.Threading.Tasks;
 using EFT;
 using EFT.InventoryLogic;
 using LootingBots.Actions;
@@ -308,7 +307,7 @@ public class LootingInventoryController
     * If bots are looting something that is equippable and they have nothing equipped in that slot, they will always equip it.
     * If the bot decides not to equip the item then it will attempt to put in an available container slot
     */
-    public async UniTask<bool> TryAddItemsToBotAsync(List<Item> items, CancellationToken token = default)
+    public async Task<bool> TryAddItemsToBotAsync(List<Item> items, CancellationToken token = default)
     {
         List<LootingAction> lootingActions = ListActionPool.Rent();
         try
@@ -482,7 +481,7 @@ public class LootingInventoryController
     }
 
     /** Use the ExamineTime of an object and the AttentionExamineValue of the bot to calculate the delay for discovering an item while looting */
-    public UniTask SimulateExamineTimeAsync(Item item, CancellationToken token = default)
+    public Task SimulateExamineTimeAsync(Item item, CancellationToken token = default)
     {
         // Taken from ExamineOperationClass constructor
         return LootingTransactionController.SimulatePlayerDelayAsync(
@@ -671,7 +670,7 @@ public class LootingInventoryController
     * Throws all magazines from the rig that are not used by any of the weapons that the bot currently has equipped.
     * Also records thrown mag value.
     */
-    public async UniTask ThrowUselessMagsAsync(Weapon thrownWeapon, CancellationToken token)
+    public async Task ThrowUselessMagsAsync(Weapon thrownWeapon, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
 
@@ -1005,7 +1004,7 @@ public class LootingInventoryController
     /// <summary>
     /// Searches throughout the children of a compound item and attempts to loot them
     /// </summary>
-    public async UniTask<bool> LootNestedItemsAsync(Item item, CancellationToken token = default)
+    public async Task<bool> LootNestedItemsAsync(Item item, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
 
@@ -1057,7 +1056,7 @@ public class LootingInventoryController
     /// <summary>
     /// Searches through the child items of a container and attempts to throw them
     /// </summary>
-    public async UniTask ThrowUndervaluedItemsAsync(Item item, CancellationToken token = default)
+    public async Task ThrowUndervaluedItemsAsync(Item item, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
 
@@ -1136,7 +1135,7 @@ public class LootingInventoryController
         }
     }
 
-    public async UniTask<bool> StripWeaponAsync(Weapon weapon, CancellationToken token = default)
+    public async Task<bool> StripWeaponAsync(Weapon weapon, CancellationToken token = default)
     {
         var itemsToAdd = ListPool<Item>.Get();
         try

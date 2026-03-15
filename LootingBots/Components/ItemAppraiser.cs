@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using Comfort.Common;
-using Cysharp.Threading.Tasks;
 using EFT;
 using EFT.HandBook;
 using EFT.InventoryLogic;
@@ -20,7 +19,7 @@ public class ItemAppraiser(Log _log)
 
     public bool IsUpdatingPrices { get; private set; }
 
-    public async UniTask UpdatePricesAsync()
+    public async Task UpdatePricesAsync()
     {
         IsUpdatingPrices = true;
 
@@ -29,7 +28,7 @@ public class ItemAppraiser(Log _log)
             if (LootingBots.UseMarketPrices.Value)
             {
                 // ShowMeTheMoney flea prices
-                var json = await RequestHandler.GetJsonAsync("/showMeTheMoney/getFleaPrices").AsUniTask();
+                var json = await RequestHandler.GetJsonAsync("/showMeTheMoney/getFleaPrices");
                 if (!json.IsNullOrEmpty())
                 {
                     try
@@ -50,7 +49,7 @@ public class ItemAppraiser(Log _log)
 
                 _log.LogInfo("ShowMeTheMoney flea prices not available, falling back to BE session");
 
-                var completionClass = new UniTaskCompletionSourceEx<Result<Dictionary<string, float>>>();
+                var completionClass = new TaskCompletionSource<Result<Dictionary<string, float>>>();
                 Singleton<ClientApplication<ISession>>
                     .Instance.GetClientBackEndSession()
                     .RagfairGetPrices(completionClass.SetResult);

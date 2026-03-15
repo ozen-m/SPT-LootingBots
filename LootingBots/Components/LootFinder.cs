@@ -1,6 +1,5 @@
 using System.Buffers;
 using Comfort.Common;
-using Cysharp.Threading.Tasks;
 using EFT;
 using EFT.Interactive;
 using EFT.InventoryLogic;
@@ -96,7 +95,7 @@ public class LootFinder : MonoBehaviour
         _lootFinderCts = new CancellationTokenSource();
         if (!FindPrioritizedCorpse(ticket))
         {
-            FindLootAsync(ticket, _lootFinderCts.Token).Forget(ExceptionHandler);
+            _ = FindLootAsync(ticket, _lootFinderCts.Token).ContinueWith(ExceptionHandler, TaskScheduler.Current);
         }
 
         SetLockUntilNextScan(false);
@@ -141,7 +140,7 @@ public class LootFinder : MonoBehaviour
         }
     }
 
-    private async UniTask FindLootAsync(int queue, CancellationToken token)
+    private async Task FindLootAsync(int queue, CancellationToken token)
     {
         IsScanRunning = true;
 
@@ -172,7 +171,7 @@ public class LootFinder : MonoBehaviour
                 QueryTriggerInteraction.Ignore
             );
 
-            await UniTask.Yield(token);
+            await Task.Yield();
 
             if (hits == 0)
             {
@@ -191,7 +190,7 @@ public class LootFinder : MonoBehaviour
                 _log.LogDebug($"Scan results: {hits}");
             }
 
-            await UniTask.Yield(token);
+            await Task.Yield();
 
             const int maxRangeCalculations = 3;
             var rangeCalculations = 0;
@@ -245,11 +244,11 @@ public class LootFinder : MonoBehaviour
                     }
                 }
 
-                await UniTask.Yield(token);
+                await Task.Yield();
 
                 if (lootType is LootType.None || rootItem is null)
                 {
-                    await UniTask.Yield(token);
+                    await Task.Yield();
 
                     continue;
                 }
@@ -257,7 +256,7 @@ public class LootFinder : MonoBehaviour
                 // If object has been ignored, skip to the next object detected
                 if (_lootingBrain.IsLootIgnored(rootItem.Id))
                 {
-                    await UniTask.Yield(token);
+                    await Task.Yield();
 
                     continue;
                 }
@@ -266,7 +265,7 @@ public class LootFinder : MonoBehaviour
                 var center = new Vector3(bounds.center.x, bounds.center.y - bounds.extents.y - 0.4f, bounds.center.z);
                 var destination = GetDestination(center);
 
-                await UniTask.Yield(token);
+                await Task.Yield();
 
                 // Check if we can perform distance and LOS checks
                 if (_botOwner.Mover == null)
@@ -301,7 +300,7 @@ public class LootFinder : MonoBehaviour
 
                         break;
                     }
-                    await UniTask.Yield(token);
+                    await Task.Yield();
 
                     continue;
                 }
@@ -309,7 +308,7 @@ public class LootFinder : MonoBehaviour
                 // Check if loot is in sight
                 if (!IsLootInSight(lootType, destination))
                 {
-                    await UniTask.Yield(token);
+                    await Task.Yield();
 
                     continue;
                 }
@@ -317,7 +316,7 @@ public class LootFinder : MonoBehaviour
                 // Cache the loot and set active target
                 if (!ActiveLootCache.CacheActiveLootId(rootItem.Id, _botOwner))
                 {
-                    await UniTask.Yield(token);
+                    await Task.Yield();
 
                     continue;
                 }
@@ -512,9 +511,9 @@ public class LootFinder : MonoBehaviour
         }
     }
 
-    private void ExceptionHandler(Exception ex)
+    private void ExceptionHandler(Task task)
     {
-        if (ex is OperationCanceledException)
+        if (task.IsCanceled)
         {
             if (_log.DebugEnabled)
             {
@@ -522,10 +521,14 @@ public class LootFinder : MonoBehaviour
             }
             return;
         }
-        if (_log.ErrorEnabled)
+
+        if (task.IsFaulted)
         {
-            _log.LogError("Exception while trying to scan for loot:");
-            _log.LogError(ex.ToString());
+            if (_log.ErrorEnabled)
+            {
+                _log.LogError("Exception while trying to scan for loot:");
+                _log.LogError(task.Exception!.ToString());
+            }
         }
     }
 }

@@ -1,5 +1,4 @@
-﻿using Cysharp.Threading.Tasks;
-using EFT.InventoryLogic;
+﻿using EFT.InventoryLogic;
 using LootingBots.Components;
 
 namespace LootingBots.Actions;
@@ -19,7 +18,7 @@ public abstract class LootingAction
     /// </summary>
     public float NetWorthDelta { get; set; }
 
-    public abstract UniTask<bool> ExecuteAsync(LootingTransactionController controller, CancellationToken token);
+    public abstract Task<bool> ExecuteAsync(LootingTransactionController controller, CancellationToken token);
 
     public abstract void Return();
 

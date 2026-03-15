@@ -20,64 +20,32 @@
     <PackageReference Include="RoR2.BepInEx.Analyzers" Version="1.0.*-*" PrivateAssets="all" />
   </ItemGroup>
   <ItemGroup>
+    <Reference Include="CommonExtensions">
+      <HintPath>..\References\CommonExtensions.dll</HintPath>
+    </Reference>
     <Reference Include="DrakiaXYZ-BigBrain">
       <HintPath>..\References\DrakiaXYZ-BigBrain.dll</HintPath>
     </Reference>
     <Reference Include="spt-common">
       <HintPath>..\References\spt-common.dll</HintPath>
     </Reference>
-    <Reference Include="spt-reflection, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
+    <Reference Include="spt-reflection">
       <HintPath>..\References\spt-reflection.dll</HintPath>
     </Reference>
-    <Reference Include="Assembly-CSharp, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
+    <Reference Include="Assembly-CSharp">
       <HintPath>..\References\hollowed.dll</HintPath>
     </Reference>
     <Reference Include="Comfort">
       <HintPath>..\References\Comfort.dll</HintPath>
     </Reference>
-    <Reference Include="ItemComponent.Types" HintPath="..\References\ItemComponent.Types.dll" Private="False" />
-    <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
+    <Reference Include="ItemComponent.Types">
+      <HintPath>..\References\ItemComponent.Types.dll</HintPath>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
       <HintPath>..\References\Newtonsoft.Json.dll</HintPath>
     </Reference>
-    <Reference Include="DissonanceVoip" HintPath="..\References\DissonanceVoip.dll" Private="False" />
-    <Reference Include="UniTask">
-      <HintPath>..\References\UnityToolkit\UniTask.dll</HintPath>
-    </Reference>
-    <Reference Include="UniTask.Addressables">
-      <HintPath>..\References\UnityToolkit\UniTask.Addressables.dll</HintPath>
-    </Reference>
-    <Reference Include="UniTask.DOTween">
-      <HintPath>..\References\UnityToolkit\UniTask.DOTween.dll</HintPath>
-    </Reference>
-    <Reference Include="UniTask.Linq">
-      <HintPath>..\References\UnityToolkit\UniTask.Linq.dll</HintPath>
-    </Reference>
-    <Reference Include="UniTask.TextMeshPro">
-      <HintPath>..\References\UnityToolkit\UniTask.TextMeshPro.dll</HintPath>
-    </Reference>
-    <Reference Include="Unity.Collections">
-      <HintPath>..\References\UnityToolkit\Unity.Collections.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityToolkit">
-      <HintPath>..\References\UnityToolkit\UnityToolkit.dll</HintPath>
-    </Reference>
-    <Reference Include="VContainer">
-      <HintPath>..\References\UnityToolkit\VContainer.dll</HintPath>
-    </Reference>
-    <Reference Include="ZLinq">
-      <HintPath>..\References\UnityToolkit\ZLinq.dll</HintPath>
-    </Reference>
-    <Reference Include="ZLinq.Unity">
-      <HintPath>..\References\UnityToolkit\ZLinq.Unity.dll</HintPath>
-    </Reference>
-    <Reference Include="ZLinq.Unity.UnityCollectoins">
-      <HintPath>..\References\UnityToolkit\ZLinq.Unity.UnityCollectoins.dll</HintPath>
-    </Reference>
-    <Reference Include="ZString">
-      <HintPath>..\References\UnityToolkit\ZString.dll</HintPath>
+    <Reference Include="DissonanceVoip">
+      <HintPath>..\References\DissonanceVoip.dll</HintPath>
     </Reference>
   </ItemGroup>
   <!-- Build script for release build-->

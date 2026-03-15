@@ -1,17 +1,14 @@
 using BepInEx;
 using BepInEx.Configuration;
-using Cysharp.Threading.Tasks;
 using DrakiaXYZ.BigBrain.Brains;
 using LootingBots.Components;
 using LootingBots.Utilities;
-
 using SPT.Reflection.Patching;
 
 namespace LootingBots;
 
 [BepInPlugin(MOD_GUID, MOD_NAME, MOD_VERSION)]
 [BepInDependency("xyz.drakia.bigbrain", "1.4.0")]
-[BepInDependency("com.arys.unitytoolkit", "2.0.1")]
 public class LootingBots : BaseUnityPlugin
 {
     private PatchManager _patchManager;
@@ -531,13 +528,6 @@ public class LootingBots : BaseUnityPlugin
         }
 
         ItemAppraiserLog.LogInfo("Updating item appraiser");
-        ItemAppraiser.UpdatePricesAsync().Forget(ex =>
-        {
-            if (ItemAppraiserLog.ErrorEnabled)
-            {
-                ItemAppraiserLog.LogError("Exception while updating prices:");
-                ItemAppraiserLog.LogError(ex.ToString());
-            }
-        });
+        ItemAppraiser.UpdatePricesAsync().HandleExceptions("Exception while updating prices");
     }
 }

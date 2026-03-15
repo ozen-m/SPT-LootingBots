@@ -1,5 +1,4 @@
 using Comfort.Common;
-using Cysharp.Threading.Tasks;
 using EFT;
 using EFT.InventoryLogic;
 using LootingBots.Utilities;
@@ -10,7 +9,6 @@ namespace LootingBots.Components;
 public class LootingTransactionController(InventoryController inventoryController, BotLog log)
 {
     private const int NetworkTransactionTimeout = 5000;
-    private readonly TimeoutController _networkTransactionTimeoutController = new();
 
     /** Tries to add extra spare ammo for the weapon being looted into the bot's secure container so that the bots are able to refill their mags properly in their reload logic */
     public bool AddExtraAmmo(Weapon weapon)
@@ -94,7 +92,7 @@ public class LootingTransactionController(InventoryController inventoryControlle
     }
 
     /** Tries to find an open Slot to equip the current item to. If a slot is found, issue a move action to equip the item */
-    public UniTask<bool> TryEquipItemAsync(Item item, CancellationToken token = default)
+    public Task<bool> TryEquipItemAsync(Item item, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
 
@@ -106,7 +104,7 @@ public class LootingTransactionController(InventoryController inventoryControlle
             {
                 log.LogDebug($"Could not find a place to equip: {item.Name.Localized()}");
             }
-            return UniTask.FromResult(false);
+            return Task.FromResult(false);
         }
 
         if (log.WarningEnabled)
@@ -118,7 +116,7 @@ public class LootingTransactionController(InventoryController inventoryControlle
     }
 
     /** Tries to find a valid grid for the item being looted. Checks all containers currently equipped to the bot. If there is a valid grid to place the item inside of, issue a move action to pick up the item */
-    public UniTask<bool> TryPickupItemAsync(Item item, CancellationToken token = default)
+    public Task<bool> TryPickupItemAsync(Item item, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
 
@@ -153,13 +151,13 @@ public class LootingTransactionController(InventoryController inventoryControlle
             log.LogDebug($"Could not find a place to pickup: {item.Name.Localized()}");
         }
 
-        return UniTask.FromResult(false);
+        return Task.FromResult(false);
     }
 
     /// <summary>
     /// Moves an item to a specified item address
     /// </summary>
-    public async UniTask<bool> MoveItemAsync(Item item, ItemAddress location, CancellationToken token = default)
+    public async Task<bool> MoveItemAsync(Item item, ItemAddress location, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
 
@@ -205,7 +203,7 @@ public class LootingTransactionController(InventoryController inventoryControlle
     }
 
     /** Moves an item to a specified item address. Supports executing a callback */
-    public async UniTask<bool> SwapItemsAsync(Item item, Item toSwap, CancellationToken token = default)
+    public async Task<bool> SwapItemsAsync(Item item, Item toSwap, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
 
@@ -245,7 +243,7 @@ public class LootingTransactionController(InventoryController inventoryControlle
     }
 
     /** Attempts to merge an item stack with another specified item stack. Supports executing a callback */
-    public async UniTask<bool> MergeItemAsync(Item toMove, Item toItem, CancellationToken token = default)
+    public async Task<bool> MergeItemAsync(Item toMove, Item toItem, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
 
@@ -292,7 +290,7 @@ public class LootingTransactionController(InventoryController inventoryControlle
     /// <summary>
     /// Method used when we want the bot the throw an item
     /// </summary>
-    public async UniTask<bool> ThrowItemAsync(Item toThrow, CancellationToken token = default)
+    public async Task<bool> ThrowItemAsync(Item toThrow, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
 
@@ -303,7 +301,7 @@ public class LootingTransactionController(InventoryController inventoryControlle
 
         await SimulatePlayerDelayAsync(token: token);
 
-        var promise = new UniTaskCompletionSourceEx<IResult>();
+        var promise = new TaskCompletionSource<IResult>();
         inventoryController.ThrowItem(
             toThrow,
             false,
@@ -335,50 +333,42 @@ public class LootingTransactionController(InventoryController inventoryControlle
     ///
     /// It's GClass2053 Operation (RemoveWeaponOperation) running indefinitely.
     /// </summary>
-    public async UniTask<IResult> TryRunNetworkTransactionWithTimeoutAsync(InventoryControllerResultStruct operationResult, Callback callback = null, CancellationToken token = default)
+    public async Task<IResult> TryRunNetworkTransactionWithTimeoutAsync(InventoryControllerResultStruct operationResult, Callback callback = null, CancellationToken token = default)
     {
-        var timeoutToken = _networkTransactionTimeoutController.Timeout(NetworkTransactionTimeout);
-        try
+        using var timeoutSource = new CancellationTokenSource(TimeSpan.FromMilliseconds(NetworkTransactionTimeout));
+
+        var networkTask = inventoryController.TryRunNetworkTransaction(operationResult, callback);
+
+        await Task.WhenAny(
+            networkTask,
+            Task.Delay(Timeout.Infinite, timeoutSource.Token),
+            Task.Delay(Timeout.Infinite, token)
+        );
+
+        if (timeoutSource.Token.IsCancellationRequested)
         {
-            var networkTask = inventoryController.TryRunNetworkTransaction(operationResult, callback).AsUniTask();
-
-            var anyTask = await UniTask.WhenAny(
-                networkTask,
-                UniTask.WaitUntilCanceled(timeoutToken).SuppressCancellationThrow(),
-                UniTask.WaitUntilCanceled(token).SuppressCancellationThrow()
-            );
-
-            switch (anyTask.winArgumentIndex)
+            var playerInvCont = (Player.PlayerInventoryController)inventoryController;
+            if (log.WarningEnabled)
             {
-                case 0:
-                    return anyTask.result1;
-                case 1:
-                    var playerInvCont = (Player.PlayerInventoryController)inventoryController;
-                    if (log.WarningEnabled)
-                    {
-                        log.LogWarning("Timed out on network transaction, trying to fast forward...");
-                    }
-                    playerInvCont.Player_0.FastForwardCurrentOperations();
-                    break;
-                case 2:
-                    throw new OperationCanceledException(token);
+                log.LogWarning("Timed out on network transaction, trying to fast forward...");
             }
-
-            return await networkTask;
+            playerInvCont.Player_0.FastForwardCurrentOperations();
         }
-        finally
+        else
         {
-            _networkTransactionTimeoutController.Reset();
+            token.ThrowIfCancellationRequested();
         }
+
+        return await networkTask;
     }
 
-    public static UniTask SimulatePlayerDelayAsync(double delay = -1f, CancellationToken token = default)
+    public static Task SimulatePlayerDelayAsync(double delay = -1f, CancellationToken token = default)
     {
         if (delay == -1D)
         {
             delay = LootingBots.TransactionDelay.Value;
         }
 
-        return UniTask.Delay(TimeSpan.FromMilliseconds(delay), cancellationToken: token);
+        return Task.Delay(TimeSpan.FromMilliseconds(delay), cancellationToken: token);
     }
 }
