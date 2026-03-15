@@ -45,14 +45,14 @@ public class LootingBrain : MonoBehaviour
         get
         {
             return ForceBrainEnabled
-                || (
-                    !_isDisabledForPerformance
-                    && (
-                        LootingBots.ContainerLootingEnabled.Value.IsBotEnabled(this)
-                        || LootingBots.LooseItemLootingEnabled.Value.IsBotEnabled(this)
-                        || LootingBots.CorpseLootingEnabled.Value.IsBotEnabled(this)
-                    )
-                );
+                   || (
+                       !_isDisabledForPerformance
+                       && (
+                           LootingBots.ContainerLootingEnabled.Value.IsBotEnabled(this)
+                           || LootingBots.LooseItemLootingEnabled.Value.IsBotEnabled(this)
+                           || LootingBots.CorpseLootingEnabled.Value.IsBotEnabled(this)
+                       )
+                   );
         }
     }
 
@@ -446,14 +446,13 @@ public class LootingBrain : MonoBehaviour
     }
 
     /// <summary>
-    /// Check to see if the object being looted has been
-    /// ignored due to bad navigation, looted already, or if its in use by another bot.
+    /// Check to see if the object being looted has been ignored due to bad navigation, or looted already.
+    ///
+    /// (1.6.4) No longer checks if its in use by another bot, since it can conflict with prioritized loot.
     /// </summary>
     public bool IsLootIgnored(string lootId)
     {
-        var alreadyTried = NonNavigableLootIds.Contains(lootId) || IgnoredLootIds.Contains(lootId);
-
-        return lootId == null || alreadyTried || ActiveLootCache.IsLootInUse(lootId);
+        return lootId == null || NonNavigableLootIds.Contains(lootId) || IgnoredLootIds.Contains(lootId);
     }
 
     /// <summary>
