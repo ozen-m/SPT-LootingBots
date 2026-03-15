@@ -264,7 +264,8 @@ public class LootFinder : MonoBehaviour
                 }
 
                 // If object has been ignored, skip to the next object detected
-                if (_lootingBrain.IsLootIgnored(rootItem.Id))
+                var rootItemId = rootItem.Id;
+                if (_lootingBrain.IsLootIgnored(rootItemId) || ActiveLootCache.IsLootInUse(rootItemId))
                 {
                     await Task.Yield();
 
@@ -324,8 +325,12 @@ public class LootFinder : MonoBehaviour
                 }
 
                 // Cache the loot and set active target
-                if (!ActiveLootCache.CacheActiveLootId(rootItem.Id, _botOwner))
+                if (!ActiveLootCache.CacheActiveLootId(rootItemId, _botOwner))
                 {
+                    if (_log.ErrorEnabled)
+                    {
+                        _log.LogError("Failed to cache and set active loot, bot owner is null or id already in the cache?");
+                    }
                     await Task.Yield();
 
                     continue;
@@ -355,6 +360,9 @@ public class LootFinder : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// TODO: Maybe expand to other loot types
+    /// </summary>
     public bool FindPrioritizedCorpse(int ticket)
     {
         for (var i = 0; i < _priorityCorpses.Count; i++)
@@ -376,10 +384,19 @@ public class LootFinder : MonoBehaviour
                 continue;
             }
 
-            // If corpse has been ignored, skip to the next prioritized corpse
+            // If corpse has been ignored, continue to the next prioritized corpse
             var rootItemId = corpse.GetRootItemId();
             if (_lootingBrain.IsLootIgnored(rootItemId))
             {
+                continue;
+            }
+            if (ActiveLootCache.IsLootInUse(rootItemId))
+            {
+                if (_log.DebugEnabled)
+                {
+                    _log.LogDebug($"Re-queuing corpse [{corpse.GetLootName()}], is currently being looted by someone else");
+                }
+                _priorityCorpses.Enqueue(player);
                 continue;
             }
 
@@ -392,7 +409,7 @@ public class LootFinder : MonoBehaviour
             {
                 if (_log.DebugEnabled)
                 {
-                    _log.LogDebug($"Skipping corpse [{corpse.GetLootName()}], not in range. Dist: {dist}");
+                    _log.LogDebug($"Re-queuing corpse [{corpse.GetLootName()}], not in range. Dist: {dist}");
                 }
                 _priorityCorpses.Enqueue(player);
                 continue;
@@ -401,11 +418,10 @@ public class LootFinder : MonoBehaviour
             // Cache the loot and set active target
             if (!ActiveLootCache.CacheActiveLootId(rootItemId, _botOwner))
             {
-                if (_log.DebugEnabled)
+                if (_log.ErrorEnabled)
                 {
-                    _log.LogDebug($"Skipping corpse [{corpse.GetLootName()}], is currently being looted by someone else");
+                    _log.LogError("Failed to cache and set active loot, bot owner is null or id already in the cache?");
                 }
-                _priorityCorpses.Enqueue(player);
                 continue;
             }
 

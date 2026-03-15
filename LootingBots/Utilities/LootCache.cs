@@ -45,16 +45,14 @@ public static class ActiveLootCache
 
     public static bool CacheActiveLootId(string containerId, BotOwner botOwner)
     {
-        if (!string.IsNullOrEmpty(botOwner.name) || !string.IsNullOrEmpty(containerId))
-        {
-            return ActiveLoot.TryAdd(containerId, botOwner);
-        }
-        return false;
+        return !string.IsNullOrEmpty(botOwner.name)
+               && !string.IsNullOrEmpty(containerId)
+               && ActiveLoot.TryAdd(containerId, botOwner);
     }
 
     public static bool IsLootInUse(string lootId)
     {
-        return ActiveLoot.TryGetValue(lootId, out _);
+        return ActiveLoot.ContainsKey(lootId);
     }
 
     private static readonly List<string> _keysToRemoveScratch = [];
