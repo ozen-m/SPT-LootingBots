@@ -45,14 +45,14 @@ public class LootingBrain : MonoBehaviour
         get
         {
             return ForceBrainEnabled
-                   || (
-                       !_isDisabledForPerformance
-                       && (
-                           LootingBots.ContainerLootingEnabled.Value.IsBotEnabled(this)
-                           || LootingBots.LooseItemLootingEnabled.Value.IsBotEnabled(this)
-                           || LootingBots.CorpseLootingEnabled.Value.IsBotEnabled(this)
-                       )
-                   );
+                || (
+                    !_isDisabledForPerformance
+                    && (
+                        LootingBots.ContainerLootingEnabled.Value.IsBotEnabled(this)
+                        || LootingBots.LooseItemLootingEnabled.Value.IsBotEnabled(this)
+                        || LootingBots.CorpseLootingEnabled.Value.IsBotEnabled(this)
+                    )
+                );
         }
     }
 
