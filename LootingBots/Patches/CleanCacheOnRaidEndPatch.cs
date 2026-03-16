@@ -3,25 +3,25 @@ using EFT;
 using LootingBots.Utilities;
 using SPT.Reflection.Patching;
 
-namespace LootingBots.Patches
+namespace LootingBots.Patches;
+
+public class CleanCacheOnRaidEndPatch : ModulePatch
 {
-    public class CleanCacheOnRaidEndPatch : ModulePatch
+    protected override MethodBase GetTargetMethod()
     {
-        protected override MethodBase GetTargetMethod()
+        return typeof(GameWorld).GetMethod(nameof(GameWorld.Dispose), BindingFlags.Public | BindingFlags.Instance);
+    }
+
+    [PatchPrefix]
+    private static void PatchPrefix()
+    {
+        if (LootingBots.LootLog.DebugEnabled)
         {
-            return typeof(GameWorld).GetMethod(nameof(GameWorld.Dispose), BindingFlags.Public | BindingFlags.Instance);
+            LootingBots.LootLog.LogDebug("Resetting Caches");
         }
 
-        [PatchPrefix]
-        private static void PatchPrefix()
-        {
-            if (LootingBots.LootLog.DebugEnabled)
-            {
-                LootingBots.LootLog.LogDebug("Resetting Caches");
-            }
-
-            ActiveLootCache.Reset();
-            ActiveBotCache.Reset();
-        }
+        ActiveLootCache.Reset();
+        ActiveBotCache.Reset();
+        ScanScheduler.Reset();
     }
 }

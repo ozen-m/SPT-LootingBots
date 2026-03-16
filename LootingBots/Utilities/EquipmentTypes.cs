@@ -1,178 +1,264 @@
 using EFT.InventoryLogic;
 
-namespace LootingBots.Utilities
+namespace LootingBots.Utilities;
+
+[Flags]
+public enum EquipmentType
 {
-    [Flags]
-    public enum EquipmentType
-    {
-        Backpack = 1,
-        TacticalRig = 2,
-        ArmoredRig = 4,
-        ArmorVest = 8,
-        Weapon = 16,
-        Grenade = 32,
-        Helmet = 64,
-        Dogtag = 128,
-        ArmorPlate = 256,
+    Backpack = 1,
+    TacticalRig = 2,
+    ArmoredRig = 4,
+    Chest = 8,
+    Weapon = 16,
+    Grenade = 32,
+    Helmet = 64,
+    Dogtag = 128,
+    ArmorPlate = 256,
+    Earpiece = 512,
+    FaceCover = 1024,
+    Eyewear = 2048,
+    Armband = 4096,
 
-        All = Backpack | TacticalRig | ArmoredRig | ArmorVest | Weapon | Helmet | Grenade | Dogtag | ArmorPlate,
+    All =
+        Backpack
+        | TacticalRig
+        | ArmoredRig
+        | Chest
+        | Weapon
+        | Helmet
+        | Grenade
+        | Dogtag
+        | ArmorPlate
+        | Earpiece
+        | FaceCover
+        | Eyewear
+        | Armband,
+}
+
+[Flags]
+public enum CanEquipEquipmentType
+{
+    Backpack = EquipmentType.Backpack,
+    TacticalRig = EquipmentType.TacticalRig,
+    ArmoredRig = EquipmentType.ArmoredRig,
+    Chest = EquipmentType.Chest,
+    Weapon = EquipmentType.Weapon,
+    Grenade = EquipmentType.Grenade,
+    Helmet = EquipmentType.Helmet,
+    Earpiece = EquipmentType.Earpiece,
+    FaceCover = EquipmentType.FaceCover,
+    Eyewear = EquipmentType.Eyewear,
+    Armband = EquipmentType.Armband,
+
+    All = Backpack | TacticalRig | ArmoredRig | Chest | Weapon | Helmet | Grenade | Earpiece | FaceCover | Eyewear | Armband,
+}
+
+public static class EquipmentTypeUtils
+{
+    public static bool HasBackpack(this EquipmentType equipmentType)
+    {
+        return (equipmentType & EquipmentType.Backpack) != 0;
     }
 
-    [Flags]
-    public enum CanEquipEquipmentType
+    public static bool HasTacticalRig(this EquipmentType equipmentType)
     {
-        Backpack = EquipmentType.Backpack,
-        TacticalRig = EquipmentType.TacticalRig,
-        ArmoredRig = EquipmentType.ArmoredRig,
-        ArmorVest = EquipmentType.ArmorVest,
-        Weapon = EquipmentType.Weapon,
-        Grenade = EquipmentType.Grenade,
-        Helmet = EquipmentType.Helmet,
-
-        All = Backpack | TacticalRig | ArmoredRig | ArmorVest | Weapon | Helmet | Grenade,
+        return (equipmentType & EquipmentType.TacticalRig) != 0;
     }
 
-    public static class EquipmentTypeUtils
+    public static bool HasArmoredRig(this EquipmentType equipmentType)
     {
-        public static bool HasBackpack(this EquipmentType equipmentType)
+        return (equipmentType & EquipmentType.ArmoredRig) != 0;
+    }
+
+    public static bool HasChestArmor(this EquipmentType equipmentType)
+    {
+        return (equipmentType & EquipmentType.Chest) != 0;
+    }
+
+    public static bool HasGrenade(this EquipmentType equipmentType)
+    {
+        return (equipmentType & EquipmentType.Grenade) != 0;
+    }
+
+    public static bool HasWeapon(this EquipmentType equipmentType)
+    {
+        return (equipmentType & EquipmentType.Weapon) != 0;
+    }
+
+    public static bool HasHelmet(this EquipmentType equipmentType)
+    {
+        return (equipmentType & EquipmentType.Helmet) != 0;
+    }
+
+    public static bool HasArmorPlate(this EquipmentType equipmentType)
+    {
+        return (equipmentType & EquipmentType.ArmorPlate) != 0;
+    }
+
+    public static bool HasDogtag(this EquipmentType equipmentType)
+    {
+        return (equipmentType & EquipmentType.Dogtag) != 0;
+    }
+
+    public static bool HasEarpiece(this EquipmentType equipmentType)
+    {
+        return (equipmentType & EquipmentType.Earpiece) != 0;
+    }
+
+    public static bool HasFaceCover(this EquipmentType equipmentType)
+    {
+        return (equipmentType & EquipmentType.FaceCover) != 0;
+    }
+
+    public static bool HasEyewear(this EquipmentType equipmentType)
+    {
+        return (equipmentType & EquipmentType.Eyewear) != 0;
+    }
+
+    public static bool HasArmband(this EquipmentType equipmentType)
+    {
+        return (equipmentType & EquipmentType.Armband) != 0;
+    }
+
+    /// <summary>
+    /// GClasses based off GClass3373.FindSlotToPickUp
+    /// </summary>
+    public static bool IsItemEligible(this EquipmentType allowedGear, Item item, bool toPickup = false)
+    {
+        if (IsChestArmor(item))
         {
-            return equipmentType.HasFlag(EquipmentType.Backpack);
+            return allowedGear.HasChestArmor();
         }
 
-        public static bool HasTacticalRig(this EquipmentType equipmentType)
+        if (IsHelmet(item))
         {
-            return equipmentType.HasFlag(EquipmentType.TacticalRig);
+            return allowedGear.HasHelmet();
         }
 
-        public static bool HasArmoredRig(this EquipmentType equipmentType)
+        if (IsBackpack(item))
         {
-            return equipmentType.HasFlag(EquipmentType.ArmoredRig);
+            return allowedGear.HasBackpack();
         }
 
-        public static bool HasArmorVest(this EquipmentType equipmentType)
+        if (IsEarpiece(item))
         {
-            return equipmentType.HasFlag(EquipmentType.ArmorVest);
+            return allowedGear.HasEarpiece();
         }
 
-        public static bool HasGrenade(this EquipmentType equipmentType)
+        if (IsFaceCover(item))
         {
-            return equipmentType.HasFlag(EquipmentType.Grenade);
+            return allowedGear.HasFaceCover();
         }
 
-        public static bool HasWeapon(this EquipmentType equipmentType)
+        if (IsEyewear(item))
         {
-            return equipmentType.HasFlag(EquipmentType.Weapon);
+            return allowedGear.HasEyewear();
         }
 
-        public static bool HasHelmet(this EquipmentType equipmentType)
+        if (IsArmoredRig(item))
         {
-            return equipmentType.HasFlag(EquipmentType.Helmet);
+            return allowedGear.HasArmoredRig();
         }
 
-        public static bool HasArmorPlate(this EquipmentType equipmentType)
+        if (IsTacticalRig(item))
         {
-            return equipmentType.HasFlag(EquipmentType.ArmorPlate);
+            return allowedGear.HasTacticalRig();
         }
 
-        public static bool HasDogtag(this EquipmentType equipmentType)
+        if (IsArmorPlate(item))
         {
-            return equipmentType.HasFlag(EquipmentType.Dogtag);
+            return allowedGear.HasArmorPlate();
         }
 
-        // GClasses based off GClass2558.FindSlotToPickUp
-        public static bool IsItemEligible(this EquipmentType allowedGear, Item item)
+        if (IsDogtag(item))
         {
-            if (IsArmorVest(item))
+            return allowedGear.HasDogtag();
+        }
+
+        if (item is KnifeItemClass) { }
+
+        if (item is ThrowWeapItemClass)
+        {
+            return allowedGear.HasGrenade();
+        }
+
+        if (item is Weapon)
+        {
+            return allowedGear.HasWeapon();
+        }
+
+        if (IsArmband(item))
+        {
+            return allowedGear.HasArmband();
+        }
+
+        return toPickup;
+    }
+
+    public static bool IsTacticalRig(Item item)
+    {
+        return item is VestItemClass;
+    }
+
+    public static bool IsArmoredRig(Item item)
+    {
+        if (item is VestItemClass vest)
+        {
+            foreach (var slot in vest.Slots)
             {
-                return allowedGear.HasArmorVest();
+                // If any slot is an armor slot
+                if (slot is GClass3125)
+                {
+                    return true;
+                }
             }
-
-            if (IsHelmet(item))
-            {
-                return allowedGear.HasHelmet();
-            }
-
-            if (IsBackpack(item))
-            {
-                return allowedGear.HasBackpack();
-            }
-
-            if (IsArmoredRig(item))
-            {
-                return allowedGear.HasArmoredRig();
-            }
-
-            if (IsTacticalRig(item))
-            {
-                return allowedGear.HasTacticalRig();
-            }
-
-            if (IsArmorPlate(item, out ArmorPlateItemClass _))
-            {
-                return allowedGear.HasArmorPlate();
-            }
-
-            if (IsDogtag(item))
-            {
-                return allowedGear.HasDogtag();
-            }
-
-            if (item is KnifeItemClass) { }
-
-            if (item is ThrowWeapItemClass)
-            {
-                return allowedGear.HasGrenade();
-            }
-
-            if (item is Weapon)
-            {
-                return allowedGear.HasWeapon();
-            }
-
-            return true;
         }
 
-        public static bool IsTacticalRig(Item item)
-        {
-            return item is VestItemClass;
-        }
+        return false;
+    }
 
-        public static bool IsArmoredRig(Item item)
-        {
-            return item is VestItemClass && item.IsArmorMod();
-        }
+    public static bool IsBackpack(Item item)
+    {
+        return item is BackpackItemClass;
+    }
 
-        public static bool IsBackpack(Item item)
-        {
-            return item is BackpackItemClass;
-        }
+    public static bool IsHelmet(Item item)
+    {
+        return item is HeadwearItemClass;
+    }
 
-        public static bool IsHelmet(Item item)
-        {
-            return item is HeadwearItemClass;
-        }
+    public static bool IsChestArmor(Item item)
+    {
+        return item is ArmorItemClass;
+    }
 
-        public static bool IsArmorVest(Item item)
-        {
-            return item is ArmoredEquipmentItemClass;
-        }
+    public static bool IsFaceCover(Item item)
+    {
+        return item is FaceCoverItemClass;
+    }
 
-        public static bool IsFaceCovering(Item item)
-        {
-            return item is VisorsItemClass;
-        }
+    public static bool IsEyewear(Item item)
+    {
+        return item is VisorsItemClass;
+    }
 
-        public static bool IsArmorPlate(Item item, out ArmorPlateItemClass plate)
-        {
-            bool isArmorPlate = item is ArmorPlateItemClass;
-            plate = isArmorPlate ? (ArmorPlateItemClass) item : null;
+    public static bool IsArmorPlate(Item item)
+    {
+        return item is ArmorPlateItemClass;
+    }
 
-            return isArmorPlate;
-        }
+    public static bool IsDogtag(Item item)
+    {
+        return item is OtherItemClass;
+    }
 
-        public static bool IsDogtag(Item item)
-        {
-            return item is OtherItemClass;
-        }
+    public static bool IsEarpiece(Item item)
+    {
+        return item is HeadphonesItemClass;
+    }
+
+    public static bool IsArmband(Item item)
+    {
+        return item is ArmBandItemClass;
     }
 }

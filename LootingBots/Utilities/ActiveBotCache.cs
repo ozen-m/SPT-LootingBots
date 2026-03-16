@@ -1,57 +1,61 @@
 using EFT;
 
-namespace LootingBots.Utilities
+namespace LootingBots.Utilities;
+
+/// <summary>
+/// Cached used to keep track of which bots are able to loot
+/// </summary>
+public static class ActiveBotCache
 {
-    // Cached used to keep track of what lootable are currently being targeted by a bot so that multiple bots
-    // dont try and path to the same lootable
-    public static class ActiveBotCache
+    public static readonly List<BotOwner> ActiveBots = [];
+
+    public static bool IsCacheActive
     {
-        public static List<BotOwner> ActiveBots = [];
+        get { return LootingBots.MaxActiveLootingBots.Value > 0; }
+    }
 
-        public static bool IsCacheActive
+    public static bool IsAbleToCache
+    {
+        get { return GetSize() < LootingBots.MaxActiveLootingBots.Value; }
+    }
+
+    public static bool IsOverCapacity
+    {
+        get { return GetSize() > LootingBots.MaxActiveLootingBots.Value; }
+    }
+
+    public static void Reset()
+    {
+        ActiveBots.Clear();
+    }
+
+    public static void Add(BotOwner botOwner)
+    {
+        ActiveBots.Add(botOwner);
+
+        if (LootingBots.LootLog.DebugEnabled)
         {
-            get { return LootingBots.MaxActiveLootingBots.Value > 0; }
+            LootingBots.LootLog.LogDebug($"{botOwner.name.Localized()} looting enabled  (total: {ActiveBots.Count})");
         }
+    }
 
-        public static bool IsAbleToCache
+    public static bool Has(BotOwner botOwner)
+    {
+        return ActiveBots.Contains(botOwner);
+    }
+
+    public static void Remove(BotOwner botOwner)
+    {
+        ActiveBots.Remove(botOwner);
+
+        if (LootingBots.LootLog.DebugEnabled)
         {
-            get { return GetSize() < LootingBots.MaxActiveLootingBots.Value; }
+            LootingBots.LootLog.LogDebug($"{botOwner.name.Localized()} looting disabled (total: {ActiveBots.Count})");
         }
+    }
 
-        public static bool IsOverCapacity
-        {
-            get { return GetSize() > LootingBots.MaxActiveLootingBots.Value; }
-        }
-
-        public static void Reset()
-        {
-            ActiveBots = [];
-        }
-
-        public static void Add(BotOwner botOwner)
-        {
-            ActiveBots.Add(botOwner);
-
-            if (LootingBots.LootLog.DebugEnabled)
-                LootingBots.LootLog.LogDebug($"{botOwner.name.Localized()} looting enabled  (total: {ActiveBots.Count})");
-        }
-
-        public static bool Has(BotOwner botOwner)
-        {
-            return ActiveBots.Contains(botOwner);
-        }
-
-        public static void Remove(BotOwner botOwner)
-        {
-            ActiveBots.Remove(botOwner);
-
-            if (LootingBots.LootLog.DebugEnabled)
-                LootingBots.LootLog.LogDebug($"{botOwner.name.Localized()} looting disabled (total: {ActiveBots.Count})");
-        }
-
-        public static int GetSize()
-        {
-            return ActiveBots.Count;
-        }
+    public static int GetSize()
+    {
+        return ActiveBots.Count;
     }
 }

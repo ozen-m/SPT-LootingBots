@@ -1,377 +1,413 @@
 using Comfort.Common;
 using EFT;
 using EFT.InventoryLogic;
-using LootingBots.Actions;
 using LootingBots.Utilities;
 using InventoryControllerResultStruct = GStruct153;
 
-namespace LootingBots.Components
+namespace LootingBots.Components;
+
+public class LootingTransactionController(InventoryController inventoryController, BotLog log)
 {
-    public class LootingTransactionController(InventoryController inventoryController, BotLog log)
+    private const int NetworkTransactionTimeout = 5000;
+
+    /// <summary>
+    /// Tries to add extra spare ammo for the weapon being looted into the bot's secure container,
+    /// so that the bots are able to refill their mags properly in their reload logic.
+    ///
+    /// Incompatible with Fika.
+    /// </summary>
+    public bool AddExtraAmmo(Weapon weapon)
     {
-        public bool Enabled;
-
-        /** Tries to add extra spare ammo for the weapon being looted into the bot's secure container so that the bots are able to refill their mags properly in their reload logic */
-        public bool AddExtraAmmo(Weapon weapon)
+        try
         {
-            try
+            var secureContainer = (SearchableItemItemClass)
+                inventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.SecuredContainer).ContainedItem;
+
+            var container = secureContainer.Grids.FirstOrDefault();
+
+            // Try to get the current ammo used by the weapon by checking the contents of the magazine.
+            // If it's empty, try to create an instance of the ammo using the Weapon's CurrentAmmoTemplate
+            var ammoToAdd =
+                weapon.GetCurrentMagazine()?.FirstRealAmmo()
+                ?? Singleton<ItemFactoryClass>.Instance.CreateItem(MongoID.Generate(), weapon.CurrentAmmoTemplate._id, null);
+
+            // Check to see if there already is ammo that meets the weapon's caliber in the secure container
+            var alreadyHasAmmo = false;
+
+            foreach (var item in secureContainer.GetAllItems())
             {
-                SearchableItemItemClass secureContainer = (SearchableItemItemClass)
-                    inventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.SecuredContainer).ContainedItem;
-
-                StashGridClass container = secureContainer.Grids.FirstOrDefault();
-
-                // Try to get the current ammo used by the weapon by checking the contents of the magazine. If its empty, try to create an instance of the ammo using the Weapon's CurrentAmmoTemplate
-                Item ammoToAdd =
-                    weapon.GetCurrentMagazine()?.FirstRealAmmo()
-                    ?? Singleton<ItemFactoryClass>.Instance.CreateItem(MongoID.Generate(), weapon.CurrentAmmoTemplate._id, null);
-
-                // Check to see if there already is ammo that meets the weapon's caliber in the secure container
-                bool alreadyHasAmmo = false;
-
-                foreach (var item in secureContainer.GetAllItems())
+                if (item is AmmoItemClass bullet && bullet.Caliber.Equals(((AmmoItemClass)ammoToAdd).Caliber))
                 {
-                    if (item is AmmoItemClass bullet && bullet.Caliber.Equals(((AmmoItemClass) ammoToAdd).Caliber))
-                    {
-                        alreadyHasAmmo = true;
-                        break; // Early exit as soon as a match is found
-                    }
+                    alreadyHasAmmo = true;
+                    break; // Early exit as soon as a match is found
+                }
+            }
+
+            // If we don't have any ammo,
+            // attempt to add 10 max ammo stacks into the bot's secure container for use in the bot's internal reloading code
+            if (!alreadyHasAmmo)
+            {
+                if (log.DebugEnabled)
+                {
+                    log.LogDebug($"Trying to add ammo");
                 }
 
-                // If we dont have any ammo, attempt to add 10 max ammo stacks into the bot's secure container for use in the bot's internal reloading code
-                if (!alreadyHasAmmo)
+                var ammoAdded = 0;
+
+                for (var i = 0; i < 10; i++)
                 {
-                    if (log.DebugEnabled)
+                    var ammo = ammoToAdd.CloneItem();
+                    ammo.StackObjectsCount = ammo.StackMaxSize;
+
+                    var location = container.FindFreeSpace(ammo);
+
+                    if (location != null)
                     {
-                        log.LogDebug($"Trying to add ammo");
-                    }
-
-                    int ammoAdded = 0;
-
-                    for (int i = 0; i < 10; i++)
-                    {
-                        Item ammo = ammoToAdd.CloneItem();
-                        ammo.StackObjectsCount = ammo.StackMaxSize;
-
-                        LocationInGrid location = container.FindFreeSpace(ammo);
-
-                        if (location != null)
+                        var result = container.AddItemWithoutRestrictions(ammo, location);
+                        if (result.Succeeded)
                         {
-                            GStruct154<GClass3415> result = container.AddItemWithoutRestrictions(ammo, location);
-                            if (result.Succeeded)
-                            {
-                                ammoAdded += ammo.StackObjectsCount;
-                            }
-                            else if (log.ErrorEnabled)
-                            {
-                                log.LogError($"Failed to add {ammo.Name.Localized()} to secure container");
-                            }
+                            ammoAdded += ammo.StackObjectsCount;
                         }
                         else if (log.ErrorEnabled)
                         {
-                            log.LogError($"Cannot find location in secure container for {ammo.Name.Localized()}");
+                            log.LogError($"Failed to add {ammo.Name.Localized()} to secure container");
                         }
                     }
-
-                    if (ammoAdded > 0 && log.DebugEnabled)
+                    else if (log.ErrorEnabled)
                     {
-                        log.LogDebug($"Successfully added {ammoAdded} round of {ammoToAdd.Name.Localized()}");
+                        log.LogError($"Cannot find location in secure container for {ammo.Name.Localized()}");
                     }
                 }
-                else if (log.DebugEnabled)
+
+                if (ammoAdded > 0 && log.DebugEnabled)
                 {
-                    log.LogDebug($"Already has ammo for {weapon.Name.Localized()}");
+                    log.LogDebug($"Successfully added {ammoAdded} round of {ammoToAdd.Name.Localized()}");
                 }
-
-                return true;
             }
-            catch (Exception e)
+            else if (log.DebugEnabled)
             {
-                log.LogError(e);
+                log.LogDebug($"Already has ammo for {weapon.Name.Localized()}");
             }
-
+        }
+        catch (Exception e)
+        {
+            log.LogError(e);
             return false;
         }
 
-        /** Tries to find an open Slot to equip the current item to. If a slot is found, issue a move action to equip the item */
-        public async Task<bool> TryEquipItem(Item item)
-        {
-            try
-            {
-                // Check to see if we can equip the item
-                var ableToEquip = inventoryController.FindSlotToPickUp(item);
-                if (ableToEquip != null)
-                {
-                    if (log.WarningEnabled)
-                    {
-                        log.LogWarning($"Equipping: {item.Name.Localized()} [place: {ableToEquip.Container.ID.Localized()}]");
-                    }
-                    bool success = await MoveItem(new LootingMoveAction(item, ableToEquip));
-                    return success;
-                }
-            }
-            catch (Exception e)
-            {
-                log.LogError(e);
-            }
+        return true;
+    }
 
-            return false;
+    /// <summary>
+    /// Tries to find an open Slot to equip the current item to. If a slot is found, issue a move action to equip the item.
+    /// </summary>
+    public Task<bool> TryEquipItemAsync(Item item, CancellationToken token = default)
+    {
+        token.ThrowIfCancellationRequested();
+
+        // Check to see if we can equip the item
+        var ableToEquip = inventoryController.FindSlotToPickUp(item);
+        if (ableToEquip == null)
+        {
+            if (log.DebugEnabled)
+            {
+                log.LogDebug($"Could not find a place to equip: {item.Name.Localized()}");
+            }
+            return Task.FromResult(false);
         }
 
-        /** Tries to find a valid grid for the item being looted. Checks all containers currently equipped to the bot. If there is a valid grid to place the item inside of, issue a move action to pick up the item */
-        public async Task<bool> TryPickupItem(Item item)
+        if (log.WarningEnabled)
         {
-            try
-            {
-                // Check to see if this is an item that we can merge with another item in the inventory
-                var mergeableItem = inventoryController.FindItemToMerge(item);
-
-                if (mergeableItem != null)
-                {
-                    if (log.WarningEnabled)
-                    {
-                        log.LogWarning($"Merging: {item.Name.Localized()} [with: {mergeableItem.Name.Localized()}]");
-                    }
-
-                    return await MergeItem(new LootingMoveAction(item, null, mergeableItem));
-                }
-
-                // Otherwise, find an empty grid slot to put the item in
-                var gridAddress = inventoryController.FindGridToPickUp(item);
-
-                if (gridAddress != null && !gridAddress.GetRootItem().Parent.Container.ID.ToLower().Equals("securedcontainer"))
-                {
-                    if (log.WarningEnabled)
-                    {
-                        log.LogWarning($"Picking up: {item.Name.Localized()} [place: {gridAddress.GetRootItem().Name.Localized()}]");
-                    }
-
-                    return await MoveItem(new LootingMoveAction(item, gridAddress));
-                }
-
-                if (log.DebugEnabled)
-                {
-                    log.LogDebug($"No valid slot found for: {item.Name.Localized()}");
-                }
-            }
-            catch (Exception e)
-            {
-                log.LogError(e);
-            }
-            return false;
+            log.LogWarning($"Equipping: {item.Name.Localized()} [place: {ableToEquip.Container.ID.Localized()}]");
         }
 
-        /** Moves an item to a specified item address. Supports executing a callback */
-        public async Task<bool> MoveItem(LootingMoveAction moveAction)
+        return MoveItemAsync(item, ableToEquip, token);
+    }
+
+    /// <summary>
+    /// Tries to find a valid grid for the item being looted. Checks all containers currently equipped to the bot.
+    /// If there is a valid grid to place the item inside, issue a merge/move action to pick up the item.
+    /// </summary>
+    public Task<bool> TryPickupItemAsync(Item item, CancellationToken token = default)
+    {
+        token.ThrowIfCancellationRequested();
+
+        // Check to see if this is an item that we can merge with another item in the inventory
+        var mergeableItem = inventoryController.FindItemToMerge(item);
+
+        if (mergeableItem != null)
         {
-            try
+            if (log.WarningEnabled)
             {
-                if (IsLootingInterrupted())
-                {
-                    return false;
-                }
-
-                if (moveAction.ToMove is Weapon weapon && !(moveAction.ToMove is AmmoItemClass))
-                {
-                    //Todo: Doesn't work on Fika for obvious reasons
-                    //AddExtraAmmo(weapon);
-                }
-
-                if (log.DebugEnabled)
-                {
-                    log.LogDebug($"Moving item to: {moveAction?.Place?.Container?.ID?.Localized()}");
-                }
-
-                var value = InteractionsHandlerClass.Move(moveAction.ToMove, moveAction.Place, inventoryController, true);
-
-                if (value.Failed)
-                {
-                    if (log.ErrorEnabled)
-                    {
-                        log.LogError($"Failed to move {moveAction.ToMove.Name.Localized()} to {moveAction.Place.Container.ID.Localized()}");
-                    }
-                    return false;
-                }
-
-                if (moveAction.Callback == null)
-                {
-                    await SimulatePlayerDelay();
-                    await inventoryController.TryRunNetworkTransaction(value, null);
-                }
-                else
-                {
-                    TaskCompletionSource<IResult> promise = new TaskCompletionSource<IResult>();
-
-                    await inventoryController.TryRunNetworkTransaction(
-                        value,
-                        new Callback(async result =>
-                        {
-                            if (result.Succeed)
-                            {
-                                await SimulatePlayerDelay();
-                                await moveAction.Callback();
-                            }
-                            promise.TrySetResult(result);
-                        })
-                    );
-
-                    await promise.Task;
-                }
-                if (moveAction.OnComplete != null)
-                {
-                    await SimulatePlayerDelay();
-                    await moveAction.OnComplete();
-                }
-            }
-            catch (Exception e)
-            {
-                log.LogError(e);
+                log.LogWarning($"Merging: {item.Name.Localized()} [with: {mergeableItem.Name.Localized()}]");
             }
 
-            return true;
+            return MergeItemAsync(item, mergeableItem, token);
         }
 
-        /** Attempts to merge an item stack with another specified item stack. Supports executing a callback */
-        public async Task<bool> MergeItem(LootingMoveAction moveAction)
+        // Otherwise, find an empty grid slot to put the item in
+        var gridAddress = inventoryController.FindGridToPickUp(item);
+
+        if (
+            gridAddress != null
+            && !string.Equals(gridAddress.GetRootItem()?.Parent?.Container?.ID, "securedcontainer", StringComparison.OrdinalIgnoreCase)
+        )
         {
-            try
+            if (log.WarningEnabled)
             {
-                if (IsLootingInterrupted())
-                {
-                    return false;
-                }
-
-                if (log.DebugEnabled)
-                {
-                    log.LogDebug(
-                        $"Merging {moveAction?.ToMove?.Name?.Localized()} (Stack Size: {moveAction?.ToMove?.StackObjectsCount}) with: {moveAction?.ToItem?.Name?.Localized()} (Stack Size: {moveAction?.ToItem?.StackObjectsCount})"
-                    );
-                }
-
-                var value = InteractionsHandlerClass.Merge(moveAction.ToMove, moveAction.ToItem, inventoryController, true);
-
-                if (value.Failed)
-                {
-                    if (log.ErrorEnabled)
-                    {
-                        log.LogError(
-                            $"Failed to merge {moveAction?.ToMove?.Name?.Localized()} (Stack Size: {moveAction?.ToMove?.StackObjectsCount}) with: {moveAction?.ToItem?.Name?.Localized()} (Stack Size: {moveAction?.ToItem?.StackObjectsCount})"
-                        );
-                    }
-                    return false;
-                }
-
-                if (moveAction.Callback == null)
-                {
-                    await SimulatePlayerDelay();
-                    await inventoryController.TryRunNetworkTransaction(value, null);
-                }
-                else
-                {
-                    TaskCompletionSource<IResult> promise = new TaskCompletionSource<IResult>();
-
-                    await inventoryController.TryRunNetworkTransaction(
-                        value,
-                        new Callback(async result =>
-                        {
-                            if (result.Succeed)
-                            {
-                                await SimulatePlayerDelay();
-                                await moveAction.Callback();
-                            }
-                            promise.TrySetResult(result);
-                        })
-                    );
-
-                    await promise.Task;
-                }
-                if (moveAction.OnComplete != null)
-                {
-                    await SimulatePlayerDelay();
-                    await moveAction.OnComplete();
-                }
-            }
-            catch (Exception e)
-            {
-                log.LogError(e);
+                log.LogWarning($"Picking up: {item.Name.Localized()} [place: {gridAddress.GetRootItem()?.Name.Localized()}]");
             }
 
-            return true;
+            return MoveItemAsync(item, gridAddress, token);
         }
 
-        /** Method used when we want the bot the throw an item and then equip an item immediately afterwards */
-        public async Task<bool> ThrowAndEquip(LootingSwapAction swapAction)
+        if (log.DebugEnabled)
         {
-            if (IsLootingInterrupted())
+            log.LogDebug($"Could not find a place to pickup: {item.Name.Localized()}");
+        }
+
+        return Task.FromResult(false);
+    }
+
+    /// <summary>
+    /// Moves an item to a specified item address
+    /// </summary>
+    /// <param name="location">If address is null, try to equip if a slot is available, or pickup if a grid is available</param>
+    public async Task<bool> MoveItemAsync(Item item, ItemAddress location, CancellationToken token = default)
+    {
+        token.ThrowIfCancellationRequested();
+
+        // No address was given, try equipping or picking up
+        if (location == null)
+        {
+            return await TryEquipItemAsync(item, token) || await TryPickupItemAsync(item, token);
+        }
+
+        if (log.WarningEnabled)
+        {
+            log.LogWarning(
+                $"Moving {item.Name.Localized()} to: {location.Container.ID.Localized()} [{location.GetRootItem()?.Name.Localized()}]..."
+            );
+        }
+
+        await SimulatePlayerDelayAsync(token: token);
+
+        var moveResult = InteractionsHandlerClass.Move(item, location, inventoryController, true);
+        if (moveResult.Failed)
+        {
+            if (log.ErrorEnabled)
             {
-                return false;
-            }
-
-            try
-            {
-                TaskCompletionSource<IResult> promise = new TaskCompletionSource<IResult>();
-                Item toThrow = swapAction.ToThrow;
-
-                if (log.WarningEnabled)
-                {
-                    log.LogWarning($"Throwing item: {toThrow.Name.Localized()}");
-                }
-
-                inventoryController.ThrowItem(
-                    toThrow,
-                    false,
-                    new Callback(async result =>
-                    {
-                        if (result.Succeed && swapAction.Callback != null)
-                        {
-                            await SimulatePlayerDelay();
-                            await swapAction.Callback();
-                        }
-
-                        promise.TrySetResult(result);
-                    })
+                log.LogWarning(
+                    $"Failed to move {item.Name.Localized()} to {location.Container.ID.Localized()} [{location.GetRootItem()?.Name.Localized()}]. Error: {moveResult.Error}"
                 );
-
-                await SimulatePlayerDelay();
-                IResult taskResult = await promise.Task;
-                if (taskResult.Failed)
-                {
-                    return false;
-                }
-
-                if (swapAction.OnComplete != null)
-                {
-                    await swapAction.OnComplete();
-                }
-
-                return true;
             }
-            catch (Exception e)
-            {
-                log.LogError(e);
-            }
-
             return false;
         }
 
-        public Task<IResult> TryRunNetworkTransaction(InventoryControllerResultStruct operationResult, Callback callback = null)
+        var moveNetworkResult = await TryRunNetworkTransactionWithTimeoutAsync(moveResult, null, token);
+        if (moveNetworkResult.Failed)
         {
-            return inventoryController.TryRunNetworkTransaction(operationResult, callback);
-        }
-
-        public bool IsLootingInterrupted()
-        {
-            return !Enabled;
-        }
-
-        public static Task SimulatePlayerDelay(float delay = -1f)
-        {
-            if (delay == -1)
+            if (log.ErrorEnabled)
             {
-                delay = LootingBots.TransactionDelay.Value;
+                log.LogError(
+                    $"Failed to move {item.Name.Localized()} to {location.Container.ID.Localized()} [{location.GetRootItem()?.Name.Localized()}]. Network Error: {moveNetworkResult.Error}"
+                );
             }
-
-            return Task.Delay(TimeSpan.FromMilliseconds(delay));
+            return false;
         }
+
+        if (log.DebugEnabled)
+        {
+            log.LogDebug(
+                $"Moving {item.Name.Localized()} to: {location.Container.ID.Localized()} [{location.GetRootItem()?.Name.Localized()}]...done"
+            );
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Swaps an item with another item.
+    /// </summary>
+    /// <param name="item">Is almost always the incoming item</param>
+    /// <param name="toSwap">Is almost always the swapped out/thrown out item</param>
+    public async Task<bool> SwapItemsAsync(Item item, Item toSwap, CancellationToken token = default)
+    {
+        token.ThrowIfCancellationRequested();
+
+        if (log.WarningEnabled)
+        {
+            log.LogWarning($"Swapping {item.Name.Localized()} with {toSwap.Name.Localized()}...");
+        }
+
+        await SimulatePlayerDelayAsync(token: token);
+
+        var swapResult = InteractionsHandlerClass.Swap(item, toSwap.CurrentAddress, toSwap, item.CurrentAddress, inventoryController, true);
+        if (swapResult.Failed)
+        {
+            if (log.ErrorEnabled)
+            {
+                log.LogError($"Failed to swap {item.Name.Localized()} with {toSwap.Name.Localized()}. Error: {swapResult.Error}");
+            }
+            return false;
+        }
+
+        var swapNetworkResult = await TryRunNetworkTransactionWithTimeoutAsync(swapResult, null, token);
+        if (swapNetworkResult.Failed)
+        {
+            if (log.ErrorEnabled)
+            {
+                log.LogError(
+                    $"Failed to swap {item.Name.Localized()} with {toSwap.Name.Localized()}. Network Error: {swapNetworkResult.Error}"
+                );
+            }
+            return false;
+        }
+
+        if (log.DebugEnabled)
+        {
+            log.LogWarning($"Swapping {item.Name.Localized()} with {toSwap.Name.Localized()}...done");
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Attempts to merge an item stack with another specified item stack.
+    /// </summary>
+    public async Task<bool> MergeItemAsync(Item toMove, Item toItem, CancellationToken token = default)
+    {
+        token.ThrowIfCancellationRequested();
+
+        if (toItem == null)
+        {
+            log.LogWarning($"Cannot merge item {toMove} to NULL target item!");
+            return false;
+        }
+
+        if (log.WarningEnabled)
+        {
+            log.LogWarning(
+                $"Merging {toMove.Name?.Localized()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount})..."
+            );
+        }
+
+        var mergeResult = InteractionsHandlerClass.Merge(toMove, toItem, inventoryController, true);
+        if (mergeResult.Failed)
+        {
+            if (log.ErrorEnabled)
+            {
+                log.LogError(
+                    $"Failed to merge {toMove.Name.Localized()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount}). Error: {mergeResult.Error}"
+                );
+            }
+            return false;
+        }
+
+        await SimulatePlayerDelayAsync(token: token);
+        var mergeNetworkResult = await TryRunNetworkTransactionWithTimeoutAsync(mergeResult, null, token);
+        if (mergeNetworkResult.Failed)
+        {
+            if (log.ErrorEnabled)
+            {
+                log.LogError(
+                    $"Failed to merge {toMove.Name.Localized()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount}). Network Error: {mergeNetworkResult.Error}"
+                );
+            }
+            return false;
+        }
+
+        if (log.DebugEnabled)
+        {
+            log.LogDebug(
+                $"Merging {toMove.Name?.Localized()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount})...done"
+            );
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Throw an item.
+    /// </summary>
+    public async Task<bool> ThrowItemAsync(Item toThrow, CancellationToken token = default)
+    {
+        token.ThrowIfCancellationRequested();
+
+        if (log.WarningEnabled)
+        {
+            log.LogWarning($"Throwing item: {toThrow.Name.Localized()}...");
+        }
+
+        await SimulatePlayerDelayAsync(token: token);
+
+        var promise = new TaskCompletionSource<IResult>();
+        inventoryController.ThrowItem(toThrow, false, promise.SetResult);
+
+        var throwResult = await promise.Task;
+        if (throwResult.Failed)
+        {
+            if (log.WarningEnabled)
+            {
+                log.LogWarning($"Failed to throw item: {toThrow.Name.Localized()}. Error: {throwResult.Error}");
+            }
+            return false;
+        }
+
+        if (log.DebugEnabled)
+        {
+            log.LogDebug($"Throwing item: {toThrow.Name.Localized()}...done");
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Try to run network transaction with timeout.
+    /// For some odd reason I can't figure out, especially when moving the bot's active weapon around, the method runs indefinitely.
+    /// So try to circumvent it by fast forwarding the current state.
+    ///
+    /// It's GClass2053 Operation (RemoveWeaponOperation) running indefinitely.
+    /// </summary>
+    public async Task<IResult> TryRunNetworkTransactionWithTimeoutAsync(
+        InventoryControllerResultStruct operationResult,
+        Callback callback = null,
+        CancellationToken token = default
+    )
+    {
+        using var timeoutSource = new CancellationTokenSource(TimeSpan.FromMilliseconds(NetworkTransactionTimeout));
+
+        var networkTask = inventoryController.TryRunNetworkTransaction(operationResult, callback);
+
+        await Task.WhenAny(networkTask, Task.Delay(Timeout.Infinite, timeoutSource.Token), Task.Delay(Timeout.Infinite, token));
+
+        if (timeoutSource.Token.IsCancellationRequested)
+        {
+            var playerInvCont = (Player.PlayerInventoryController)inventoryController;
+            if (log.WarningEnabled)
+            {
+                log.LogWarning("Timed out on network transaction, trying to fast forward...");
+            }
+            playerInvCont.Player_0.FastForwardCurrentOperations();
+        }
+        else
+        {
+            token.ThrowIfCancellationRequested();
+        }
+
+        return await networkTask;
+    }
+
+    /// <summary>
+    /// Simulate decisions while looting by performing a delay.
+    /// </summary>
+    public static Task SimulatePlayerDelayAsync(double delay = -1f, CancellationToken token = default)
+    {
+        if (delay == -1D)
+        {
+            delay = LootingBots.TransactionDelay.Value;
+        }
+
+        return Task.Delay(TimeSpan.FromMilliseconds(delay), cancellationToken: token);
     }
 }
