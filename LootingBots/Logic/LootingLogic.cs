@@ -182,14 +182,14 @@ internal class LootingLogic(BotOwner botOwner) : CustomLogic(botOwner)
             {
                 if (isBotStuck)
                 {
-                    if (_log.ErrorEnabled)
+                    if (_log.WarningEnabled)
                     {
-                        _log.LogError($"Has been stuck trying to reach: {lootableName}. Ignoring");
+                        _log.LogWarning($"Has been stuck trying to reach: {lootableName}. Ignoring");
                     }
                 }
-                else if (_log.ErrorEnabled)
+                else if (_log.WarningEnabled)
                 {
-                    _log.LogError($"Has exceeded the navigation limit (30) trying to reach: {lootableName}. Ignoring");
+                    _log.LogWarning($"Has exceeded the navigation limit (30) trying to reach: {lootableName}. Ignoring");
                 }
                 canMove = false;
             }
