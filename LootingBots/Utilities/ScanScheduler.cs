@@ -57,7 +57,11 @@ public static class ScanScheduler
 #if DEBUG
         if (ticket < 1 || ticket > _capacity)
         {
-            throw new ArgumentOutOfRangeException(nameof(ticket), ticket, $"Ticket is less than 1 or more than the capacity ({_capacity})!");
+            throw new ArgumentOutOfRangeException(
+                nameof(ticket),
+                ticket,
+                $"Ticket is less than 1 or more than the capacity ({_capacity})!"
+            );
         }
 
         if (_tickets.Contains(ticket))
