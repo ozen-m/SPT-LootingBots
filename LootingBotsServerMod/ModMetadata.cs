@@ -1,6 +1,6 @@
 ﻿using SPTarkov.Server.Core.Models.Spt.Mod;
-using Version = SemanticVersioning.Version;
 using Range = SemanticVersioning.Range;
+using Version = SemanticVersioning.Version;
 
 namespace LootingBotsServerMod
 {
@@ -10,7 +10,7 @@ namespace LootingBotsServerMod
         public override string Name { get; init; } = "LootingBots-ServerMod";
         public override string Author { get; init; } = "Skwizzy";
         public override List<string>? Contributors { get; init; }
-        public override Version Version { get; init; } = new("1.6.4");
+        public override Version Version { get; init; } = new("1.7.0");
         public override Range SptVersion { get; init; } = new("~4.0.0");
         public override List<string>? Incompatibilities { get; init; }
         public override Dictionary<string, Range>? ModDependencies { get; init; }
