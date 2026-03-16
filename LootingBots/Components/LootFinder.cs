@@ -1,8 +1,10 @@
 using System.Buffers;
 using Comfort.Common;
+using Dissonance;
 using EFT;
 using EFT.Interactive;
 using EFT.InventoryLogic;
+using LootingBots.Patches;
 using LootingBots.Utilities;
 using UnityEngine;
 using UnityEngine.AI;
@@ -62,6 +64,7 @@ public class LootFinder : MonoBehaviour
     public bool IsScanRunning { get; private set; }
     private CancellationTokenSource _lootFinderCts;
 
+    private readonly Queue<LootableContainer> _priorityLootableContainers = [];
     private readonly Queue<Player> _priorityCorpses = [];
 
     public void Init(BotOwner botOwner)
@@ -74,6 +77,11 @@ public class LootFinder : MonoBehaviour
         _containerLootingEnabled = LootingBots.ContainerLootingEnabled.Value.IsBotEnabled(_lootingBrain);
         _itemLootingEnabled = LootingBots.LooseItemLootingEnabled.Value.IsBotEnabled(_lootingBrain);
         _corpseLootingEnabled = LootingBots.CorpseLootingEnabled.Value.IsBotEnabled(_lootingBrain);
+
+        if (_containerLootingEnabled)
+        {
+            OnAirdropLandedPatch.OnAirdropLanded += OnAirdropLanded;
+        }
 
         if (_corpseLootingEnabled)
         {
@@ -96,7 +104,7 @@ public class LootFinder : MonoBehaviour
 
         StopFindingLoot();
         _lootFinderCts = new CancellationTokenSource();
-        if (!FindPrioritizedCorpse(ticket))
+        if (!FindPrioritizedLoot(ticket))
         {
             _ = FindLootAsync(ticket, _lootFinderCts.Token).ContinueWith(ExceptionHandler, TaskScheduler.Current);
         }
@@ -137,6 +145,12 @@ public class LootFinder : MonoBehaviour
     public void OnDestroy()
     {
         StopFindingLoot();
+
+        if (_containerLootingEnabled)
+        {
+            OnAirdropLandedPatch.OnAirdropLanded -= OnAirdropLanded;
+        }
+
         if (_corpseLootingEnabled)
         {
             _botOwner.BotPersonalStats.OnKillTarget -= OnKilledEnemyPlayer;
@@ -360,11 +374,48 @@ public class LootFinder : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// TODO: Maybe expand to other loot types
-    /// </summary>
-    public bool FindPrioritizedCorpse(int ticket)
+    public bool FindPrioritizedLoot(int ticket)
     {
+        for (var i = 0; i < _priorityLootableContainers.Count; i++)
+        {
+            var lootableContainer = _priorityLootableContainers.Dequeue();
+
+            var position = lootableContainer.TrackableTransform.position;
+            var destination = GetDestination(position);
+
+            if (!IsLootInRange(LootType.Container, destination, out var dist))
+            {
+                if (_log.DebugEnabled)
+                {
+                    _log.LogDebug($"Re-queuing container [{lootableContainer.GetLootName()}], not in range. Dist: {dist}");
+                }
+                _priorityLootableContainers.Enqueue(lootableContainer);
+                continue;
+            }
+
+            // Cache the loot and set active target
+            if (!ActiveLootCache.CacheActiveLootId(lootableContainer.GetRootItemId(), _botOwner))
+            {
+                if (_log.ErrorEnabled)
+                {
+                    _log.LogError("Failed to cache and set active loot, bot owner is null or id already in the cache?");
+                }
+                continue;
+            }
+
+            _lootingBrain.SetLoot(lootableContainer, LootType.Container, position, destination, dist);
+
+            if (_log.DebugEnabled)
+            {
+                _log.LogDebug($"Setting container [{lootableContainer.GetLootName()}] as active loot. Dist: {dist}");
+            }
+
+            ScanScheduler.Return(ticket);
+            _lootingBrain.ForceBrainEnabled = false;
+            IsScanRunning = false;
+            return true;
+        }
+
         for (var i = 0; i < _priorityCorpses.Count; i++)
         {
             var player = _priorityCorpses.Dequeue();
@@ -519,6 +570,16 @@ public class LootFinder : MonoBehaviour
         }
 
         return destination;
+    }
+
+    private void OnAirdropLanded(LootableContainer airdrop)
+    {
+        if(_log.DebugEnabled)
+        {
+            _log.LogDebug($"Adding [{airdrop.GetLootName()}] to priority queue");
+        }
+
+        _priorityLootableContainers.Enqueue(airdrop);
     }
 
     private void OnKilledEnemyPlayer(string victimProfileId, DamageInfoStruct damageInfo)
