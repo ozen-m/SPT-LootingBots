@@ -23,6 +23,9 @@
     <Reference Include="DrakiaXYZ-BigBrain">
       <HintPath>..\References\DrakiaXYZ-BigBrain.dll</HintPath>
     </Reference>
+    <Reference Include="Sirenix.Serialization">
+      <HintPath>..\References\Sirenix.Serialization.dll</HintPath>
+    </Reference>
     <Reference Include="spt-common">
       <HintPath>..\References\spt-common.dll</HintPath>
     </Reference>
