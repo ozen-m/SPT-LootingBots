@@ -1,8 +1,7 @@
-﻿namespace LootingBotsServerMod.Models
+﻿namespace LootingBotsServerMod.Models;
+
+public record ConfigModel
 {
-    public record ConfigModel
-    {
-        public bool PmcSpawnWithLoot { get; set; } = true;
-        public bool ScavSpawnWithLoot { get; set; } = true;
-    }
+    public bool PmcSpawnWithLoot { get; set; } = true;
+    public bool ScavSpawnWithLoot { get; set; } = true;
 }
