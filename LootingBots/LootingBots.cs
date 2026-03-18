@@ -43,11 +43,11 @@ public class LootingBots : BaseUnityPlugin
 
     public static ConfigEntry<float> LootScanInterval;
     public static ConfigEntry<float> DetectItemDistance;
-    public static ConfigEntry<bool> DetectItemNeedsSight;
+    public static ConfigEntry<BotType> DetectItemNeedsSight;
     public static ConfigEntry<float> DetectContainerDistance;
-    public static ConfigEntry<bool> DetectContainerNeedsSight;
+    public static ConfigEntry<BotType> DetectContainerNeedsSight;
     public static ConfigEntry<float> DetectCorpseDistance;
-    public static ConfigEntry<bool> DetectCorpseNeedsSight;
+    public static ConfigEntry<BotType> DetectCorpseNeedsSight;
 
     public static ConfigEntry<bool> DebugLootNavigation;
     public static ConfigEntry<LogLevel> LootingLogLevels;
@@ -100,9 +100,9 @@ public class LootingBots : BaseUnityPlugin
         DetectCorpseNeedsSight = Config.Bind(
             "Loot Finder",
             "Enable corpse line of sight check",
-            false,
+            BotType.None,
             new ConfigDescription(
-                "When scanning for loot, corpses will be ignored if they are not visible by the bot",
+                "When scanning for loot, corpses will be ignored if they are not visible for the selected bot types. Takes effect next raid",
                 null,
                 new ConfigurationManagerAttributes { Order = 9 }
             )
@@ -131,9 +131,9 @@ public class LootingBots : BaseUnityPlugin
         DetectContainerNeedsSight = Config.Bind(
             "Loot Finder",
             "Enable container line of sight check",
-            false,
+            BotType.None,
             new ConfigDescription(
-                "When scanning for loot, containers will be ignored if they are not visible by the bot",
+                "When scanning for loot, containers will be ignored if they are not visible for the selected bot types. Takes effect next raid",
                 null,
                 new ConfigurationManagerAttributes { Order = 6 }
             )
@@ -162,9 +162,9 @@ public class LootingBots : BaseUnityPlugin
         DetectItemNeedsSight = Config.Bind(
             "Loot Finder",
             "Enable item line of sight check",
-            false,
+            BotType.None,
             new ConfigDescription(
-                "When scanning for loot, loose items will be ignored if they are not visible by the bot",
+                "When scanning for loot, loose items will be ignored if they are not visible for the selected bot types. Takes effect next raid",
                 null,
                 new ConfigurationManagerAttributes { Order = 3 }
             )
