@@ -386,7 +386,10 @@ public class LootingInventoryController
                                 {
                                     // If we swapped away our previous weapon, throw away its mags and strip the attachments
                                     await ThrowUselessMagsAsync(thrownWeapon, token);
-                                    await StripWeaponAsync(thrownWeapon, token);
+                                    if (LootingBots.CanStripAttachments.Value)
+                                    {
+                                        await StripWeaponAsync(thrownWeapon, token);
+                                    }
                                 }
                                 else
                                 {
@@ -410,7 +413,10 @@ public class LootingInventoryController
                                 {
                                     // Throw mags of thrown weapon and strip attachments
                                     await ThrowUselessMagsAsync(thrownWeapon, token);
-                                    await StripWeaponAsync(thrownWeapon, token);
+                                    if (LootingBots.CanStripAttachments.Value)
+                                    {
+                                        await StripWeaponAsync(thrownWeapon, token);
+                                    }
                                 }
                                 else
                                 {

@@ -293,7 +293,7 @@ public class LootingBots : BaseUnityPlugin
             "Calculate weapon value from attachments",
             true,
             new ConfigDescription(
-                "Calculate weapon value by looking up each attachement. More accurate than just looking at the base weapon template but a slightly more expensive check",
+                "Calculate weapon value by looking up each attachment. More accurate than just looking at the base weapon template but a slightly more expensive check",
                 null,
                 new ConfigurationManagerAttributes { Order = 11 }
             )
@@ -303,7 +303,7 @@ public class LootingBots : BaseUnityPlugin
             "Allow weapon attachment stripping",
             true,
             new ConfigDescription(
-                "Allows bots to take the attachments off of a weapon if they are not able to pick the weapon up into their inventory",
+                "Allows bots to take the attachments off of a weapon if they cannot pick it up, or if they discard a previously owned weapon",
                 null,
                 new ConfigurationManagerAttributes { Order = 10 }
             )
