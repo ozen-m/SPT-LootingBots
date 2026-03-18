@@ -1,7 +1,6 @@
 using System.Buffers;
 using Comfort.Common;
 using Cysharp.Threading.Tasks;
-using Dissonance;
 using EFT;
 using EFT.Interactive;
 using EFT.InventoryLogic;
@@ -31,8 +30,11 @@ public class LootFinder : MonoBehaviour
 
     // Bot specific config
     private bool _containerLootingEnabled;
+    private bool _needsContainerSight;
     private bool _itemLootingEnabled;
+    private bool _needsItemSight;
     private bool _corpseLootingEnabled;
+    private bool _needsCorpseSight;
 
     public bool IsScheduledScan
     {
@@ -76,8 +78,11 @@ public class LootFinder : MonoBehaviour
         _log = new BotLog(LootingBots.LootLog, _botOwner);
 
         _containerLootingEnabled = LootingBots.ContainerLootingEnabled.Value.IsBotEnabled(_lootingBrain);
+        _needsContainerSight = LootingBots.DetectContainerNeedsSight.Value.IsBotEnabled(_lootingBrain);
         _itemLootingEnabled = LootingBots.LooseItemLootingEnabled.Value.IsBotEnabled(_lootingBrain);
+        _needsItemSight = LootingBots.DetectItemNeedsSight.Value.IsBotEnabled(_lootingBrain);
         _corpseLootingEnabled = LootingBots.CorpseLootingEnabled.Value.IsBotEnabled(_lootingBrain);
+        _needsCorpseSight = LootingBots.DetectCorpseNeedsSight.Value.IsBotEnabled(_lootingBrain);
 
         if (_containerLootingEnabled)
         {
@@ -521,9 +526,9 @@ public class LootFinder : MonoBehaviour
     {
         var needsSight = lootType switch
         {
-            LootType.Corpse => LootingBots.DetectCorpseNeedsSight.Value,
-            LootType.Container => LootingBots.DetectContainerNeedsSight.Value,
-            LootType.Item => LootingBots.DetectItemNeedsSight.Value,
+            LootType.Corpse => _needsCorpseSight,
+            LootType.Container => _needsContainerSight,
+            LootType.Item => _needsItemSight,
             LootType.None => throw new ArgumentOutOfRangeException(nameof(lootType), lootType, null),
             _ => throw new ArgumentOutOfRangeException(nameof(lootType), lootType, null),
         };

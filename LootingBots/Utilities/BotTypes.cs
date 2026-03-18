@@ -15,6 +15,7 @@ public enum BotType
     Follower = 64,
     Bloodhound = 128,
 
+    None = 0,
     All = Scav | Pmc | PlayerScav | Raider | Cultist | Boss | Follower | Bloodhound,
 }
 
