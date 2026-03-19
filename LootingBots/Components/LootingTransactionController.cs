@@ -116,9 +116,9 @@ public class LootingTransactionController(InventoryController inventoryControlle
             return Task.FromResult(false);
         }
 
-        if (log.WarningEnabled)
+        if (log.InfoEnabled)
         {
-            log.LogWarning($"Equipping: {item.Name.Localized()} [place: {ableToEquip.Container.ID.Localized()}]");
+            log.LogInfo($"Equipping: {item.Name.Localized()} [place: {ableToEquip.Container.ID.Localized()}]");
         }
 
         return MoveItemAsync(item, ableToEquip, token);
@@ -137,9 +137,9 @@ public class LootingTransactionController(InventoryController inventoryControlle
 
         if (mergeableItem != null)
         {
-            if (log.WarningEnabled)
+            if (log.DebugEnabled)
             {
-                log.LogWarning($"Merging: {item.Name.Localized()} [with: {mergeableItem.Name.Localized()}]");
+                log.LogDebug($"Merging: {item.Name.Localized()} [with: {mergeableItem.Name.Localized()}]");
             }
 
             return MergeItemAsync(item, mergeableItem, token);
@@ -153,9 +153,9 @@ public class LootingTransactionController(InventoryController inventoryControlle
             && !string.Equals(gridAddress.GetRootItem()?.Parent?.Container?.ID, "securedcontainer", StringComparison.OrdinalIgnoreCase)
         )
         {
-            if (log.WarningEnabled)
+            if (log.InfoEnabled)
             {
-                log.LogWarning($"Picking up: {item.Name.Localized()} [place: {gridAddress.GetRootItem()?.Name.Localized()}]");
+                log.LogInfo($"Picking up: {item.Name.Localized()} [place: {gridAddress.GetRootItem()?.Name.Localized()}]");
             }
 
             return MoveItemAsync(item, gridAddress, token);
@@ -183,9 +183,9 @@ public class LootingTransactionController(InventoryController inventoryControlle
             return await TryEquipItemAsync(item, token) || await TryPickupItemAsync(item, token);
         }
 
-        if (log.WarningEnabled)
+        if (log.DebugEnabled)
         {
-            log.LogWarning(
+            log.LogDebug(
                 $"Moving {item.Name.Localized()} to: {location.Container.ID.Localized()} [{location.GetRootItem()?.Name.Localized()}]..."
             );
         }
@@ -216,9 +216,9 @@ public class LootingTransactionController(InventoryController inventoryControlle
             return false;
         }
 
-        if (log.DebugEnabled)
+        if (log.InfoEnabled)
         {
-            log.LogDebug(
+            log.LogInfo(
                 $"Moving {item.Name.Localized()} to: {location.Container.ID.Localized()} [{location.GetRootItem()?.Name.Localized()}]...done"
             );
         }
@@ -235,9 +235,9 @@ public class LootingTransactionController(InventoryController inventoryControlle
     {
         token.ThrowIfCancellationRequested();
 
-        if (log.WarningEnabled)
+        if (log.DebugEnabled)
         {
-            log.LogWarning($"Swapping {item.Name.Localized()} with {toSwap.Name.Localized()}...");
+            log.LogDebug($"Swapping {item.Name.Localized()} with {toSwap.Name.Localized()}...");
         }
 
         await SimulatePlayerDelayAsync(token: token);
@@ -245,9 +245,9 @@ public class LootingTransactionController(InventoryController inventoryControlle
         var swapResult = InteractionsHandlerClass.Swap(item, toSwap.CurrentAddress, toSwap, item.CurrentAddress, inventoryController, true);
         if (swapResult.Failed)
         {
-            if (log.ErrorEnabled)
+            if (log.WarningEnabled)
             {
-                log.LogError($"Failed to swap {item.Name.Localized()} with {toSwap.Name.Localized()}. Error: {swapResult.Error}");
+                log.LogWarning($"Failed to swap {item.Name.Localized()} with {toSwap.Name.Localized()}. Error: {swapResult.Error}");
             }
             return false;
         }
@@ -264,9 +264,9 @@ public class LootingTransactionController(InventoryController inventoryControlle
             return false;
         }
 
-        if (log.DebugEnabled)
+        if (log.InfoEnabled)
         {
-            log.LogWarning($"Swapping {item.Name.Localized()} with {toSwap.Name.Localized()}...done");
+            log.LogInfo($"Swapping {item.Name.Localized()} with {toSwap.Name.Localized()}...done");
         }
 
         return true;
@@ -285,9 +285,9 @@ public class LootingTransactionController(InventoryController inventoryControlle
             return false;
         }
 
-        if (log.WarningEnabled)
+        if (log.DebugEnabled)
         {
-            log.LogWarning(
+            log.LogDebug(
                 $"Merging {toMove.Name?.Localized()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount})..."
             );
         }
@@ -317,9 +317,9 @@ public class LootingTransactionController(InventoryController inventoryControlle
             return false;
         }
 
-        if (log.DebugEnabled)
+        if (log.InfoEnabled)
         {
-            log.LogDebug(
+            log.LogInfo(
                 $"Merging {toMove.Name?.Localized()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount})...done"
             );
         }
@@ -334,9 +334,9 @@ public class LootingTransactionController(InventoryController inventoryControlle
     {
         token.ThrowIfCancellationRequested();
 
-        if (log.WarningEnabled)
+        if (log.DebugEnabled)
         {
-            log.LogWarning($"Throwing item: {toThrow.Name.Localized()}...");
+            log.LogDebug($"Throwing item: {toThrow.Name.Localized()}...");
         }
 
         await SimulatePlayerDelayAsync(token: token);
@@ -354,9 +354,9 @@ public class LootingTransactionController(InventoryController inventoryControlle
             return false;
         }
 
-        if (log.DebugEnabled)
+        if (log.InfoEnabled)
         {
-            log.LogDebug($"Throwing item: {toThrow.Name.Localized()}...done");
+            log.LogInfo($"Throwing item: {toThrow.Name.Localized()}...done");
         }
 
         return true;

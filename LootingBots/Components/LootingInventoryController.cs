@@ -335,11 +335,11 @@ public class LootingInventoryController
                 var itemSize = item.GetItemSize();
                 CurrentItemPrice = _itemAppraiser.GetItemPrice(item, _log);
 
-                if (_log.InfoEnabled)
+                if (_log.DebugEnabled)
                 {
                     var itemValue =
                         itemSize > 1 ? $"{CurrentItemPrice:N0}₽ {CurrentItemPrice / itemSize:N0}₽/slot" : $"{CurrentItemPrice:N0}₽";
-                    _log.LogInfo($"Loot found: {itemName} ({itemValue})");
+                    _log.LogDebug($"Loot found: {itemName} ({itemValue})");
                 }
 
                 // Ignore magazines that a bot cannot actively use
@@ -512,9 +512,9 @@ public class LootingInventoryController
             _botOwner.GetPlayer.HandsController.FastForwardCurrentState();
         }
 
-        if (_log.InfoEnabled)
+        if (_log.DebugEnabled)
         {
-            _log.LogInfo("Updating weapons");
+            _log.LogDebug("Updating weapons");
         }
 
         var weaponSelector = _botOwner.WeaponManager.Selector;
@@ -1138,9 +1138,9 @@ public class LootingInventoryController
 
             if (itemsToThrow.Count > 0)
             {
-                if (_log.DebugEnabled)
+                if (_log.InfoEnabled)
                 {
-                    _log.LogDebug($"Throwing {itemsToThrow.Count} undervalued items from {parentItem.Name.Localized()}");
+                    _log.LogInfo($"Throwing {itemsToThrow.Count} undervalued items from {parentItem.Name.Localized()}");
                 }
 
                 foreach (var (toThrow, value) in itemsToThrow)
@@ -1201,9 +1201,9 @@ public class LootingInventoryController
 
             if (itemsToAdd.Count > 0)
             {
-                if (_log.WarningEnabled)
+                if (_log.InfoEnabled)
                 {
-                    _log.LogWarning($"Trying to strip attachments of weapon: {weapon.Name.Localized()}");
+                    _log.LogInfo($"Trying to strip attachments of weapon: {weapon.Name.Localized()}");
                 }
 
                 // Call TryAddItemsToBot with the filtered items
