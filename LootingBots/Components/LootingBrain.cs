@@ -328,9 +328,9 @@ public class LootingBrain : MonoBehaviour
         {
             OnLootTaskEnd(isSuccessful);
 
-            if (_log.DebugEnabled)
+            if (_log.InfoEnabled)
             {
-                _log.LogDebug(
+                _log.LogInfo(
                     $"Corpse loot time: {_lootTimer.ElapsedMilliseconds / 1000f:F0}s. Looted: {Stats.Looted:N0}₽. Was successful: {isSuccessful}"
                 );
             }
@@ -378,9 +378,9 @@ public class LootingBrain : MonoBehaviour
         {
             OnLootTaskEnd(isSuccessful);
 
-            if (_log.DebugEnabled)
+            if (_log.InfoEnabled)
             {
-                _log.LogDebug(
+                _log.LogInfo(
                     $"Container loot time: {_lootTimer.ElapsedMilliseconds / 1000f:F0}s. Looted: {Stats.Looted:N0}₽. Was successful: {isSuccessful}"
                 );
             }
@@ -415,9 +415,9 @@ public class LootingBrain : MonoBehaviour
         {
             OnLootTaskEnd(isSuccessful);
 
-            if (_log.DebugEnabled)
+            if (_log.InfoEnabled)
             {
-                _log.LogDebug(
+                _log.LogInfo(
                     $"Loose item loot time: {_lootTimer.ElapsedMilliseconds / 1000f:F0}s. Looted: {Stats.Looted:N0}₽. Was successful: {isSuccessful}"
                 );
             }

@@ -30,11 +30,13 @@ public static class LootUtils
 
     private static readonly EquipmentSlot[] OtherSlots =
     [
+        EquipmentSlot.ArmBand,
         EquipmentSlot.Headwear,
         EquipmentSlot.Earpiece,
         EquipmentSlot.Dogtag,
         EquipmentSlot.Scabbard,
         EquipmentSlot.FaceCover,
+        EquipmentSlot.Eyewear,
     ];
 
     /// <summary>
