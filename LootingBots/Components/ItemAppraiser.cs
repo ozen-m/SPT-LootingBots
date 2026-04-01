@@ -1,138 +1,233 @@
+using System.Diagnostics;
 using Comfort.Common;
 using EFT;
 using EFT.HandBook;
 using EFT.InventoryLogic;
 using LootingBots.Utilities;
+using UnityEngine;
 
-namespace LootingBots.Components
+namespace LootingBots.Components;
+
+public class ItemAppraiser(Log _log)
 {
-    public class ItemAppraiser
+    public readonly Stopwatch LastPriceUpdate = Stopwatch.StartNew();
+
+    public Dictionary<MongoID, HandbookData> HandbookData;
+    public Dictionary<MongoID, float> MarketData;
+
+    public bool IsUpdatingPrices { get; private set; }
+
+    public async Task UpdatePricesAsync()
     {
-        public Log Log;
-        public Dictionary<string, HandbookData> HandbookData;
-        public Dictionary<string, float> MarketData;
-
-        public bool MarketInitialized = false;
-
-        public void Init()
+        IsUpdatingPrices = true;
+        try
         {
-            Log = LootingBots.ItemAppraiserLog;
-
             if (LootingBots.UseMarketPrices.Value)
             {
-                // Initialize ragfair prices from the BE session
-                Singleton<ClientApplication<ISession>>
-                    .Instance.GetClientBackEndSession()
-                    .RagfairGetPrices(
-                        new Callback<Dictionary<string, float>>((Result<Dictionary<string, float>> result) => MarketData = result.Value)
-                    );
-                MarketInitialized = true;
+                var tcs = new TaskCompletionSource<Result<Dictionary<string, float>>>();
+                Singleton<ClientApplication<ISession>>.Instance.GetClientBackEndSession().RagfairGetPrices(tcs.SetResult);
+                var ragfairPrices = await tcs.Task;
+                if (ragfairPrices.Succeed)
+                {
+                    MarketData = ragfairPrices.Value.ToDictionary(pair => new MongoID(pair.Key), pair => pair.Value);
+                }
+                if (MarketData is null)
+                {
+                    _log.LogError("Failed to get flea prices from BE session");
+                }
             }
             else
             {
                 // This is the handbook instance which is initialized when the client first starts.
-                HandbookData = Singleton<HandbookClass>.Instance.Items.ToDictionary((item) => item.Id);
+                HandbookData = Singleton<HandbookClass>.Instance.Items.ToDictionary(item => new MongoID(item.Id));
+                if (HandbookData is null)
+                {
+                    _log.LogError("Failed to get handbook data");
+                }
             }
         }
-
-        /** Will either get the lootItem's price using the ragfair service or the handbook depending on the option selected in the mod menu. If the item is a weapon, will calculate its value based off its attachments if the mod setting is enabled */
-        public float GetItemPrice(Item lootItem)
+        catch (Exception ex)
         {
-            bool valueFromMods = LootingBots.ValueFromMods.Value;
-            if (LootingBots.UseMarketPrices.Value && MarketData != null)
-            {
-                return lootItem is Weapon && valueFromMods ? GetWeaponMarketPrice(lootItem as Weapon) : GetItemMarketPrice(lootItem);
-            }
-
-            if (HandbookData != null)
-            {
-                return lootItem is Weapon && valueFromMods ? GetWeaponHandbookPrice(lootItem as Weapon) : GetItemHandbookPrice(lootItem);
-            }
-
-            if (Log.DebugEnabled)
-            {
-                Log.LogDebug($"ItemAppraiser data is null");
-            }
-
-            return 0;
+            _log.LogError(ex.ToString());
+            _log.LogError("Failed to get item prices");
         }
-
-        /**
-        * Get the price of a weapon from the sum of its attachments mods, using the default handbook prices to appraise each mod.
-        */
-        public float GetWeaponHandbookPrice(Weapon lootWeapon)
+        finally
         {
-            if (Log.DebugEnabled)
-            {
-                Log.LogDebug($"Getting value of attachments for {lootWeapon.Name.Localized()}");
-            }
-
-            float finalPrice = 0f;
-
-            foreach (Mod weaponMod in lootWeapon.Mods)
-            {
-                finalPrice += GetItemHandbookPrice(weaponMod);
-            }
-
-            if (Log.DebugEnabled)
-            {
-                Log.LogDebug($"Final price of attachments: {finalPrice} compared to full item {GetItemHandbookPrice(lootWeapon)}");
-            }
-
-            return finalPrice;
+            LastPriceUpdate.Restart();
+            IsUpdatingPrices = false;
         }
+    }
 
-        /** Gets the price of the item as stated from the beSession handbook values */
-        public float GetItemHandbookPrice(Item lootItem)
+    /// <summary>
+    /// Will either get the lootItem's price using the ragfair service or the handbook depending on the option selected in the mod menu.
+    /// If the item is a weapon, will calculate its value based off its attachments if the mod setting is enabled.
+    /// </summary>
+    public float GetItemPrice(Item lootItem, BotLog log)
+    {
+        // Get the price of an ammo box by its ammo
+        if (lootItem is AmmoBox box)
         {
-            HandbookData.TryGetValue(lootItem.TemplateId, out HandbookData value);
-            float price = value?.Price ?? 0;
-
-            if (Log.DebugEnabled)
+            var ammoItem = box.Cartridges.Items.GetFirstItem();
+            if (ammoItem != null)
             {
-                Log.LogDebug($"Price of {lootItem.Name.Localized()} is {price}");
+                lootItem = ammoItem;
             }
-
-            return price;
         }
 
-        /**
-        * Get the price of a weapon from the sum of its attachments mods, using the ragfair prices to appraise each mod.
-        */
-        public float GetWeaponMarketPrice(Weapon lootWeapon)
+        var valueFromMods = LootingBots.ValueFromMods.Value;
+        if (LootingBots.UseMarketPrices.Value && MarketData != null)
         {
-            if (Log.DebugEnabled)
-            {
-                Log.LogDebug($"Getting value of attachments for {lootWeapon.Name.Localized()}");
-            }
-
-            float finalPrice = 0f;
-
-            // Iterate over each weapon mod and accumulate the price
-            foreach (Mod weaponMod in lootWeapon.Mods)
-            {
-                finalPrice += GetItemMarketPrice(weaponMod);
-            }
-
-            if (Log.DebugEnabled)
-            {
-                Log.LogDebug($"Final price of attachments: {finalPrice} compared to item template {GetItemMarketPrice(lootWeapon)}");
-            }
-
-            return finalPrice;
+            return lootItem is Weapon weapon && valueFromMods ? GetWeaponMarketPrice(weapon, log) : GetItemMarketPrice(lootItem, log);
         }
 
-        /** Gets the price of the item as stated from the ragfair values */
-        public float GetItemMarketPrice(Item lootItem)
+        if (HandbookData != null)
         {
-            float price = MarketData[lootItem.TemplateId];
-
-            if (Log.DebugEnabled)
-            {
-                Log.LogDebug($"Price of {lootItem.Name.Localized()} is {price}");
-            }
-
-            return price;
+            return lootItem is Weapon weapon && valueFromMods ? GetWeaponHandbookPrice(weapon, log) : GetItemHandbookPrice(lootItem, log);
         }
+
+        if (_log.DebugEnabled)
+        {
+            if (log != null)
+            {
+                log.LogDebug("ItemAppraiser data is null");
+            }
+            else
+            {
+                _log.LogDebug("ItemAppraiser data is null");
+            }
+        }
+
+        return 0f;
+    }
+
+    /// <summary>
+    /// Get the price of a weapon from the sum of its attachments mods, using the default handbook prices to appraise each mod.
+    /// </summary>
+    public float GetWeaponHandbookPrice(Weapon lootWeapon, BotLog log)
+    {
+        if (_log.DebugEnabled)
+        {
+            if (log != null)
+            {
+                log.LogDebug($"Getting value of attachments for {lootWeapon.Name.Localized()}");
+            }
+            else
+            {
+                _log.LogDebug($"Getting value of attachments for {lootWeapon.Name.Localized()}");
+            }
+        }
+
+        var finalPrice = 0f;
+
+        foreach (var weaponMod in lootWeapon.Mods)
+        {
+            finalPrice += GetItemHandbookPrice(weaponMod, log);
+        }
+
+        if (_log.DebugEnabled)
+        {
+            if (log != null)
+            {
+                log.LogDebug($"Final price of attachments: {finalPrice} compared to full item {GetItemHandbookPrice(lootWeapon, log)}");
+            }
+            else
+            {
+                _log.LogDebug($"Final price of attachments: {finalPrice} compared to full item {GetItemHandbookPrice(lootWeapon, null)}");
+            }
+        }
+
+        return finalPrice;
+    }
+
+    /// <summary>
+    /// Gets the price of the item as stated from the beSession handbook values.
+    /// </summary>
+    public float GetItemHandbookPrice(Item lootItem, BotLog log)
+    {
+        HandbookData.TryGetValue(lootItem.TemplateId, out var value);
+        var price = value?.Price ?? 0f;
+        price *= lootItem.StackObjectsCount;
+
+        // if (_log.DebugEnabled)
+        // {
+        //     if (log != null)
+        //     {
+        //         log.LogDebug($"Price of {lootItem.Name.Localized()} is {price}");
+        //     }
+        //     else
+        //     {
+        //         _log.LogDebug($"Price of {lootItem.Name.Localized()} is {price}");
+        //     }
+        // }
+
+        return Mathf.Max(0f, price);
+    }
+
+    /// <summary>
+    /// Get the price of a weapon from the sum of its attachments mods, using the ragfair prices to appraise each mod.
+    /// </summary>
+    public float GetWeaponMarketPrice(Weapon lootWeapon, BotLog log)
+    {
+        if (_log.DebugEnabled)
+        {
+            if (log != null)
+            {
+                log.LogDebug($"Getting value of attachments for {lootWeapon.Name.Localized()}");
+            }
+            else
+            {
+                _log.LogDebug($"Getting value of attachments for {lootWeapon.Name.Localized()}");
+            }
+        }
+
+        var finalPrice = 0f;
+
+        // Iterate over each weapon mod and accumulate the price
+        foreach (var weaponMod in lootWeapon.Mods)
+        {
+            finalPrice += GetItemMarketPrice(weaponMod, log);
+        }
+
+        if (_log.DebugEnabled)
+        {
+            if (log != null)
+            {
+                log.LogDebug($"Final price of attachments: {finalPrice} compared to item template {GetItemMarketPrice(lootWeapon, log)}");
+            }
+            else
+            {
+                _log.LogDebug($"Final price of attachments: {finalPrice} compared to item template {GetItemMarketPrice(lootWeapon, null)}");
+            }
+        }
+
+        return finalPrice;
+    }
+
+    /// <summary>
+    /// Gets the price of the item as stated from the ragfair values
+    /// </summary>
+    public float GetItemMarketPrice(Item lootItem, BotLog log)
+    {
+        if (MarketData.TryGetValue(lootItem.TemplateId, out var price))
+        {
+            price *= lootItem.StackObjectsCount;
+
+            // if (_log.DebugEnabled)
+            // {
+            //     if (log != null)
+            //     {
+            //         log.LogDebug($"Price of {lootItem.Name.Localized()} is {price}");
+            //     }
+            //     else
+            //     {
+            //         _log.LogDebug($"Price of {lootItem.Name.Localized()} is {price}");
+            //     }
+            // }
+
+            return Mathf.Max(0f, price);
+        }
+
+        // Fallback
+        return GetItemHandbookPrice(lootItem, log);
     }
 }

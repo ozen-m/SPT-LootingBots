@@ -1,21 +1,58 @@
 ﻿using EFT.InventoryLogic;
+using LootingBots.Components;
+using LootingBots.Utilities;
+using UnityEngine.Pool;
 
-namespace LootingBots.Actions
+namespace LootingBots.Actions;
+
+/// <summary>
+/// Move action to be executed
+/// </summary>
+public class LootingMoveAction : LootingAction
 {
-    public class LootingMoveAction(
-        Item toMove = null,
-        ItemAddress place = null,
-        Item toItem = null,
-        ActionCallback callback = null,
-        ActionCallback onComplete = null
-    )
+    private static readonly ObjectPool<LootingMoveAction> _pool = new(
+        Create,
+        null,
+        a => a.Reset(),
+        ListActionPool.LogOnDestroyInstance,
+        true,
+        2,
+        32
+    );
+
+    public static LootingMoveAction Create()
     {
-        public Item ToMove { get; private set; } = toMove;
-        public ItemAddress Place { get; private set; } = place;
-        public Item ToItem { get; private set; } = toItem;
-        public ActionCallback Callback { get; private set; } = callback;
-        public ActionCallback OnComplete { get; private set; } = onComplete;
+        return new LootingMoveAction();
     }
 
-    public delegate Task ActionCallback();
+    public static LootingMoveAction Rent(Item item, ItemAddress place = null, float netWorthDelta = 0f)
+    {
+        var moveAction = _pool.Get();
+        moveAction.Item = item;
+        moveAction.Place = place;
+        moveAction.NetWorthDelta = netWorthDelta;
+
+        return moveAction;
+    }
+
+    /// <summary>
+    /// Move item to this address, if null try to equip the item
+    /// </summary>
+    public ItemAddress Place { get; set; }
+
+    public override Task<bool> ExecuteAsync(LootingTransactionController controller, CancellationToken token)
+    {
+        return controller.MoveItemAsync(Item, Place, token);
+    }
+
+    public override void Return()
+    {
+        _pool.Release(this);
+    }
+
+    protected override void Reset()
+    {
+        base.Reset();
+        Place = null;
+    }
 }

@@ -3,9 +3,10 @@
     <TargetFramework>netstandard2.1</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>disable</Nullable>
-    <LangVersion>latest</LangVersion>
+    <LangVersion>preview</LangVersion>
     <RootNamespace>LootingBots</RootNamespace>
     <AssemblyName>skwizzy.LootingBots</AssemblyName>
+    <Version>1.7.0</Version>
     <ReleaseOutputDir>..\Build\BepInEx\plugins\</ReleaseOutputDir>
   </PropertyGroup>
   <ItemGroup>
@@ -13,35 +14,49 @@
     <PackageReference Include="UnityEngine.Modules" Version="2022.3.43" IncludeAssets="compile" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.Unity.Analyzers" Version="1.25.*-*" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="10.0.*-*" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" Version="17.14.*-*" PrivateAssets="all" />
+    <PackageReference Include="RoR2.BepInEx.Analyzers" Version="1.0.*-*" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="CommonExtensions">
+      <HintPath>..\References\CommonExtensions.dll</HintPath>
+    </Reference>
     <Reference Include="DrakiaXYZ-BigBrain">
       <HintPath>..\References\DrakiaXYZ-BigBrain.dll</HintPath>
+    </Reference>
+    <Reference Include="Sirenix.Serialization">
+      <HintPath>..\References\Sirenix.Serialization.dll</HintPath>
     </Reference>
     <Reference Include="spt-common">
       <HintPath>..\References\spt-common.dll</HintPath>
     </Reference>
-    <Reference Include="spt-reflection, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
+    <Reference Include="spt-reflection">
       <HintPath>..\References\spt-reflection.dll</HintPath>
     </Reference>
-    <Reference Include="Assembly-CSharp, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
+    <Reference Include="Assembly-CSharp">
       <HintPath>..\References\hollowed.dll</HintPath>
     </Reference>
     <Reference Include="Comfort">
       <HintPath>..\References\Comfort.dll</HintPath>
     </Reference>
-    <Reference Include="ItemComponent.Types" HintPath="..\References\ItemComponent.Types.dll" Private="False" />
-    <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
+    <Reference Include="ItemComponent.Types">
+      <HintPath>..\References\ItemComponent.Types.dll</HintPath>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
       <HintPath>..\References\Newtonsoft.Json.dll</HintPath>
     </Reference>
-    <Reference Include="DissonanceVoip" HintPath="..\References\DissonanceVoip.dll" Private="False" />
+    <Reference Include="DissonanceVoip">
+      <HintPath>..\References\DissonanceVoip.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <!-- Build script for release build-->
   <Target Name="CleanUnwantedFiles" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
     <ItemGroup>
       <AllFiles Include="$(OutputPath)**\*" />
       <FilesToKeep Include="$(OutputPath)$(TargetFileName)" />
+      <FilesToKeep Include="$(OutputPath)$(TargetName).pdb" />
     </ItemGroup>
     <ItemGroup>
       <FilesToDelete Include="@(AllFiles)" Exclude="@(FilesToKeep)" />
