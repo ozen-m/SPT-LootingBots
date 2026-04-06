@@ -517,7 +517,11 @@ public class LootingInventoryController
             _log.LogDebug("Updating weapons");
         }
 
-        var weaponSelector = _botOwner.WeaponManager.Selector;
+        var weaponSelector = _botOwner.WeaponManager?.Selector;
+        if (weaponSelector == null)
+        {
+            return;
+        }
         weaponSelector.UpdateWeaponsList();
         weaponSelector.SetSlotItem(OnWeaponTaken, true);
     }
@@ -1349,7 +1353,10 @@ public class LootingInventoryController
         }
 
         // Not active, not preactive, not allFine, not reached max errors, hands.failed
-        _botOwner.GetPlayer.HandsController.FastForwardCurrentState();
+        if (_botOwner.GetPlayer.HandsController != null)
+        {
+            _botOwner.GetPlayer.HandsController.FastForwardCurrentState();
+        }
         _botOwner.AITaskManager.RegisterDelayedTask(_botOwner, 0.5f, UpdateActiveWeapon);
     }
 }
