@@ -205,7 +205,8 @@ public class LootFinder : MonoBehaviour
             }
 
             // Sort colliders by distance
-            Array.Sort(colliders, 0, hits, new ColliderDistanceComparer(botPosition));
+            ColliderDistanceComparer.Instance.SetReferencePosition(botPosition);
+            Array.Sort(colliders, 0, hits, ColliderDistanceComparer.Instance);
 
             if (_log.DebugEnabled)
             {
@@ -292,7 +293,8 @@ public class LootFinder : MonoBehaviour
                 }
 
                 var bounds = collider.bounds;
-                var center = new Vector3(bounds.center.x, bounds.center.y - bounds.extents.y - 0.4f, bounds.center.z);
+                var center = bounds.center;
+                center.y -= bounds.extents.y + 0.4f;
                 var destination = GetDestination(center);
 
                 await Task.Yield();
