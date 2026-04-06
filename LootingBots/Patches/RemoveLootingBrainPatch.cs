@@ -10,28 +10,36 @@ public class RemoveLootingBrainPatch : ModulePatch
 {
     protected override MethodBase GetTargetMethod()
     {
-        return typeof(BotOwner).GetMethod(nameof(BotOwner.Dispose), BindingFlags.Public | BindingFlags.Instance);
+        return typeof(BotsController).GetMethod(nameof(BotsController.BotDied), BindingFlags.Public | BindingFlags.Instance);
     }
 
     [PatchPrefix]
-    private static void PatchPrefix(BotOwner __instance)
+    private static void PatchPrefix(BotOwner botOwner)
     {
-        if (__instance.GetPlayer.TryGetComponent<LootingBrain>(out var lootingBrain))
+        if (botOwner.GetPlayer.TryGetComponent<LootingBrain>(out var lootingBrain))
         {
             UnityEngine.Object.Destroy(lootingBrain);
         }
+        else
+        {
+            LootingBots.LootLog.LogError($"Could not destroy LootingBrain for {botOwner.name}");
+        }
 
-        if (__instance.GetPlayer.TryGetComponent<LootFinder>(out var lootFinder))
+        if (botOwner.GetPlayer.TryGetComponent<LootFinder>(out var lootFinder))
         {
             UnityEngine.Object.Destroy(lootFinder);
+        }
+        else
+        {
+            LootingBots.LootLog.LogError($"Could not destroy LootFinder for {botOwner.name}");
         }
 
         if (LootingBots.LootLog.DebugEnabled)
         {
-            LootingBots.LootLog.LogDebug("Cleanup on ActiveLootCache");
+            LootingBots.LootLog.LogDebug($"Cleanup on ActiveLootCache for {botOwner.name}");
         }
 
-        ActiveLootCache.Cleanup(__instance);
-        ActiveBotCache.Remove(__instance);
+        ActiveLootCache.Cleanup(botOwner);
+        ActiveBotCache.Remove(botOwner);
     }
 }
