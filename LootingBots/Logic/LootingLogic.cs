@@ -152,8 +152,9 @@ internal class LootingLogic : CustomLogic
 
             var lootableName = _lootingBrain.ActiveLoot.GetLootName();
 
-            // If the bot has not been stuck for more than 2 navigation checks, attempt to navigate to the lootable otherwise ignore the container forever
-            var isBotStuck = _stuckCount > 1;
+            // If the bot has not been stuck for more than 4 stuck checks, and is not at its navigation limit,
+            // attempt to navigate to the lootable otherwise ignore the container forever
+            var isBotStuck = _stuckCount > 3;
             var isNavigationLimit = _navigationAttempts > 30;
 
             // Log every 5 movement attempts to reduce noise
@@ -166,7 +167,11 @@ internal class LootingLogic : CustomLogic
             {
                 _destination = _lootingBrain.Destination;
 
-                if (_navigationAttempts == 1)
+                if (
+                    _navigationAttempts == 1
+                    || BotOwner.Mover.TargetPoint is null
+                    || Vector3.Distance(_destination, BotOwner.Mover.TargetPoint.Value) > 0.9f
+                )
                 {
                     var pathStatus = BotOwner.GoToPoint(_destination, true, -1f, false, false);
 
@@ -179,8 +184,7 @@ internal class LootingLogic : CustomLogic
 
                         canMove = false;
                     }
-
-                    if (pathStatus == NavMeshPathStatus.PathPartial)
+                    else if (pathStatus == NavMeshPathStatus.PathPartial)
                     {
                         if (_log.WarningEnabled)
                         {
