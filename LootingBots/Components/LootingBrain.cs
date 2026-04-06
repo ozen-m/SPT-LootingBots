@@ -235,7 +235,7 @@ public class LootingBrain : MonoBehaviour
                         case LootItem lootItem when lootItem.ItemOwner?.RootItem != null:
                             return;
                         default:
-                            CleanupLoot(false, true);
+                            CleanupLoot(false);
                             break;
                     }
                 }
@@ -503,11 +503,10 @@ public class LootingBrain : MonoBehaviour
 
     /// <summary>
     /// Cleans the ActiveLoot from the active loot cache.
-    /// Can optionally add the item to the ignore list after cleaning, or force the bot to find new loot if item is not ignored.
+    /// Can optionally add the item to the ignore list after cleaning.
     /// </summary>
-    /// <param name="ignore">Add the active loot to the bot's ignore list and clears the bot's active loot</param>
-    /// <param name="clear">Clears the bot's active loot to force it to find a new one.</param>
-    public void CleanupLoot(bool ignore = true, bool clear = false)
+    /// <param name="ignore">Optionally add the active loot to the bot's ignore list</param>
+    public void CleanupLoot(bool ignore = true)
     {
         var item = ActiveLoot.GetRootItem();
         if (item != null)
@@ -518,12 +517,8 @@ public class LootingBrain : MonoBehaviour
             }
         }
 
-        if (ignore || clear)
-        {
-            SetLoot(null, LootFinder.LootType.None, Vector3.zero, Vector3.zero);
-        }
-
         ActiveLootCache.Cleanup(BotOwner);
+        SetLoot(null, LootFinder.LootType.None, Vector3.zero, Vector3.zero);
     }
 
     public void SetLoot(
