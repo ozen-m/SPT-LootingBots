@@ -507,6 +507,12 @@ public class LootingInventoryController
             return;
         }
 
+        var weaponSelector = _botOwner.WeaponManager?.Selector;
+        if (weaponSelector == null)
+        {
+            return;
+        }
+
         if (_botOwner.InventoryController.IsChangingWeaponNonLinq())
         {
             _botOwner.GetPlayer.HandsController.FastForwardCurrentState();
@@ -516,13 +522,8 @@ public class LootingInventoryController
         {
             _log.LogDebug("Updating weapons");
         }
-
-        var weaponSelector = _botOwner.WeaponManager?.Selector;
-        if (weaponSelector == null)
-        {
-            return;
-        }
         weaponSelector.UpdateWeaponsList();
+        weaponSelector.IsWeaponReady = false;
         weaponSelector.SetSlotItem(OnWeaponTaken, true);
     }
 
@@ -1333,12 +1334,16 @@ public class LootingInventoryController
         {
             if (allFine)
             {
+                // Update LastEquippedSlot and WeaponManager.CurrentWeaponInfo
+                var currentEquippedSlot = weaponSelector.MainWeapon; // MainWeapon is set by WeaponSelector.SetSlotItem(Callback<IHandsController> onSpawn, bool order)
+                weaponSelector.LastEquipmentSlot_1 = currentEquippedSlot;
+                weaponSelector.OnActiveEquipmentSlotChanged?.Invoke(currentEquippedSlot);
                 RefillAndReload();
-                weaponSelector.ErrorCounter = 0;
 
+                weaponSelector.ErrorCounter = 0;
                 if (_log.DebugEnabled)
                 {
-                    _log.LogDebug($"{_botOwner.Name()} Current weapon is {hands.Value.Item.ToFullString()}");
+                    _log.LogDebug($"Current weapon is: {hands.Value.Item}");
                 }
                 return;
             }
