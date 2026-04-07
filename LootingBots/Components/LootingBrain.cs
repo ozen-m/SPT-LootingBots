@@ -515,6 +515,10 @@ public class LootingBrain : MonoBehaviour
             {
                 IgnoreLoot(item.Id);
             }
+            else if (ActiveLoot is Corpse corpse && BotOwner.GetPlayer.TryGetComponent(out LootFinder lootFinder))
+            {
+                lootFinder.EnqueuePriorityCorpse(corpse.PlayerProfileID);
+            }
         }
 
         ActiveLootCache.Cleanup(BotOwner);

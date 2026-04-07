@@ -147,6 +147,27 @@ public class LootFinder : MonoBehaviour
         _lootFinderCts = null;
     }
 
+    public void EnqueuePriorityCorpse(string corpseProfileId)
+    {
+        var playerOwner = Singleton<GameWorld>.Instance.GetEverExistedBridgeByProfileID(corpseProfileId);
+        if (playerOwner?.iPlayer is Player deadPlayer)
+        {
+            if (_log.DebugEnabled)
+            {
+                _log.LogDebug($"Adding [{deadPlayer.name}] to priority queue");
+            }
+
+            _priorityCorpses.Enqueue(deadPlayer);
+        }
+        else
+        {
+            if (_log.ErrorEnabled)
+            {
+                _log.LogError($"Cannot prioritize corpse, player not found! ProfileId: {corpseProfileId}");
+            }
+        }
+    }
+
     public void OnDestroy()
     {
         StopFindingLoot();
@@ -381,7 +402,7 @@ public class LootFinder : MonoBehaviour
         }
     }
 
-    public bool FindPrioritizedLoot(int ticket)
+    private bool FindPrioritizedLoot(int ticket)
     {
         for (var i = 0; i < _priorityLootableContainers.Count; i++)
         {
@@ -591,18 +612,7 @@ public class LootFinder : MonoBehaviour
 
     private void OnKilledEnemyPlayer(string victimProfileId, DamageInfoStruct damageInfo)
     {
-        var playerOwner = Singleton<GameWorld>.Instance.GetEverExistedBridgeByProfileID(victimProfileId);
-        if (playerOwner?.iPlayer is Player victimPlayer)
-        {
-            _priorityCorpses.Enqueue(victimPlayer);
-        }
-        else
-        {
-            if (_log.ErrorEnabled)
-            {
-                _log.LogError($"Killed player not found! Victim ProfileId: {victimProfileId}");
-            }
-        }
+        EnqueuePriorityCorpse(victimProfileId);
     }
 
     private void ExceptionHandler(Task task)
