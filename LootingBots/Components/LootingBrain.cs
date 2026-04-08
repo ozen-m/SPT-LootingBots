@@ -216,20 +216,11 @@ public class LootingBrain : MonoBehaviour
                     // Open any nearby door
                     BotOwner.DoorOpener.UpdateDoorInteractionStatus();
 
-                    // If a player picks up an item that was marked as active by a bot, its ItemOwner?.RootItem will be null. In this case cleanup the active item
-                    if (ActiveLoot == null)
+                    // If a player picks up an item that was marked as active by a bot, its ItemOwner?.RootItem will be null.
+                    // In this case cleanup the active item
+                    if (ActiveLootType == LootFinder.LootType.Item && ActiveLoot.GetRootItem() == null)
                     {
-                        return;
-                    }
-
-                    switch (ActiveLoot)
-                    {
-                        case LootableContainer container when container.ItemOwner?.RootItem != null:
-                        case LootItem lootItem when lootItem.ItemOwner?.RootItem != null:
-                            return;
-                        default:
-                            CleanupLoot(false);
-                            break;
+                        CleanupLoot(false);
                     }
                 }
             }
