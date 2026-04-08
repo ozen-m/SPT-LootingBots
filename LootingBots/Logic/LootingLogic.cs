@@ -36,11 +36,24 @@ internal class LootingLogic : CustomLogic
 
     public override void Update(CustomLayer.ActionData data)
     {
-        // Kick off looting logic
-        if (_shouldUpdate)
+        if (!_shouldUpdate)
         {
-            TryLoot();
+            return;
         }
+
+        // Open any nearby door
+        BotOwner.DoorOpener.UpdateDoorInteractionStatus();
+
+        // If a player picks up an item that was marked as active by a bot, its ItemOwner?.RootItem will be null.
+        // In this case cleanup the active item
+        if (_lootingBrain.ActiveLootType == LootFinder.LootType.Item && _lootingBrain.ActiveLoot.GetRootItem() == null)
+        {
+            _lootingBrain.CleanupLoot(false);
+            return;
+        }
+
+        // Kick off looting logic
+        TryLoot();
     }
 
     public override void Stop()

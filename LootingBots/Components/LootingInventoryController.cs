@@ -260,40 +260,36 @@ public class LootingInventoryController
         Stats.TotalGridSpaces = (tacVest?.Grids?.Length ?? 0) + (backpack?.Grids?.Length ?? 0) + (pockets?.Grids?.Length ?? 0);
     }
 
-    // /// <summary>
-    // /// Sorts the items in the tactical vest so that items prefer to be in slots that match their size.
-    // /// i.e a 1x1 item will be placed in a 1x1 slot instead of a 1x2 slot
-    // /// </summary>
-    // public async Task SortTacVestAsync()
-    // {
-    //     var tacVest = (SearchableItemItemClass)
-    //         _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem;
-    //
-    //     ShouldSort = false;
-    //
-    //     if (tacVest != null)
-    //     {
-    //         var result = InteractionsHandlerClass.Sort(tacVest, _botInventoryController, true);
-    //
-    //         await Task.Yield(); // Sorting can be expensive
-    //
-    //         if (result.Succeeded)
-    //         {
-    //             try
-    //             {
-    //                 await _transactionController.TryRunNetworkTransactionWithTimeoutAsync(result);
-    //             }
-    //             catch (Exception ex)
-    //             {
-    //                 _log.LogError($"Failed to execute {nameof(SortTacVestAsync)}: {ex}");
-    //             }
-    //         }
-    //         else if (_log.ErrorEnabled)
-    //         {
-    //             _log.LogError($"Failed to execute {nameof(SortTacVestAsync)}: {result.Error}");
-    //         }
-    //     }
-    // }
+    /// <summary>
+    /// Sorts the items in the tactical vest so that items prefer to be in slots that match their size.
+    /// i.e a 1x1 item will be placed in a 1x1 slot instead of a 1x2 slot
+    /// </summary>
+    public async Task SortCompoundItemAsync(CompoundItem compoundItem)
+    {
+        ShouldSort = false;
+
+        if (compoundItem != null)
+        {
+            var result = InteractionsHandlerClass.Sort(compoundItem, _botInventoryController, true);
+            if (result.Failed)
+            {
+                if (_log.WarningEnabled)
+                {
+                    _log.LogWarning($"Failed to execute {nameof(SortCompoundItemAsync)}. Error: {result.Error}");
+                }
+                return;
+            }
+
+            var networkResult = await _transactionController.TryRunNetworkTransactionWithTimeoutAsync(result);
+            if (networkResult.Failed)
+            {
+                if (_log.WarningEnabled)
+                {
+                    _log.LogWarning($"Failed to execute {nameof(SortCompoundItemAsync)}. Network Error: {networkResult.Error}");
+                }
+            }
+        }
+    }
 
     /// <summary>
     /// Main driving method which kicks off the logic for what a bot will do with the loot found.
