@@ -21,20 +21,15 @@ public class LootingBrain : MonoBehaviour
     public LootFinder.LootType ActiveLootType = LootFinder.LootType.None;
 
     // Final destination of the bot when moving to loot something
-    public Vector3 Destination = Vector3.zero;
+    public Vector3 Destination;
 
     // Collider.transform.position for the active lootable. Used in LOS checks to make sure bots dont loot through walls
     public Vector3 LootObjectPosition;
 
-    // Object ids that the bot has looted
-    public HashSet<string> IgnoredLootIds;
-
-    // Object ids that were not able to be reached even though a valid path exists. Is cleared every 2 mins by default
-    public HashSet<string> NonNavigableLootIds;
+    // Object ids that the bot has looted or failed to reach even though a valid path exists
+    public readonly HashSet<string> IgnoredLootIds = [];
 
     public bool IsPlayerScav;
-
-    public bool LockUntilNextScan;
 
     // Allows external methods to force the looting brain for a bot to be enabled regardless of performance settings
     public bool ForceBrainEnabled;
@@ -123,8 +118,6 @@ public class LootingBrain : MonoBehaviour
         _log = new BotLog(LootingBots.LootLog, botOwner);
         BotOwner = botOwner;
         InventoryController = new LootingInventoryController(BotOwner, this);
-        IgnoredLootIds = [];
-        NonNavigableLootIds = [];
     }
 
     /// <summary>
@@ -451,7 +444,7 @@ public class LootingBrain : MonoBehaviour
     /// </summary>
     public bool IsLootIgnored(string lootId)
     {
-        return lootId == null || NonNavigableLootIds.Contains(lootId) || IgnoredLootIds.Contains(lootId);
+        return lootId == null || IgnoredLootIds.Contains(lootId);
     }
 
     /// <summary>
@@ -467,22 +460,6 @@ public class LootingBrain : MonoBehaviour
     }
 
     /// <summary>
-    /// Handles adding non-navigable loot to the list of non-navigable ids for use in the ignore logic.
-    /// Additionally, removes the object from the active loot cache.
-    /// </summary>
-    public void HandleNonNavigableLoot()
-    {
-        var lootId = ActiveLoot.GetRootItemId();
-
-        if (lootId != null)
-        {
-            NonNavigableLootIds.Add(lootId);
-        }
-
-        Cleanup();
-    }
-
-    /// <summary>
     /// Adds a loot id to the list of loot items to ignore for a specific bot
     /// </summary>
     public void IgnoreLoot(string id)
@@ -491,21 +468,10 @@ public class LootingBrain : MonoBehaviour
     }
 
     /// <summary>
-    /// Adds the ActiveLoot to ignore list for the LootFinder ignore and cleans them from the active loot cache
-    /// </summary>
-    public void Cleanup()
-    {
-        if (ActiveLoot != null)
-        {
-            CleanupLoot();
-        }
-    }
-
-    /// <summary>
     /// Cleans the ActiveLoot from the active loot cache.
-    /// Can optionally add the item to the ignore list after cleaning.
+    /// By default, also adds the ActiveLoot to the bot's ignore list for the LootFinder to ignore.
     /// </summary>
-    /// <param name="ignore">Optionally add the active loot to the bot's ignore list</param>
+    /// <param name="ignore">If true, adds the active loot to the bot's ignore list</param>
     public void CleanupLoot(bool ignore = true)
     {
         var item = ActiveLoot.GetRootItem();

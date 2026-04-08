@@ -273,12 +273,7 @@ public static class LootUtils
     /// </summary>
     public static string GetRootItemId(this InteractableObject interactableObject)
     {
-        return interactableObject switch
-        {
-            LootableContainer container => container.ItemOwner?.RootItem.Id,
-            LootItem lootItem => lootItem.ItemOwner?.RootItem.Id,
-            _ => null,
-        };
+        return interactableObject.GetRootItem()?.Id;
     }
 
     /// <summary>

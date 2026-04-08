@@ -103,7 +103,7 @@ internal class LootingLogic : CustomLogic
                 // If there is not a valid path to the loot, ignore the loot forever
                 if (!canMove)
                 {
-                    _lootingBrain.HandleNonNavigableLoot();
+                    _lootingBrain.CleanupLoot();
                     _stuckCount = 0;
                 }
             }
