@@ -57,51 +57,44 @@ public static class ActiveLootCache
 
     public static void Cleanup(BotOwner botOwner)
     {
-        try
+        // Check to make sure the BotOwner we are cleaning up has a valid name
+        if (botOwner == null || botOwner.name == null)
         {
-            // Check to make sure the BotOwner we are cleaning up has a valid name
-            if (botOwner == null || botOwner.name == null)
+            if (LootingBots.LootLog.ErrorEnabled)
+            {
+                LootingBots.LootLog.LogError("Cleanup issued on a bot with no name?");
+            }
+            return;
+        }
+
+        _keysToRemoveScratch.Clear();
+
+        // Look through the entries in the dictionary and remove any that match the specified bot owner
+        foreach (var keyValue in ActiveLoot)
+        {
+            // Check to make sure the BotOwner saved in the dictionary has a valid name before comparing
+            if (keyValue.Value == null || keyValue.Value.name == null)
             {
                 if (LootingBots.LootLog.ErrorEnabled)
                 {
-                    LootingBots.LootLog.LogError("Cleanup issued on a bot with no name?");
+                    LootingBots.LootLog.LogError("Bot in loot cache has no name?");
                 }
-                return;
+
+                // Bot is null, so remove it from active loot cache
+                _keysToRemoveScratch.Add(keyValue.Key);
+                continue;
             }
 
-            _keysToRemoveScratch.Clear();
-
-            // Look through the entries in the dictionary and remove any that match the specified bot owner
-            foreach (var keyValue in ActiveLoot)
+            // If the bot's name matches, remove the item
+            if (keyValue.Value.name == botOwner.name)
             {
-                // Check to make sure the BotOwner saved in the dictionary has a valid name before comparing
-                if (keyValue.Value == null || keyValue.Value.name == null)
-                {
-                    if (LootingBots.LootLog.ErrorEnabled)
-                    {
-                        LootingBots.LootLog.LogError("Bot in loot cache has no name?");
-                    }
-
-                    // Bot is null, so remove it from active loot cache
-                    _keysToRemoveScratch.Add(keyValue.Key);
-                    continue;
-                }
-
-                // If the bot's name matches, remove the item
-                if (keyValue.Value.name == botOwner.name)
-                {
-                    _keysToRemoveScratch.Add(keyValue.Key);
-                }
-            }
-
-            foreach (var key in _keysToRemoveScratch)
-            {
-                ActiveLoot.Remove(key);
+                _keysToRemoveScratch.Add(keyValue.Key);
             }
         }
-        catch (Exception e)
+
+        foreach (var key in _keysToRemoveScratch)
         {
-            LootingBots.LootLog.LogError(e);
+            ActiveLoot.Remove(key);
         }
     }
 }

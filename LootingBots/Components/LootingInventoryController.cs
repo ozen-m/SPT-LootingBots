@@ -140,24 +140,17 @@ public class LootingInventoryController
     {
         _log = new BotLog(LootingBots.LootLog, botOwner);
 
-        try
-        {
-            _lootingBrain = lootingBrain;
-            _itemAppraiser = LootingBots.ItemAppraiser;
+        _lootingBrain = lootingBrain;
+        _itemAppraiser = LootingBots.ItemAppraiser;
 
-            // Initialize bot inventory controller
-            _botInventoryController = botOwner.GetPlayer.InventoryController;
-            _botOwner = botOwner;
-            _transactionController = new LootingTransactionController(_botInventoryController, _log);
+        // Initialize bot inventory controller
+        _botInventoryController = botOwner.GetPlayer.InventoryController;
+        _botOwner = botOwner;
+        _transactionController = new LootingTransactionController(_botInventoryController, _log);
 
-            CalculateGearValue();
-            CalculateInitialNetWorth();
-            UpdateGridStats();
-        }
-        catch (Exception e)
-        {
-            _log.LogError(e);
-        }
+        CalculateGearValue();
+        CalculateInitialNetWorth();
+        UpdateGridStats();
     }
 
     /// <summary>
