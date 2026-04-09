@@ -327,4 +327,15 @@ public static class LootUtils
 
         return false;
     }
+
+    public static Item GetFirstItem(this IEnumerable<Item> items)
+    {
+        if (items == null)
+        {
+            return null;
+        }
+
+        using var enumerator = items.GetEnumerator();
+        return enumerator.MoveNext() ? enumerator.Current : null;
+    }
 }
