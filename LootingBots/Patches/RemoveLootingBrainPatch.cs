@@ -39,7 +39,6 @@ public class RemoveLootingBrainPatch : ModulePatch
             LootingBots.LootLog.LogDebug($"Cleanup on LB components for {botOwner.name}");
         }
 
-        ActiveLootCache.Cleanup(botOwner);
         ActiveBotCache.Remove(botOwner);
     }
 
