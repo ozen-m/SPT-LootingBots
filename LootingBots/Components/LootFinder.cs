@@ -605,7 +605,7 @@ public class LootFinder : MonoBehaviour
 
     private void OnAirdropLanded(LootableContainer airdrop)
     {
-        if(_log.DebugEnabled)
+        if (_log.DebugEnabled)
         {
             _log.LogDebug($"Adding [{airdrop.GetLootName()}] to priority queue");
         }

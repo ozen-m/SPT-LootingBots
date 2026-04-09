@@ -11,11 +11,12 @@ internal class FindLootLogic : CustomLogic
     private readonly LootFinder _lootFinder;
     private readonly BotLog _log;
 
-    public FindLootLogic(BotOwner botOwner) : base(botOwner)
+    public FindLootLogic(BotOwner botOwner)
+        : base(botOwner)
     {
         _lootingBrain = botOwner.GetPlayer.gameObject.GetComponent<LootingBrain>();
         _lootFinder = botOwner.GetPlayer.gameObject.GetComponent<LootFinder>();
-        _log = new(LootingBots.LootLog, botOwner);
+        _log = new BotLog(LootingBots.LootLog, botOwner);
 
         if (botOwner.Profile.Nickname != _lootingBrain.BotOwner.Profile.Nickname)
         {

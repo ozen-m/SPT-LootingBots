@@ -23,10 +23,11 @@ internal class LootingLogic : CustomLogic
         get { return !_lootingBrain.LootTaskRunning && BotOwner.BotState == EBotState.Active; }
     }
 
-    public LootingLogic(BotOwner botOwner) : base(botOwner)
+    public LootingLogic(BotOwner botOwner)
+        : base(botOwner)
     {
         _lootingBrain = botOwner.GetPlayer.gameObject.GetComponent<LootingBrain>();
-        _log = new(LootingBots.LootLog, botOwner);
+        _log = new BotLog(LootingBots.LootLog, botOwner);
 
         if (botOwner.Profile.Nickname != _lootingBrain.BotOwner.Profile.Nickname)
         {
