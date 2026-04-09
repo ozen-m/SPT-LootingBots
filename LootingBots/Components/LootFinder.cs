@@ -295,8 +295,6 @@ public class LootFinder : MonoBehaviour
                     }
                 }
 
-                await Task.Yield();
-
                 if (lootType is LootType.None || rootItem is null)
                 {
                     await Task.Yield();
@@ -318,8 +316,6 @@ public class LootFinder : MonoBehaviour
                 center.y -= bounds.extents.y + 0.4f;
                 var destination = GetDestination(center);
 
-                await Task.Yield();
-
                 // Check if we can perform distance and LOS checks
                 if (_botOwner.Mover == null)
                 {
@@ -328,7 +324,7 @@ public class LootFinder : MonoBehaviour
                         _log.LogWarning("botOwner.BotMover is null! Cannot perform path distance calculations");
                     }
 
-                    break;
+                    return;
                 }
                 if (_botOwner.LookSensor == null)
                 {
@@ -337,7 +333,7 @@ public class LootFinder : MonoBehaviour
                         _log.LogWarning("botOwner.LookSensor is null! Cannot perform line of sight check");
                     }
 
-                    break;
+                    return;
                 }
 
                 // Check if loot is in range
@@ -380,7 +376,7 @@ public class LootFinder : MonoBehaviour
 
                 _lootingBrain.SetLoot(interactableObject, lootType, interactableObject.transform.position, destination, rootItemId, dist);
                 _emptyAttempts = 0;
-                break;
+                return;
             }
         }
         finally
