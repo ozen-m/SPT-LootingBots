@@ -413,11 +413,14 @@ public class LootFinder : MonoBehaviour
 
             if (!IsLootInRange(LootType.Container, destination, out var dist))
             {
-                if (_log.DebugEnabled)
+                if (dist != -1f)
                 {
-                    _log.LogDebug($"Re-queuing container [{lootableContainer.GetLootName()}], not in range. Dist: {dist}");
+                    if (_log.DebugEnabled)
+                    {
+                        _log.LogDebug($"Re-queuing container [{lootableContainer.GetLootName()}], not in range. Dist: {dist}");
+                    }
+                    _priorityLootableContainers.Enqueue(lootableContainer);
                 }
-                _priorityLootableContainers.Enqueue(lootableContainer);
                 continue;
             }
 
@@ -486,11 +489,14 @@ public class LootFinder : MonoBehaviour
             // No need to check LOS since technically it's their kill
             if (!IsLootInRange(LootType.Corpse, destination, out var dist))
             {
-                if (_log.DebugEnabled)
+                if (dist != -1f)
                 {
-                    _log.LogDebug($"Re-queuing corpse [{corpse.GetLootName()}], not in range. Dist: {dist}");
+                    if (_log.DebugEnabled)
+                    {
+                        _log.LogDebug($"Re-queuing corpse [{corpse.GetLootName()}], not in range. Dist: {dist}");
+                    }
+                    _priorityCorpses.Enqueue(player);
                 }
-                _priorityCorpses.Enqueue(player);
                 continue;
             }
 
