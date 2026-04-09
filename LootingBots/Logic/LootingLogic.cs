@@ -17,10 +17,10 @@ internal class LootingLogic : CustomLogic
     private int _stuckCount;
     private int _navigationAttempts;
 
-    // Run looting logic only when the bot is not looting and when the bot has an active item to loot
+    // Run looting logic only when the bot is not looting
     private bool ShouldUpdate
     {
-        get { return !_lootingBrain.LootTaskRunning && _lootingBrain.HasActiveLootable && BotOwner.BotState == EBotState.Active; }
+        get { return !_lootingBrain.LootTaskRunning && BotOwner.BotState == EBotState.Active; }
     }
 
     public LootingLogic(BotOwner botOwner) : base(botOwner)
