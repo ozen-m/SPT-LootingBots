@@ -180,15 +180,15 @@ public class LootingBrain : MonoBehaviour
                 _isDisabledForPerformance = false;
             }
             // For an enabled bot to become disabled they must meet the following criteria:
-            // 1. Bot is not currently trying to loot something
+            // 1. The bot has not been manually flagged for looting
             // 2. BotCache is over capacity or the bot is no longer close enough to the player
-            else if (
-                !HasActiveLootable
-                && !ForceBrainEnabled
-                && ActiveBotCache.Has(BotOwner)
-                && (ActiveBotCache.IsOverCapacity || !closeEnoughToPlayer)
-            )
+            else if (!ForceBrainEnabled && ActiveBotCache.Has(BotOwner) && (ActiveBotCache.IsOverCapacity || !closeEnoughToPlayer))
             {
+                if (IsBotLooting)
+                {
+                    StopLooting();
+                }
+
                 ActiveBotCache.Remove(BotOwner);
                 _isDisabledForPerformance = true;
 
@@ -220,8 +220,6 @@ public class LootingBrain : MonoBehaviour
     /// </summary>
     public void StartLooting()
     {
-        StopLooting();
-
         LootTaskRunning = true;
         _lootingCts = new CancellationTokenSource(LootingBots.LootTimeout.Value * 1000);
 
@@ -244,10 +242,14 @@ public class LootingBrain : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Stops the loot task if running and cleans up loot from the cache
+    /// </summary>
     public void StopLooting()
     {
         if (_lootingCts is null)
         {
+            CleanupLoot(false);
             return;
         }
 
