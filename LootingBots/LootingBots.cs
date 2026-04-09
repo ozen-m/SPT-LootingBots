@@ -235,7 +235,7 @@ public class LootingBots : BaseUnityPlugin
         LootScanInterval = Config.Bind(
             "Loot Finder (Timing)",
             "Loot scan interval",
-            15f,
+            5f,
             new ConfigDescription(
                 "The amount of seconds the bot will wait until triggering another loot scan",
                 null,
