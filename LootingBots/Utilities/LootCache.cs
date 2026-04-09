@@ -10,13 +10,13 @@ namespace LootingBots.Utilities;
 public static class ActiveLootCache
 {
     // Handle to the players instance for use in friendly checks
-    public static List<IPlayer> ActivePlayers { get; } = [];
+    private static readonly List<IPlayer> _activePlayers = [];
 
     private static readonly Dictionary<string, BotOwner> _activeLoot = [];
 
     public static void Init()
     {
-        if (ActivePlayers.Count > 0)
+        if (_activePlayers.Count > 0)
         {
             return;
         }
@@ -33,14 +33,14 @@ public static class ActiveLootCache
                 continue;
             }
 
-            ActivePlayers.Add(player);
+            _activePlayers.Add(player);
         }
     }
 
     public static void Reset()
     {
         _activeLoot.Clear();
-        ActivePlayers.Clear();
+        _activePlayers.Clear();
     }
 
     public static bool CacheActiveLootId(string lootId, BotOwner botOwner)
@@ -69,5 +69,34 @@ public static class ActiveLootCache
         {
             LootingBots.LootLog.LogWarning($"Could not find loot id to remove from ActiveLootCache: {lootId}");
         }
+    }
+
+    public static IPlayer GetClosestPlayer(BotOwner botOwner, out float closestDistance)
+    {
+        closestDistance = float.MaxValue;
+
+        if (_activePlayers.Count == 0)
+        {
+            return null;
+        }
+
+        IPlayer closestPlayer = null;
+        foreach (var player in _activePlayers)
+        {
+            if (!player.HealthController.IsAlive)
+            {
+                continue;
+            }
+
+            var distance = (botOwner.Position - player.Position).sqrMagnitude;
+
+            if (distance < closestDistance)
+            {
+                closestDistance = distance;
+                closestPlayer = player;
+            }
+        }
+
+        return closestPlayer;
     }
 }

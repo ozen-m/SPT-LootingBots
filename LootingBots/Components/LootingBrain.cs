@@ -94,14 +94,9 @@ public class LootingBrain : MonoBehaviour
     {
         get
         {
-            var closestPlayer = ActiveLootCache.ActivePlayers.GetClosestPlayer(BotOwner);
+            ActiveLootCache.GetClosestPlayer(BotOwner, out var distance);
 
-            if (closestPlayer == null)
-            {
-                return float.MaxValue;
-            }
-
-            return (BotOwner.Position - closestPlayer.Position).sqrMagnitude;
+            return distance;
         }
     }
 
@@ -417,7 +412,7 @@ public class LootingBrain : MonoBehaviour
     /// <summary>
     /// Check to see if the object being looted has been ignored due to bad navigation, or looted already.
     ///
-    /// (1.6.4) No longer checks if its in use by another bot, since it can conflict with prioritized loot.
+    /// (1.7.x) No longer checks if its in use by another bot, since it can conflict with prioritized loot.
     /// </summary>
     public bool IsLootIgnored(string lootId)
     {
