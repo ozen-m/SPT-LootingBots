@@ -83,7 +83,7 @@ public class LootingBrain : MonoBehaviour
     // Max distance from the player a bot can be before their looting brain is disabled
     private double DistanceLimit
     {
-        get { return Math.Pow(LootingBots.LimitDistanceFromPlayer.Value, 2); }
+        get { return LootingBots.LimitDistanceFromPlayer.Value * LootingBots.LimitDistanceFromPlayer.Value; }
     }
 
     // Current distance to the player
@@ -475,7 +475,7 @@ public class LootingBrain : MonoBehaviour
         ActiveLootType = lootType;
         LootObjectPosition = position;
         Destination = destination;
-        DistanceToLoot = dist;
+        DistanceToLoot = dist != float.MaxValue ? dist * dist : dist;
     }
 
     private void ExceptionHandler(Task task)

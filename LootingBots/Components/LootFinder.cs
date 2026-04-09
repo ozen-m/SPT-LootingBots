@@ -655,8 +655,7 @@ public static class PathExtensions
         for (var i = 1; i < corners.Length; i++)
         {
             var currentCorner = corners[i];
-            var vector3 = prevCorner - currentCorner;
-            length += Mathf.Sqrt(vector3.x * vector3.x + vector3.y * vector3.y + vector3.z * vector3.z);
+            length += Vector3.Distance(prevCorner, currentCorner);
 
             // Reached max range
             if (length > range)
