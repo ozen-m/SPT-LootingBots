@@ -20,7 +20,7 @@ public class RemoveLootingBrainPatch : ModulePatch
         {
             UnityEngine.Object.Destroy(lootingBrain);
         }
-        else
+        else if (BotHasLootingLayer(botOwner))
         {
             LootingBots.LootLog.LogError($"Could not destroy LootingBrain for {botOwner.name}");
         }
@@ -29,17 +29,30 @@ public class RemoveLootingBrainPatch : ModulePatch
         {
             UnityEngine.Object.Destroy(lootFinder);
         }
-        else
+        else if (BotHasLootingLayer(botOwner))
         {
             LootingBots.LootLog.LogError($"Could not destroy LootFinder for {botOwner.name}");
         }
 
         if (LootingBots.LootLog.DebugEnabled)
         {
-            LootingBots.LootLog.LogDebug($"Cleanup on ActiveLootCache for {botOwner.name}");
+            LootingBots.LootLog.LogDebug($"Cleanup on LB components for {botOwner.name}");
         }
 
         ActiveLootCache.Cleanup(botOwner);
         ActiveBotCache.Remove(botOwner);
+    }
+
+    private static bool BotHasLootingLayer(BotOwner botOwner)
+    {
+        foreach (var (_, layer) in botOwner.Brain.BaseBrain.Dictionary_0)
+        {
+            if (layer.Name() == "Looting")
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
