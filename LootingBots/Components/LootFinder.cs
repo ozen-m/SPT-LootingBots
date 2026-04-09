@@ -378,7 +378,7 @@ public class LootFinder : MonoBehaviour
                     continue;
                 }
 
-                _lootingBrain.SetLoot(interactableObject, lootType, interactableObject.transform.position, destination, dist);
+                _lootingBrain.SetLoot(interactableObject, lootType, interactableObject.transform.position, destination, rootItemId, dist);
                 _emptyAttempts = 0;
                 break;
             }
@@ -425,7 +425,8 @@ public class LootFinder : MonoBehaviour
             }
 
             // Cache the loot and set active target
-            if (!ActiveLootCache.CacheActiveLootId(lootableContainer.GetRootItemId(), _botOwner))
+            var rootItemId = lootableContainer.GetRootItemId();
+            if (!ActiveLootCache.CacheActiveLootId(rootItemId, _botOwner))
             {
                 if (_log.ErrorEnabled)
                 {
@@ -434,7 +435,7 @@ public class LootFinder : MonoBehaviour
                 continue;
             }
 
-            _lootingBrain.SetLoot(lootableContainer, LootType.Container, position, destination, dist);
+            _lootingBrain.SetLoot(lootableContainer, LootType.Container, position, destination, rootItemId, dist);
 
             if (_log.DebugEnabled)
             {
@@ -510,7 +511,7 @@ public class LootFinder : MonoBehaviour
                 continue;
             }
 
-            _lootingBrain.SetLoot(corpse, LootType.Corpse, position, destination, dist);
+            _lootingBrain.SetLoot(corpse, LootType.Corpse, position, destination, rootItemId, dist);
 
             if (_log.DebugEnabled)
             {

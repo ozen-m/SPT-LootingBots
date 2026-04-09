@@ -26,6 +26,9 @@ public class LootingBrain : MonoBehaviour
     // Collider.transform.position for the active lootable. Used in LOS checks to make sure bots dont loot through walls
     public Vector3 LootObjectPosition;
 
+    // ActiveLoot's id for clean up
+    public string CachedActiveLootId;
+
     // Object ids that the bot has looted or failed to reach even though a valid path exists
     public readonly HashSet<string> IgnoredLootIds = [];
 
@@ -446,21 +449,23 @@ public class LootingBrain : MonoBehaviour
     /// <param name="ignore">If true, adds the active loot to the bot's ignore list</param>
     public void CleanupLoot(bool ignore = true)
     {
-        var item = ActiveLoot.GetRootItem();
-        if (item != null)
+        if (ActiveLootType == LootFinder.LootType.None)
         {
-            if (ignore)
-            {
-                IgnoreLoot(item.Id);
-            }
-            else if (ActiveLoot is Corpse corpse && BotOwner.GetPlayer.TryGetComponent(out LootFinder lootFinder))
-            {
-                lootFinder.EnqueuePriorityCorpse(corpse.PlayerProfileID);
-            }
+            // Nothing to clean up
+            return;
+        }
+
+        if (ignore)
+        {
+            IgnoreLoot(CachedActiveLootId);
+        }
+        else if (ActiveLoot is Corpse corpse && BotOwner.GetPlayer != null && BotOwner.GetPlayer.TryGetComponent(out LootFinder lootFinder))
+        {
+            lootFinder.EnqueuePriorityCorpse(corpse.PlayerProfileID);
         }
 
         ActiveLootCache.Cleanup(BotOwner);
-        SetLoot(null, LootFinder.LootType.None, Vector3.zero, Vector3.zero);
+        SetLoot(null, LootFinder.LootType.None, Vector3.zero, Vector3.zero, string.Empty);
     }
 
     public void SetLoot(
@@ -468,6 +473,7 @@ public class LootingBrain : MonoBehaviour
         LootFinder.LootType lootType,
         Vector3 position,
         Vector3 destination,
+        string lootId,
         float dist = float.MaxValue
     )
     {
@@ -475,6 +481,7 @@ public class LootingBrain : MonoBehaviour
         ActiveLootType = lootType;
         LootObjectPosition = position;
         Destination = destination;
+        CachedActiveLootId = lootId;
         DistanceToLoot = dist != float.MaxValue ? dist * dist : dist;
     }
 
