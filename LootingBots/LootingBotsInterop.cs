@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+﻿using System;
+using System.Reflection;
 using BepInEx.Bootstrap;
 using EFT;
 using EFT.Interactive;
@@ -8,8 +9,8 @@ namespace LootingBots;
 
 internal static class LootingBotsInterop
 {
-    private static bool _LootingBotsLoadedChecked = false;
-    private static bool _LootingBotsInteropInited = false;
+    private static bool _LootingBotsLoadedChecked;
+    private static bool _LootingBotsInteropInited;
 
     private static bool _IsLootingBotsLoaded;
     private static Type _LootingBotsExternalType;
@@ -25,7 +26,7 @@ internal static class LootingBotsInterop
     /// <returns>True if Looting Bots is loaded in the client</returns>
     public static bool IsLootingBotsLoaded()
     {
-        // Only check for SAIN once
+        // Only check for LB once
         if (!_LootingBotsLoadedChecked)
         {
             _LootingBotsLoadedChecked = true;
@@ -69,8 +70,9 @@ internal static class LootingBotsInterop
     }
 
     /// <summary>
-    /// Force a bot to search for loot immediately if Looting Bots is loaded. Return true if successful.
+    /// Forces a bot to scan for loot as soon as they are able to.
     /// </summary>
+    /// <returns>True if successful</returns>
     public static bool TryForceBotToScanLoot(BotOwner botOwner)
     {
         if (!Init())
@@ -82,11 +84,11 @@ internal static class LootingBotsInterop
             return false;
         }
 
-        return (bool)_ForceBotToScanLootMethod.Invoke(null, new object[] { botOwner });
+        return (bool)_ForceBotToScanLootMethod.Invoke(null, [botOwner]);
     }
 
     /// <summary>
-    /// Stops a bot from looting if it is currently looting something and prevent loot scans if Looting Bots is loaded.
+    /// Stops a bot from looting if it is currently looting and prevent loot scans, if Looting Bots is loaded.
     /// </summary>
     /// <param name="duration">The duration, in seconds, to prevent a bot from looting</param>
     /// <returns>True if successful</returns>
@@ -101,7 +103,7 @@ internal static class LootingBotsInterop
             return false;
         }
 
-        return (bool)_PreventBotFromLootingMethod.Invoke(null, new object[] { botOwner, duration });
+        return (bool)_PreventBotFromLootingMethod.Invoke(null, [botOwner, duration]);
     }
 
     /// <summary>
@@ -118,7 +120,7 @@ internal static class LootingBotsInterop
             return false;
         }
 
-        return (bool)_CheckIfInventoryFullMethod.Invoke(null, new object[] { botOwner });
+        return (bool)_CheckIfInventoryFullMethod.Invoke(null, [botOwner]);
     }
 
     /// <summary>
@@ -135,7 +137,7 @@ internal static class LootingBotsInterop
             return 0f;
         }
 
-        return (float)_GetNetLootValueMethod.Invoke(null, new object[] { botOwner });
+        return (float)_GetNetLootValueMethod.Invoke(null, [botOwner]);
     }
 
     /// <summary>
@@ -153,6 +155,6 @@ internal static class LootingBotsInterop
             return 0f;
         }
 
-        return (float)_GetItemPriceMethod.Invoke(null, new object[] { item });
+        return (float)_GetItemPriceMethod.Invoke(null, [item]);
     }
 }

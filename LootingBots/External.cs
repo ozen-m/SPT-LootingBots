@@ -38,7 +38,7 @@ public static class External
     }
 
     /// <summary>
-    /// Stops a bot from looting if it is currently looting something and prevent loot scans.
+    /// Stops a bot from looting if it is currently looting and prevent loot scans.
     /// </summary>
     /// <param name="duration">The duration, in seconds, to prevent a bot from looting</param>
     public static bool PreventBotFromLooting(BotOwner bot, float duration)

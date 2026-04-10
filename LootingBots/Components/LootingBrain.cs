@@ -395,7 +395,6 @@ public class LootingBrain : MonoBehaviour
 
         // Need to manually cleanup item because the ItemOwner on the original object changes.
         // Only ignore and clear if looting was successful.
-        // TODO: Failed loot attempts? Only fails if interrupted by another bot (i.e. combat)
         CleanupLoot(lootingSuccessful);
 
         InventoryController.UpdateActiveWeapon();
