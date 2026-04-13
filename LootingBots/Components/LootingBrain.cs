@@ -125,7 +125,7 @@ public class LootingBrain : MonoBehaviour
     /// </summary>
     public void Start()
     {
-        IsPlayerScav = BotOwner.Profile.WillBeAPlayerScav();
+        IsPlayerScav = BotOwner.WillBeAPlayerScav();
         _performanceTimer = Time.time + PeformanceTimerInterval;
         ActiveLootCache.Init();
         ScanScheduler.Init();
@@ -216,6 +216,7 @@ public class LootingBrain : MonoBehaviour
     public void StartLooting()
     {
         LootTaskRunning = true;
+        _lootTimer.Restart();
         _lootingCts = new CancellationTokenSource(LootingBots.LootTimeout.Value * 1000);
 
         if (_log.InfoEnabled)
@@ -269,14 +270,12 @@ public class LootingBrain : MonoBehaviour
         var isSuccessful = false;
         try
         {
-            _lootTimer.Restart();
-
             // Initialize corpse inventory equipment
             if (ActiveLoot.GetRootItem() is not InventoryEquipment corpseInventoryEquipment)
             {
-                if (_log.DebugEnabled)
+                if (_log.WarningEnabled)
                 {
-                    _log.LogDebug($"ActiveLoot.Item for Corpse [{ActiveLoot.GetLootName()}] was not InventoryEquipment!");
+                    _log.LogWarning($"ActiveLoot.Item for Corpse [{ActiveLoot.GetLootName()}] was not InventoryEquipment!");
                 }
                 return;
             }
@@ -310,8 +309,6 @@ public class LootingBrain : MonoBehaviour
         var isSuccessful = false;
         try
         {
-            _lootTimer.Restart();
-
             if (ActiveLoot is not LootableContainer container || container.ItemOwner?.RootItem is not { } item)
             {
                 if (_log.WarningEnabled)
@@ -360,8 +357,6 @@ public class LootingBrain : MonoBehaviour
         var isSuccessful = false;
         try
         {
-            _lootTimer.Restart();
-
             var item = ActiveLoot.GetRootItem();
             if (item == null)
             {
@@ -393,8 +388,7 @@ public class LootingBrain : MonoBehaviour
     {
         _lootTimer.Stop();
 
-        // Need to manually cleanup item because the ItemOwner on the original object changes.
-        // Only ignore and clear if looting was successful.
+        // Only ignore if looting was successful.
         CleanupLoot(lootingSuccessful);
 
         InventoryController.UpdateActiveWeapon();

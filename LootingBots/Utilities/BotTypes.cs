@@ -166,15 +166,16 @@ public static class BotTypeUtils
     /// <summary>
     /// Determines if the bot with the given profile will be a player Scav
     /// </summary>
-    public static bool WillBeAPlayerScav(this Profile profile)
+    public static bool WillBeAPlayerScav(this IPlayer iPlayer)
     {
         // Handle the old version of creating player Scavs
-        if (profile.Info.Nickname.Contains(" ("))
+        var profileInfo = iPlayer.Profile.Info;
+        if (profileInfo.Nickname.Contains(" ("))
         {
             return true;
         }
 
         // Check for player Scavs created by SPT
-        return profile.Info.Settings.Role == WildSpawnType.assault && !string.IsNullOrEmpty(profile.Info.MainProfileNickname);
+        return profileInfo.Settings.Role == WildSpawnType.assault && !string.IsNullOrEmpty(profileInfo.MainProfileNickname);
     }
 }
