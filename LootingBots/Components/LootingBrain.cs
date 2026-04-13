@@ -284,12 +284,16 @@ public class LootingBrain : MonoBehaviour
             _itemsToLoot.Clear();
             corpseInventoryEquipment.GetPriorityItems(BotOwner.InventoryController.Inventory.Equipment, _itemsToLoot);
 
+            // Do inventory opened animation
+            BotOwner.GetPlayer.SetInventoryOpened(true);
+
             await LootingTransactionController.SimulatePlayerDelayAsync(LootingStartDelay, token);
 
             isSuccessful = await InventoryController.TryAddItemsToBotAsync(_itemsToLoot, token);
         }
         finally
         {
+            BotOwner.GetPlayer.SetInventoryOpened(false);
             OnLootTaskEnd(isSuccessful);
 
             if (_log.InfoEnabled)
@@ -326,6 +330,9 @@ public class LootingBrain : MonoBehaviour
                 didOpen = true;
             }
 
+            // Do inventory opened animation
+            BotOwner.GetPlayer.SetInventoryOpened(true);
+
             await LootingTransactionController.SimulatePlayerDelayAsync(LootingStartDelay, token);
 
             isSuccessful = await InventoryController.LootNestedItemsAsync(item, token);
@@ -338,6 +345,7 @@ public class LootingBrain : MonoBehaviour
         }
         finally
         {
+            BotOwner.GetPlayer.SetInventoryOpened(false);
             OnLootTaskEnd(isSuccessful);
 
             if (_log.InfoEnabled)
@@ -367,12 +375,22 @@ public class LootingBrain : MonoBehaviour
                 return;
             }
 
+            // Set IsInPatrol to true, this tricks SAIN to not set patrol.
+            // This lets us play the pick-up animation.
+            BotOwner.GetPlayer.MovementContext.IsInPatrol = true;
+
             _itemsToLoot.Clear();
             _itemsToLoot.Add(item);
             isSuccessful = await InventoryController.TryAddItemsToBotAsync(_itemsToLoot, token);
+            if (isSuccessful)
+            {
+                // Do pick up animation if we successfully looted the item
+                BotOwner.GetPlayer.CurrentManagedState.Pickup(true, ExitPickupState);
+            }
         }
         finally
         {
+            BotOwner.GetPlayer.MovementContext.IsInPatrol = false;
             OnLootTaskEnd(isSuccessful);
 
             if (_log.InfoEnabled)
@@ -473,6 +491,16 @@ public class LootingBrain : MonoBehaviour
         Destination = destination;
         CachedActiveLootId = lootId;
         DistanceToLoot = dist != float.MaxValue ? dist * dist : dist;
+    }
+
+    private void ExitPickupState()
+    {
+        var player = BotOwner.GetPlayer;
+        player.UpdateInteractionCast();
+        if (player.CurrentState is PickupStateClass pickupState)
+        {
+            pickupState.Pickup(false, null);
+        }
     }
 
     private void ExceptionHandler(Task task)
