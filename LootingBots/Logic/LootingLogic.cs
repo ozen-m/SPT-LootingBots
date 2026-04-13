@@ -16,6 +16,7 @@ internal class LootingLogic : CustomLogic
     private float _stuckTimer;
     private int _stuckCount;
     private int _navigationAttempts;
+    private bool _isInteractingWithDoor;
 
     // Run looting logic only when the bot is not looting
     private bool ShouldUpdate
@@ -58,6 +59,8 @@ internal class LootingLogic : CustomLogic
             _lootingBrain.CleanupLoot(false);
             return;
         }
+
+        _isInteractingWithDoor = BotOwner.DoorOpener.Interacting || BotOwner.Mover.CurrentState == EBotMoverState.NearDoor;
 
         // Kick off looting logic
         TryLoot();
@@ -107,8 +110,8 @@ internal class LootingLogic : CustomLogic
         BotOwner.Steering.LookToMovingDirection();
 
         // If the bot is closer than 5m (sqr 25f) from the loot, they should slow down to prevent power-sliding, otherwise sprint
-        var canSprint = _lootingBrain.DistanceToLoot > 25f && BotOwner.Mover.CurrentState != EBotMoverState.NearDoor;
-        BotOwner.Mover.Sprint(canSprint);
+        var canSprint = _lootingBrain.DistanceToLoot > 25f && !_isInteractingWithDoor;
+        BotOwner.Sprint(canSprint);
     }
 
     /// <summary>
@@ -154,7 +157,7 @@ internal class LootingLogic : CustomLogic
         }
 
         // If the bot is interacting with a door, let it complete first
-        if (BotOwner.DoorOpener.Interacting)
+        if (_isInteractingWithDoor)
         {
             return true;
         }
@@ -230,7 +233,7 @@ internal class LootingLogic : CustomLogic
     private bool IsBotStuck(float sqrDist)
     {
         // If the bot is interacting with a door, do not consider as stuck
-        if (BotOwner.DoorOpener.Interacting)
+        if (_isInteractingWithDoor)
         {
             return false;
         }
