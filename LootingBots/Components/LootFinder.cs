@@ -65,6 +65,7 @@ public class LootFinder : MonoBehaviour
 
     public bool IsScanRunning { get; private set; }
     private CancellationTokenSource _lootFinderCts;
+    private Action<Task> _handleExceptionAction;
 
     private readonly Queue<LootableContainer> _priorityLootableContainers = [];
     private readonly Queue<Player> _priorityCorpses = [];
@@ -75,6 +76,7 @@ public class LootFinder : MonoBehaviour
         _botOwner = botOwner;
         _lootingBrain = _botOwner.GetPlayer.gameObject.GetComponent<LootingBrain>();
         _log = new BotLog(LootingBots.LootLog, _botOwner);
+        _handleExceptionAction = ExceptionHandler;
 
         _containerLootingEnabled = LootingBots.ContainerLootingEnabled.Value.IsBotEnabled(_lootingBrain);
         _needsContainerSight = LootingBots.DetectContainerNeedsSight.Value.IsBotEnabled(_lootingBrain);
@@ -111,7 +113,7 @@ public class LootFinder : MonoBehaviour
         _lootFinderCts = new CancellationTokenSource();
         if (!FindPrioritizedLoot(ticket))
         {
-            _ = FindLootAsync(ticket, _lootFinderCts.Token).ContinueWith(ExceptionHandler, TaskScheduler.Current);
+            _ = FindLootAsync(ticket, _lootFinderCts.Token).ContinueWith(_handleExceptionAction, TaskScheduler.Current);
         }
 
         SetLockUntilNextScan(false);

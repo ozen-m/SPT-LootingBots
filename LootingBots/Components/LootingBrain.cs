@@ -110,10 +110,15 @@ public class LootingBrain : MonoBehaviour
     private float _performanceTimer;
     private BotLog _log;
     private CancellationTokenSource _lootingCts;
+    private Action<Task> _handleExceptionAction;
+    private Action _exitPickupStateAction;
 
     public void Init(BotOwner botOwner)
     {
         _log = new BotLog(LootingBots.LootLog, botOwner);
+        _handleExceptionAction = ExceptionHandler;
+        _exitPickupStateAction = ExitPickupState;
+
         BotOwner = botOwner;
         InventoryController = new LootingInventoryController(BotOwner, this);
     }
@@ -227,13 +232,13 @@ public class LootingBrain : MonoBehaviour
         switch (ActiveLootType)
         {
             case LootFinder.LootType.Corpse:
-                _ = LootCorpseAsync(_lootingCts.Token).ContinueWith(ExceptionHandler, TaskScheduler.Current);
+                _ = LootCorpseAsync(_lootingCts.Token).ContinueWith(_handleExceptionAction, TaskScheduler.Current);
                 break;
             case LootFinder.LootType.Container:
-                _ = LootContainerAsync(_lootingCts.Token).ContinueWith(ExceptionHandler, TaskScheduler.Current);
+                _ = LootContainerAsync(_lootingCts.Token).ContinueWith(_handleExceptionAction, TaskScheduler.Current);
                 break;
             case LootFinder.LootType.Item:
-                _ = LootItemAsync(_lootingCts.Token).ContinueWith(ExceptionHandler, TaskScheduler.Current);
+                _ = LootItemAsync(_lootingCts.Token).ContinueWith(_handleExceptionAction, TaskScheduler.Current);
                 break;
         }
     }
@@ -385,7 +390,7 @@ public class LootingBrain : MonoBehaviour
             if (isSuccessful)
             {
                 // Do pick up animation if we successfully looted the item
-                BotOwner.GetPlayer.CurrentManagedState.Pickup(true, ExitPickupState);
+                BotOwner.GetPlayer.CurrentManagedState.Pickup(true, _exitPickupStateAction);
             }
         }
         finally

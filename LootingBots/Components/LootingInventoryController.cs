@@ -85,6 +85,8 @@ public class LootingInventoryController
     private readonly InventoryController _botInventoryController;
     private readonly LootingBrain _lootingBrain;
     private readonly ItemAppraiser _itemAppraiser;
+    private readonly Action _updateActiveWeaponAction;
+    private readonly Callback<IHandsController> _onWeaponTakenCallback;
 
     public readonly BotStats Stats = new();
 
@@ -142,6 +144,8 @@ public class LootingInventoryController
 
         _lootingBrain = lootingBrain;
         _itemAppraiser = LootingBots.ItemAppraiser;
+        _updateActiveWeaponAction = UpdateActiveWeapon;
+        _onWeaponTakenCallback = OnWeaponTaken;
 
         // Initialize bot inventory controller
         _botInventoryController = botOwner.GetPlayer.InventoryController;
@@ -513,7 +517,7 @@ public class LootingInventoryController
         }
         weaponSelector.UpdateWeaponsList();
         weaponSelector.IsWeaponReady = false;
-        weaponSelector.SetSlotItem(OnWeaponTaken, true);
+        weaponSelector.SetSlotItem(_onWeaponTakenCallback, true);
     }
 
     /// <summary>
@@ -1351,6 +1355,6 @@ public class LootingInventoryController
         {
             _botOwner.GetPlayer.HandsController.FastForwardCurrentState();
         }
-        _botOwner.AITaskManager.RegisterDelayedTask(_botOwner, 0.5f, UpdateActiveWeapon);
+        _botOwner.AITaskManager.RegisterDelayedTask(_botOwner, 0.5f, _updateActiveWeaponAction);
     }
 }
