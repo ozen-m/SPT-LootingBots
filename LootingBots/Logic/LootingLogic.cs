@@ -16,7 +16,6 @@ internal class LootingLogic : CustomLogic
     private float _stuckTimer;
     private int _stuckCount;
     private int _navigationAttempts;
-    private bool _isInteractingWithDoor;
 
     // Run looting logic only when the bot is not looting
     private bool ShouldUpdate
@@ -60,7 +59,11 @@ internal class LootingLogic : CustomLogic
             return;
         }
 
-        _isInteractingWithDoor = BotOwner.DoorOpener.Interacting || BotOwner.Mover.CurrentState == EBotMoverState.NearDoor;
+        // If the bot is interacting with a door, let it complete first
+        if (BotOwner.DoorOpener.Interacting || BotOwner.Mover.CurrentState == EBotMoverState.NearDoor)
+        {
+            return;
+        }
 
         // Kick off looting logic
         TryLoot();
@@ -115,7 +118,7 @@ internal class LootingLogic : CustomLogic
         BotOwner.Steering.LookToMovingDirection();
 
         // If the bot is closer than 5m (sqr 25f) from the loot, they should slow down to prevent power-sliding, otherwise sprint
-        var canSprint = _lootingBrain.DistanceToLoot > 25f && !_isInteractingWithDoor;
+        var canSprint = _lootingBrain.DistanceToLoot > 25f;
         BotOwner.Sprint(canSprint);
     }
 
@@ -159,12 +162,6 @@ internal class LootingLogic : CustomLogic
             }
 
             return false;
-        }
-
-        // If the bot is interacting with a door, let it complete first
-        if (_isInteractingWithDoor)
-        {
-            return true;
         }
 
         // Instruct the bot to move to the destination: on first attempt, or if the bot has no path
@@ -237,18 +234,12 @@ internal class LootingLogic : CustomLogic
     /// <param name="sqrDist">Current squared distance</param>
     private bool IsBotStuck(float sqrDist)
     {
-        // If the bot is interacting with a door, do not consider as stuck
-        if (_isInteractingWithDoor)
-        {
-            return false;
-        }
-
         // Calculate change in distance and assume any change more than 0f means the bot has moved.
         var changeInDistSqr = Mathf.Abs(_lootingBrain.DistanceToLoot - sqrDist);
         var isStuck = changeInDistSqr < float.Epsilon;
 
         // Only increment stuck count every 2 seconds
-        if (_stuckTimer < Time.time && isStuck)
+        if (isStuck && _stuckTimer < Time.time)
         {
             // Bot is stuck, update stuck count
             _stuckTimer = Time.time + 2f;
