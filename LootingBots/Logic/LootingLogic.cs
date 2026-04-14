@@ -72,6 +72,7 @@ internal class LootingLogic : CustomLogic
     public override void Start()
     {
         _destination = _lootingBrain.Destination;
+        _stuckTimer = Time.time + 2f;
     }
 
     public override void Stop()
@@ -212,8 +213,8 @@ internal class LootingLogic : CustomLogic
         // Within a radius of 0.92 (sqr 0.85), and ±0.5 vertically
         var isCloseEnough = sqrDistance < 0.85f && Math.Abs(y) < 0.5f;
 
-        // Check to see if the bot is stuck
-        if (!IsBotStuck(sqrDistance))
+        // Check to see if the bot is stuck every 2 seconds.
+        if (_stuckTimer < Time.time && !IsBotStuck(sqrDistance))
         {
             // Bot has moved, reset stuckCount and update cached distance to container
             _stuckCount = 0;
@@ -229,26 +230,25 @@ internal class LootingLogic : CustomLogic
     }
 
     /// <summary>
-    /// Checks if the bot is stuck moving and increments the stuck counter.
+    /// Checks, every 2 seconds, if the bot is stuck moving and increments the stuck counter.
     /// </summary>
     /// <param name="sqrDist">Current squared distance</param>
     private bool IsBotStuck(float sqrDist)
     {
-        // Calculate change in distance and assume any change more than 0f means the bot has moved.
-        var changeInDistSqr = Mathf.Abs(_lootingBrain.DistanceToLoot - sqrDist);
-        var isStuck = changeInDistSqr < float.Epsilon;
+        _stuckTimer = Time.time + 2f;
 
-        // Only increment stuck count every 2 seconds
-        if (isStuck && _stuckTimer < Time.time)
+        // Calculate change in sqr distance and assume any change less than 0.5f means the bot hasn't moved.
+        var changeInDistSqr = Mathf.Abs(_lootingBrain.DistanceToLoot - sqrDist);
+        var isStuck = changeInDistSqr < 0.5f;
+        if (isStuck)
         {
             // Bot is stuck, update stuck count
-            _stuckTimer = Time.time + 2f;
             _stuckCount++;
 
             if (_log.DebugEnabled)
             {
                 _log.LogDebug(
-                    $"[Stuck: {_stuckCount}] Distance moved since check: {Mathf.Sqrt(changeInDistSqr)}. Dist from loot: {Mathf.Sqrt(sqrDist)}"
+                    $"[Stuck: {_stuckCount}] Distance moved since check: {changeInDistSqr}. Dist from loot: {Mathf.Sqrt(sqrDist)}"
                 );
             }
         }
