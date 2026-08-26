@@ -3,6 +3,7 @@ using BepInEx.Configuration;
 using Comfort.Common;
 using DrakiaXYZ.BigBrain.Brains;
 using EFT;
+using EFT.HandBook;
 using LootingBots.Components;
 using LootingBots.Utilities;
 using SPT.Reflection.Patching;
@@ -10,14 +11,14 @@ using SPT.Reflection.Patching;
 namespace LootingBots;
 
 [BepInPlugin(MOD_GUID, MOD_NAME, MOD_VERSION)]
-[BepInDependency("xyz.drakia.bigbrain", "1.4.0")]
+[BepInDependency("xyz.drakia.bigbrain", "1.5.0")]
 public class LootingBots : BaseUnityPlugin
 {
     private PatchManager _patchManager;
 
     private const string MOD_GUID = "me.skwizzy.lootingbots";
     private const string MOD_NAME = "LootingBots";
-    private const string MOD_VERSION = "1.7.1";
+    private const string MOD_VERSION = "1.8.0";
 
     public const BotType SettingsDefaults = BotType.Scav | BotType.Pmc | BotType.PlayerScav | BotType.Raider;
 
@@ -514,7 +515,7 @@ public class LootingBots : BaseUnityPlugin
         }
 
 #pragma warning disable CS0618 // Type or member is obsolete
-        if (GClass2340.InRaid)
+        if (InGameStatus.InRaid)
 #pragma warning restore CS0618 // Type or member is obsolete
         {
             return;
@@ -536,7 +537,7 @@ public class LootingBots : BaseUnityPlugin
             }
         }
 
-        if (Singleton<HandbookClass>.Instance == null || Singleton<ClientApplication<ISession>>.Instance == null)
+        if (Singleton<Handbook>.Instance == null || Singleton<ClientApplication<IEftSession>>.Instance == null)
         {
             return;
         }

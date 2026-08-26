@@ -3,6 +3,7 @@ using EFT.Interactive;
 using EFT.InventoryLogic;
 using HarmonyLib;
 using UnityEngine;
+using Grid = EFT.InventoryLogic.Grid;
 
 namespace LootingBots.Utilities;
 
@@ -42,7 +43,7 @@ public static class LootUtils
     /// <summary>
     /// Calculate the size of a container
     /// </summary>
-    public static int GetContainerSize(this SearchableItemItemClass container)
+    public static int GetContainerSize(this SearchableItem container)
     {
         var grids = container.Grids;
         var gridSize = 0;
@@ -91,17 +92,17 @@ public static class LootUtils
         if (worldInteractiveObject is Door)
         {
             // NOTE: This method MUST be used for Fika compatibility
-            botOwner.GetPlayer.vmethod_0(worldInteractiveObject, interactionResult, null);
+            botOwner.GetPlayer.StartInteraction(worldInteractiveObject, interactionResult, null);
         }
 
         // NOTE: This method MUST be used for Fika compatibility
-        botOwner.GetPlayer.vmethod_1(worldInteractiveObject, interactionResult);
+        botOwner.GetPlayer.ExecuteInteraction(worldInteractiveObject, interactionResult);
     }
 
     /// <summary>
     /// Calculates the amount of empty grid slots in the container
     /// </summary>
-    public static int GetAvailableGridSlots(StashGridClass[] grids)
+    public static int GetAvailableGridSlots(Grid[] grids)
     {
         if (grids is null)
         {
@@ -127,7 +128,7 @@ public static class LootUtils
     /// </summary>
     /// <param name="grid">The grid to calculate the amount of space taken up for</param>
     /// <returns>Returns the item size as an integer</returns>
-    public static int GetSizeOfContainedItems(this StashGridClass grid)
+    public static int GetSizeOfContainedItems(this Grid grid)
     {
         var containedItemSize = 0;
 
@@ -245,7 +246,7 @@ public static class LootUtils
                 unlootableComponent != null
                 && equipmentOwner != botOwner
                 && unlootableComponent.IsUnlootableFrom(item.Parent.Container)
-                && item is not PocketsItemClass // Include pockets to loot list
+                && item is not Pockets // Include pockets to loot list. TODO: Verify
             )
             {
                 continue;
@@ -317,7 +318,7 @@ public static class LootUtils
                 conflictingSlots.TryGetValue(slotNames[i], out var conflictingSlot)
                 && conflictingSlot != slot // Exclude checking the same slot
                 && conflictingSlot.ContainedItem is { } conflictItem
-                && conflictItem is not ArmorItemClass and not VestItemClass // Exclude chest/rig armor
+                && conflictItem is not Armor and not Vest // Exclude chest/rig armor
             )
             {
                 conflictingItem = conflictItem;

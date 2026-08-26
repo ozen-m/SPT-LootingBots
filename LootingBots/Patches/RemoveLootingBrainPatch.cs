@@ -44,7 +44,7 @@ public class RemoveLootingBrainPatch : ModulePatch
 
     private static bool BotHasLootingLayer(BotOwner botOwner)
     {
-        foreach (var (_, layer) in botOwner.Brain.BaseBrain.Dictionary_0)
+        foreach (var (_, layer) in botOwner.Brain.BaseBrain._layers)
         {
             if (layer.Name() == "Looting")
             {

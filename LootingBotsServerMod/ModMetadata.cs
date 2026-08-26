@@ -4,17 +4,18 @@ using Version = SemanticVersioning.Version;
 
 namespace LootingBotsServerMod;
 
-public record ModMetadata : AbstractModMetadata
+public record ModMetadata : IModMetadata
 {
-    public override string ModGuid { get; init; } = "me.skwizzy.lootingbots_servermod";
-    public override string Name { get; init; } = "LootingBots-ServerMod";
-    public override string Author { get; init; } = "Skwizzy";
-    public override List<string>? Contributors { get; init; }
-    public override Version Version { get; init; } = new("1.7.1");
-    public override Range SptVersion { get; init; } = new("~4.0.0");
-    public override List<string>? Incompatibilities { get; init; }
-    public override Dictionary<string, Range>? ModDependencies { get; init; }
-    public override string? Url { get; init; }
-    public override bool? IsBundleMod { get; init; }
-    public override string License { get; init; } = "MIT";
+    public string ModGuid { get; init; } = "me.skwizzy.lootingbots";
+    public string Name { get; init; } = "LootingBots";
+    public string Author { get; init; } = "Skwizzy";
+    public List<string>? Contributors { get; init; }
+    public Version Version { get; init; } = new("1.8.0");
+    public Range SptVersion { get; init; } = new("~4.1.3");
+    public bool HasPrepatcher { get; init; } = false;
+    public List<string>? Incompatibilities { get; init; }
+    public Dictionary<string, Range>? ModDependencies { get; init; }
+    public string? Url { get; init; } = "https://github.com/Skwizzy/SPT-LootingBots";
+    public bool? IsBundleMod { get; init; } = false;
+    public string License { get; init; } = "MIT";
 }

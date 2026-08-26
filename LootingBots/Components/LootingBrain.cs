@@ -380,9 +380,9 @@ public class LootingBrain : MonoBehaviour
                 return;
             }
 
-            // Set IsInPatrol to true, this tricks SAIN to not set patrol.
+            // Set _isInPatrol to true, this tricks SAIN to not set patrol.
             // This lets us play the pick-up animation.
-            BotOwner.GetPlayer.MovementContext.IsInPatrol = true;
+            BotOwner.GetPlayer.MovementContext._isInPatrol = true;
 
             _itemsToLoot.Clear();
             _itemsToLoot.Add(item);
@@ -395,7 +395,7 @@ public class LootingBrain : MonoBehaviour
         }
         finally
         {
-            BotOwner.GetPlayer.MovementContext.IsInPatrol = false;
+            BotOwner.GetPlayer.MovementContext._isInPatrol = false;
             OnLootTaskEnd(isSuccessful);
 
             if (_log.InfoEnabled)
@@ -502,7 +502,7 @@ public class LootingBrain : MonoBehaviour
     {
         var player = BotOwner.GetPlayer;
         player.UpdateInteractionCast();
-        if (player.CurrentState is PickupStateClass pickupState)
+        if (player.CurrentState is PickUpState pickupState)
         {
             pickupState.Pickup(false, null);
         }

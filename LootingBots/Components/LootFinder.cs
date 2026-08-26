@@ -1,6 +1,7 @@
 using System.Buffers;
 using Comfort.Common;
 using EFT;
+using EFT.Ballistics;
 using EFT.Interactive;
 using EFT.InventoryLogic;
 using LootingBots.Patches;
@@ -284,11 +285,8 @@ public class LootFinder : MonoBehaviour
                         rootItem is not null
                         && !rootItem.QuestItem // Item is not a quest item
                         && (
-                            rootItem is SearchableItemItemClass // If the item is something that can be searched, consider it lootable
-                            || (
-                                rootItem is ArmoredEquipmentItemClass armor
-                                && _lootingBrain.InventoryController.IsBetterArmorThanEquipped(armor)
-                            )
+                            rootItem is SearchableItem // If the item is something that can be searched, consider it lootable
+                            || (rootItem is ArmoredEquipment armor && _lootingBrain.InventoryController.IsBetterArmorThanEquipped(armor))
                             || (_lootingBrain.IsValuableEnough(rootItem) && availableGridSpaces > rootItem.GetItemSize())
                         )
                     )
@@ -572,7 +570,7 @@ public class LootFinder : MonoBehaviour
         var start = _botOwner.LookSensor.HeadPoint;
         var directionOfLoot = destination - start;
 
-        var sightBlocked = Physics.Raycast(start, directionOfLoot, directionOfLoot.magnitude, LayerMaskClass.HighPolyWithTerrainMask);
+        var sightBlocked = Physics.Raycast(start, directionOfLoot, directionOfLoot.magnitude, LayersMaskController.HighPolyWithTerrainMask);
 
         return !sightBlocked;
     }
@@ -615,7 +613,7 @@ public class LootFinder : MonoBehaviour
         _priorityLootableContainers.Enqueue(airdrop);
     }
 
-    private void OnKilledEnemyPlayer(string victimProfileId, DamageInfoStruct damageInfo)
+    private void OnKilledEnemyPlayer(string victimProfileId, DamageInfo damageInfo)
     {
         EnqueuePriorityCorpse(victimProfileId);
     }
@@ -645,7 +643,7 @@ public class LootFinder : MonoBehaviour
 public static class PathExtensions
 {
     /// <summary>
-    /// Based on <see cref="GClass371.CalculatePathLength(Vector3[] corners)"/>
+    /// Based on <see cref="NavMeshPathExtension.CalculatePathLength(Vector3[] corners)"/>
     /// </summary>
     public static bool CalculatePathLengthWithMaxRange(this Vector3[] corners, float range, out float length)
     {

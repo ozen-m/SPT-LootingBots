@@ -1,5 +1,6 @@
 ﻿using System.Reflection;
 using EFT;
+using EFT.Ballistics;
 using SPT.Reflection.Patching;
 
 namespace LootingBots.Patches;
@@ -18,7 +19,7 @@ public class InvokeOnKillPatch : ModulePatch
     protected static void Postfix(
         LocalPlayer __instance,
         IPlayer aggressor,
-        DamageInfoStruct damageInfo,
+        DamageInfo damageInfo,
         EBodyPart bodyPart,
         EDamageType lethalDamageType
     )

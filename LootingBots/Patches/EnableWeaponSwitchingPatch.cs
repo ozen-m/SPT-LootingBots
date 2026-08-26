@@ -9,19 +9,16 @@ public class EnableWeaponSwitchingPatch : ModulePatch
 {
     protected override MethodBase GetTargetMethod()
     {
-        return typeof(BotDifficultySettingsClass).GetMethod(nameof(BotDifficultySettingsClass.ApplyPresetLocation));
+        return typeof(BotSettings).GetMethod(nameof(BotSettings.ApplyPresetLocation));
     }
 
     [PatchPostfix]
-    private static void PatchPostfix(
-        BotLocationModifier modifier,
-        ref BotDifficultySettingsClass __instance,
-        ref WildSpawnType ___WildSpawnType_0
-    )
+    private static void PatchPostfix(BotLocationModifier modifier, ref BotSettings __instance)
     {
-        var corpseLootEnabled = LootingBots.CorpseLootingEnabled.Value.IsBotEnabled(___WildSpawnType_0);
-        var containerLootEnabled = LootingBots.ContainerLootingEnabled.Value.IsBotEnabled(___WildSpawnType_0);
-        var itemLootEnabled = LootingBots.LooseItemLootingEnabled.Value.IsBotEnabled(___WildSpawnType_0);
+        var role = __instance._role;
+        var corpseLootEnabled = LootingBots.CorpseLootingEnabled.Value.IsBotEnabled(role);
+        var containerLootEnabled = LootingBots.ContainerLootingEnabled.Value.IsBotEnabled(role);
+        var itemLootEnabled = LootingBots.LooseItemLootingEnabled.Value.IsBotEnabled(role);
 
         if (corpseLootEnabled || containerLootEnabled || itemLootEnabled)
         {

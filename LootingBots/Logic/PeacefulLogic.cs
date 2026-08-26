@@ -1,7 +1,5 @@
 ﻿using DrakiaXYZ.BigBrain.Brains;
 using EFT;
-//Check in CreateNode(BotLogicDecision type, BotOwner bot) (BotActionNodesClass on 4.0 to set this)
-using PeacefulNodeClass = GClass266;
 
 namespace LootingBots.Logic;
 
@@ -10,7 +8,7 @@ namespace LootingBots.Logic;
 /// </summary>
 internal class PeacefulLogic(BotOwner botOwner) : CustomLogic(botOwner)
 {
-    private readonly PeacefulNodeClass _baseLogic = new(botOwner);
+    private readonly PeacefulNode _baseLogic = new(botOwner);
 
     public override void Update(CustomLayer.ActionData data)
     {

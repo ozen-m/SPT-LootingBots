@@ -6,9 +6,9 @@ public static class NonLinqUtils
 {
     public static bool IsChangingWeaponNonLinq(this InventoryController controller)
     {
-        foreach (var activeEvent in controller.List_0)
+        foreach (var activeEvent in controller.ActiveEvents)
         {
-            if (activeEvent is GEventArgs10 or GEventArgs9)
+            if (activeEvent is RemoveFromHandsEventArgs or SetInHandsEventArgs)
             {
                 return true;
             }
@@ -17,11 +17,11 @@ public static class NonLinqUtils
         return false;
     }
 
-    public static bool HasAnyHandsActionNonLinq(this TraderControllerClass controller)
+    public static bool HasAnyHandsActionNonLinq(this ItemController controller)
     {
-        foreach (var eventArg in controller.List_0)
+        foreach (var eventArg in controller.ActiveEvents)
         {
-            if (eventArg is GInterface418)
+            if (eventArg is IItemInHandsEventArgs)
             {
                 return true;
             }

@@ -94,7 +94,7 @@ internal class LootingLogic : CustomLogic
             // Crouch and look to item
             BotOwner.SetPose(0f);
             BotOwner.Steering.LookToPoint(_lootingBrain.LootObjectPosition, 180f);
-            if (BotOwner.GetPlayer.MovementContext.IsInPatrol)
+            if (BotOwner.GetPlayer.MovementContext._isInPatrol)
             {
                 // SAIN sets bot in a patrol state if it has no enemy, or is not sprinting
                 BotOwner.GetPlayer.MovementContext.SetPatrol(false);

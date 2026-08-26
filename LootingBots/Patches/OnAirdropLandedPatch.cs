@@ -1,4 +1,5 @@
 ﻿using System.Reflection;
+using EFT.Airdrop;
 using EFT.Interactive;
 using SPT.Reflection.Patching;
 
@@ -6,22 +7,18 @@ namespace LootingBots.Patches;
 
 public class OnAirdropLandedPatch : ModulePatch
 {
-    public static Action<LootableContainer> OnAirdropLanded;
+    public static event Action<LootableContainer> OnAirdropLanded;
 
-    // method_0 in AirdropLogicClass is called after the airdrop is landed, making it perfect for us to hook into
+    // PlayLandingSound in ClientAirDrop is called after the airdrop is landed, making it perfect for us to hook into
     protected override MethodBase GetTargetMethod()
     {
-        return typeof(AirdropLogicClass).GetMethod(nameof(AirdropLogicClass.method_0));
+        return typeof(ClientAirDrop).GetMethod(nameof(ClientAirDrop.PlayLandingSound));
     }
 
     [PatchPostfix]
-    public static void Postfix(AirdropLogicClass __instance)
+    public static void Postfix(ClientAirDrop __instance)
     {
-        var lootableContainer = __instance.AirdropSynchronizableObject_0.GetComponentInChildren<LootableContainer>();
-
-        if (OnAirdropLanded != null)
-        {
-            OnAirdropLanded(lootableContainer);
-        }
+        var lootableContainer = __instance._syncObject.GetComponentInChildren<LootableContainer>();
+        OnAirdropLanded?.Invoke(lootableContainer);
     }
 }

@@ -35,7 +35,7 @@ public static class ActiveBotCache
 
         if (LootingBots.LootLog.DebugEnabled)
         {
-            LootingBots.LootLog.LogDebug($"{botOwner.name.Localized()} looting enabled  (total: {_activeBots.Count})");
+            LootingBots.LootLog.LogDebug($"{botOwner.name.Localized()} looting enabled (total: {_activeBots.Count})");
         }
     }
 
