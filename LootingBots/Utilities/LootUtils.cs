@@ -1,6 +1,7 @@
 using EFT;
 using EFT.Interactive;
 using EFT.InventoryLogic;
+using EFT.NextObservedPlayer.Operations;
 using HarmonyLib;
 using UnityEngine;
 using Grid = EFT.InventoryLogic.Grid;
@@ -68,35 +69,23 @@ public static class LootUtils
     }
 
     /// <summary>
-    /// Triggers a container to open/close. Borrowed from Questing Bots, needed for Fika
+    /// Triggers a container to open/close.
     /// </summary>
-    /// <seealso href="https://github.com/dwesterwick/SPTQuestingBots/blob/0.10.3/bepinex_dev/SPTQuestingBots/Helpers/InteractiveObjectHelpers.cs#L111"/>
-    public static void InteractContainer(
-        WorldInteractiveObject worldInteractiveObject,
-        BotOwner botOwner,
-        EInteractionType action,
-        BotLog log
-    )
+    public static Task InteractAsync(this BotOwner botOwner, WorldInteractiveObject worldInteractiveObject, EInteractionType action)
     {
-        // TODO: Null check is probably no longer needed!
         if (worldInteractiveObject == null)
         {
-            if (log.DebugEnabled)
-            {
-                log.LogWarning($"Interacting [{action.ToString()}] with WorldInteractiveObject but is NULL");
-            }
-            return;
-        }
-
-        var interactionResult = new InteractionResult(action);
-        if (worldInteractiveObject is Door)
-        {
-            // NOTE: This method MUST be used for Fika compatibility
-            botOwner.GetPlayer.StartInteraction(worldInteractiveObject, interactionResult, null);
+            return Task.FromException(
+                new ArgumentNullException($"[{botOwner.Name()}] Interacting [{action.ToString()}] with WorldInteractiveObject but is NULL")
+            );
         }
 
         // NOTE: This method MUST be used for Fika compatibility
-        botOwner.GetPlayer.ExecuteInteraction(worldInteractiveObject, interactionResult);
+        var interactionResult = new InteractionResult(action);
+        var source = new SafeTaskCompleteSource();
+        botOwner.GetPlayer.StartInteraction(worldInteractiveObject, interactionResult, source.Complete);
+
+        return source.Task;
     }
 
     /// <summary>

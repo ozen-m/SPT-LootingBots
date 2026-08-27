@@ -331,7 +331,7 @@ public class LootingBrain : MonoBehaviour
             var didOpen = false;
             if (container.DoorState == EDoorState.Shut)
             {
-                LootUtils.InteractContainer(container, BotOwner, EInteractionType.Open, _log);
+                await BotOwner.InteractAsync(container, EInteractionType.Open);
                 didOpen = true;
             }
 
@@ -345,7 +345,7 @@ public class LootingBrain : MonoBehaviour
             // Close the container if the settings to close containers is checked or if the container was already opened when the bot tried to loot it
             if (isSuccessful && (LootingBots.BotsAlwaysCloseContainers.Value || !didOpen))
             {
-                LootUtils.InteractContainer(container, BotOwner, EInteractionType.Close, _log);
+                await BotOwner.InteractAsync(container, EInteractionType.Close);
             }
         }
         finally
