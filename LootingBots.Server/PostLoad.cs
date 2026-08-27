@@ -1,11 +1,11 @@
-﻿using LootingBotsServerMod.Models;
+﻿using LootingBots.Models;
 using SPTarkov.Common.Models.Logging;
 using SPTarkov.DI.Annotations;
 using SPTarkov.Server.Core.DI;
 using SPTarkov.Server.Core.Models.Spt.Config;
 using SPTarkov.Server.Core.Models.Spt.Tables;
 
-namespace LootingBotsServerMod;
+namespace LootingBots;
 
 [Injectable(TypePriority = OnLoadOrder.PostLoad + 100)]
 public class PostLoad(

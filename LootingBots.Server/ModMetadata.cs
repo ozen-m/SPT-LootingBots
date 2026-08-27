@@ -2,7 +2,7 @@
 using Range = SemanticVersioning.Range;
 using Version = SemanticVersioning.Version;
 
-namespace LootingBotsServerMod;
+namespace LootingBots;
 
 public record ModMetadata : IModMetadata
 {

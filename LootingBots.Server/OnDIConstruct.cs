@@ -1,11 +1,11 @@
 ﻿using System.Reflection;
 using System.Text.Json;
-using LootingBotsServerMod.Models;
+using LootingBots.Models;
 using Microsoft.Extensions.DependencyInjection;
 using SPTarkov.Server.Core.DI;
 using SPTarkov.Server.Core.Utils.Json.Converters;
 
-namespace LootingBotsServerMod;
+namespace LootingBots;
 
 public class OnDIConstruct : IOnDIConstruct
 {

@@ -1,4 +1,4 @@
-﻿namespace LootingBotsServerMod.Models;
+﻿namespace LootingBots.Models;
 
 public record ConfigModel
 {
