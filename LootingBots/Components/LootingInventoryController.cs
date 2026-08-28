@@ -579,7 +579,7 @@ public class LootingInventoryController
             // then make sure to drop the chest and pick up the armored rig
             if (chest is not null && EquipmentTypeUtils.IsArmoredRig(lootItem))
             {
-                if (GetArmorDifference(lootItem, chest) > 0)
+                if (ShouldSwapGear(chest, lootItem))
                 {
                     if (_log.DebugEnabled)
                     {
@@ -590,6 +590,13 @@ public class LootingInventoryController
                     var throwAction = LootingThrowAction.Rent(chest, -chestValue);
                     lootingActions.Add(throwAction);
                     GetSwapAction(lootItem, tacVest, lootingActions, true);
+                }
+                else
+                {
+                    if (_log.DebugEnabled)
+                    {
+                        _log.LogDebug($"Equipped chest armor is better than or equal to found armored rig {lootItem.Name.Localized()}");
+                    }
                 }
             }
             else
