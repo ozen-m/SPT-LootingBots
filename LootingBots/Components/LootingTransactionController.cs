@@ -136,7 +136,6 @@ public class LootingTransactionController(InventoryController inventoryControlle
 
         // Check to see if this is an item that we can merge with another item in the inventory
         var mergeableItem = inventoryController.FindItemToMerge(item);
-
         if (mergeableItem != null)
         {
             if (log.DebugEnabled)
@@ -149,7 +148,6 @@ public class LootingTransactionController(InventoryController inventoryControlle
 
         // Otherwise, find an empty grid slot to put the item in
         var gridAddress = inventoryController.FindGridToPickUp(item);
-
         if (
             gridAddress != null
             && !string.Equals(gridAddress.GetRootItem()?.Parent?.Container?.ID, "securedcontainer", StringComparison.OrdinalIgnoreCase)
@@ -257,7 +255,7 @@ public class LootingTransactionController(InventoryController inventoryControlle
         var swapResult = ItemManipulator.Swap(item, toSwap.CurrentAddress, toSwap, item.CurrentAddress, inventoryController, true);
         if (swapResult.Failed)
         {
-            if (log.WarningEnabled)
+            if (log.WarningEnabled && swapResult.Error is not Slot.ConflictingItemError)
             {
                 log.LogWarning($"Failed to swap {item.Name.Localized()} with {toSwap.Name.Localized()}. Error: {swapResult.Error}");
             }
@@ -300,7 +298,7 @@ public class LootingTransactionController(InventoryController inventoryControlle
         if (log.DebugEnabled)
         {
             log.LogDebug(
-                $"Merging {toMove.Name?.Localized()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount})..."
+                $"Merging {toMove.Name.Localized()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount})..."
             );
         }
 
@@ -336,9 +334,7 @@ public class LootingTransactionController(InventoryController inventoryControlle
 
         if (log.InfoEnabled)
         {
-            log.LogInfo(
-                $"Merging {toMove.Name?.Localized()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount})...done"
-            );
+            log.LogInfo($"Merged with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount})...done");
         }
 
         return true;
