@@ -1300,6 +1300,11 @@ public class LootingInventoryController
         lootingActions.Add(swapAction);
     }
 
+    public void SetRootItemOwner(IItemOwner owner)
+    {
+        _transactionController.SetRootItemOwner(owner);
+    }
+
     /// <summary>
     /// Based on <see cref="BotWeaponSelector.OnWeaponTaken"/>
     /// </summary>

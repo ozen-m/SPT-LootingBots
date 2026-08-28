@@ -294,6 +294,7 @@ public class LootingBrain : MonoBehaviour
 
             await LootingTransactionController.SimulatePlayerDelayAsync(LootingStartDelay, token);
 
+            InventoryController.SetRootItemOwner(corpseInventoryEquipment.Owner);
             isSuccessful = await InventoryController.TryAddItemsToBotAsync(_itemsToLoot, token);
         }
         finally
@@ -340,6 +341,7 @@ public class LootingBrain : MonoBehaviour
 
             await LootingTransactionController.SimulatePlayerDelayAsync(LootingStartDelay, token);
 
+            InventoryController.SetRootItemOwner(item.Owner);
             isSuccessful = await InventoryController.LootNestedItemsAsync(item, token);
 
             // Close the container if the settings to close containers is checked or if the container was already opened when the bot tried to loot it
@@ -386,6 +388,7 @@ public class LootingBrain : MonoBehaviour
 
             _itemsToLoot.Clear();
             _itemsToLoot.Add(item);
+            InventoryController.SetRootItemOwner(item.Owner);
             isSuccessful = await InventoryController.TryAddItemsToBotAsync(_itemsToLoot, token);
             if (isSuccessful)
             {
@@ -416,6 +419,7 @@ public class LootingBrain : MonoBehaviour
 
         InventoryController.UpdateActiveWeapon();
         InventoryController.UpdateGridStats();
+        InventoryController.SetRootItemOwner(null);
         BotOwner.AIData.CalcPower();
         LootTaskRunning = false;
     }

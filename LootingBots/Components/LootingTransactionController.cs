@@ -10,6 +10,8 @@ public class LootingTransactionController(InventoryController inventoryControlle
 {
     private const int NetworkTransactionTimeout = 5000;
 
+    private IItemOwner _rootItemOwner;
+
     /// <summary>
     /// Tries to add extra spare ammo for the weapon being looted into the bot's secure container,
     /// so that the bots are able to refill their mags properly in their reload logic.
@@ -192,6 +194,11 @@ public class LootingTransactionController(InventoryController inventoryControlle
 
         await SimulatePlayerDelayAsync(token: token);
 
+        if (!IsItemReachable(item))
+        {
+            return false;
+        }
+
         var moveResult = ItemManipulator.Move(item, location, inventoryController, true);
         if (moveResult.Failed)
         {
@@ -242,6 +249,11 @@ public class LootingTransactionController(InventoryController inventoryControlle
 
         await SimulatePlayerDelayAsync(token: token);
 
+        if (!IsItemReachable(item))
+        {
+            return false;
+        }
+
         var swapResult = ItemManipulator.Swap(item, toSwap.CurrentAddress, toSwap, item.CurrentAddress, inventoryController, true);
         if (swapResult.Failed)
         {
@@ -290,6 +302,11 @@ public class LootingTransactionController(InventoryController inventoryControlle
             log.LogDebug(
                 $"Merging {toMove.Name?.Localized()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount})..."
             );
+        }
+
+        if (!IsItemReachable(toMove))
+        {
+            return false;
         }
 
         var mergeResult = ItemManipulator.Merge(toMove, toItem, inventoryController, true);
@@ -409,5 +426,41 @@ public class LootingTransactionController(InventoryController inventoryControlle
         }
 
         return Task.Delay(TimeSpan.FromMilliseconds(delay), cancellationToken: token);
+    }
+
+    /// <summary>
+    /// Sets owner which <see cref="IsItemReachable"/> checks for.
+    /// </summary>
+    public void SetRootItemOwner(IItemOwner rootItemOwner)
+    {
+        _rootItemOwner = rootItemOwner;
+    }
+
+    /// <summary>
+    /// Check if a bot can reach this item:
+    ///   1. The item is owned by the owner of the root item the bot is looting
+    ///   2. The bot owns the item (e.g. for secondary to main weapon swaps)
+    ///   3. The item is a <see cref="EFT.Interactive.LootItem"/> in the world, which everyone can access
+    /// </summary>
+    private bool IsItemReachable(Item item)
+    {
+        if (item.Owner == _rootItemOwner)
+        {
+            return true;
+        }
+        if (item.Owner == inventoryController)
+        {
+            return true;
+        }
+        if (Singleton<GameWorld>.Instance.LootItems.ContainsKey(item.Id.GetHashCode())) // Key is LootItem.GetNetId()
+        {
+            return true;
+        }
+
+        if (log.DebugEnabled)
+        {
+            log.LogDebug($"Cannot reach {item}, with owner: {item.Owner}");
+        }
+        return false;
     }
 }
