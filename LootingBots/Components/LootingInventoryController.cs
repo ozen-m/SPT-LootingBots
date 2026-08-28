@@ -593,7 +593,7 @@ public class LootingInventoryController
             // then make sure to drop the chest and pick up the armored rig
             if (chest is not null && EquipmentTypeUtils.IsArmoredRig(lootItem))
             {
-                if (GetArmorDifference(chest, lootItem) > 0)
+                if (GetArmorDifference(lootItem, chest) > 0)
                 {
                     if (_log.DebugEnabled)
                     {
@@ -914,7 +914,7 @@ public class LootingInventoryController
         }
 
         // Equip if we found item with a better armor class
-        var armorDifference = GetArmorDifference(equipped, itemToLoot);
+        var armorDifference = GetArmorDifference(itemToLoot, equipped);
         if (armorDifference > 0)
         {
             if (_log.DebugEnabled)
@@ -966,7 +966,7 @@ public class LootingInventoryController
     public bool IsBetterArmorThanEquipped(ArmoredEquipment newArmor)
     {
         var equippedArmor = EquipmentTypeUtils.IsHelmet(newArmor) ? CurrentHeadArmor : CurrentTorsoArmor;
-        return GetArmorDifference(equippedArmor?.Item, newArmor) > 0;
+        return GetArmorDifference(newArmor, equippedArmor?.Item) > 0;
     }
 
     /// <summary>
@@ -981,56 +981,48 @@ public class LootingInventoryController
     /// Calculate the difference between the armor classes of the item to loot and the currently equipped item
     /// </summary>
     /// <returns>Returns a positive integer if the item to loot has a higher armor class than what is currently equipped</returns>
-    public static int GetArmorDifference(Item equippedItem, Item itemToLoot)
+    public static int GetArmorDifference(Item itemToLoot, Item equippedItem)
     {
-        var currentArmorClass = equippedItem?.GetItemComponent<ArmorComponent>()?.ArmorClass ?? 0;
-        if (equippedItem is ArmoredEquipment equippedArmorItem)
-        {
-            // Also check Plates inside armor slots
-            foreach (var slot in equippedArmorItem.Slots)
-            {
-                if (slot is not ArmorSlot { ContainedItem: ArmorPlate armorPlate })
-                {
-                    // Slot is not an armor slot
-                    continue;
-                }
+        return GetArmorClass(itemToLoot) - GetArmorClass(equippedItem);
+    }
 
-                var armorComponent = armorPlate.Armor;
-                if (armorComponent != null)
-                {
-                    var armorClass = armorComponent.ArmorClass;
-                    if (armorClass > currentArmorClass)
-                    {
-                        currentArmorClass = armorClass;
-                    }
-                }
+    /// <summary>
+    /// Gets the max armor class of an item
+    /// </summary>
+    /// <param name="item"></param>
+    /// <returns></returns>
+    public static int GetArmorClass(Item item)
+    {
+        // Get item's armor class then get armor class of plates inside armor slots
+        var currentArmorClass = item?.GetItemComponent<ArmorComponent>()?.ArmorClass ?? 0;
+
+        if (item is not CompoundItem compoundItem)
+        {
+            return currentArmorClass;
+        }
+
+        foreach (var slot in compoundItem.Slots)
+        {
+            if (slot.ContainedItem is not ArmoredEquipment armoredEquipment)
+            {
+                // Slot is not containing an armor-plate/built-in-insert
+                continue;
+            }
+
+            var armorComponent = armoredEquipment.Armor;
+            if (armorComponent == null)
+            {
+                continue;
+            }
+
+            var armorClass = armorComponent.ArmorClass;
+            if (armorClass > currentArmorClass)
+            {
+                currentArmorClass = armorClass;
             }
         }
 
-        var newArmorClass = itemToLoot.GetItemComponent<ArmorComponent>()?.ArmorClass ?? 0;
-        if (itemToLoot is ArmoredEquipment newArmorItem)
-        {
-            foreach (var slot in newArmorItem.Slots)
-            {
-                if (slot is not ArmorSlot { ContainedItem: ArmorPlate armorPlate })
-                {
-                    // Slot is not an armor slot and/or not containing an armor plate
-                    continue;
-                }
-
-                var armorComponent = armorPlate.Armor;
-                if (armorComponent != null)
-                {
-                    var armorClass = armorComponent.ArmorClass;
-                    if (armorClass > newArmorClass)
-                    {
-                        newArmorClass = armorClass;
-                    }
-                }
-            }
-        }
-
-        return newArmorClass - currentArmorClass;
+        return currentArmorClass;
     }
 
     /// <summary>
