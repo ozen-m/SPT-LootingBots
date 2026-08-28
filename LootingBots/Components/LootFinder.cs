@@ -67,6 +67,7 @@ public class LootFinder : MonoBehaviour
     public bool IsScanRunning { get; private set; }
     private CancellationTokenSource _lootFinderCts;
     private Action<Task> _handleExceptionAction;
+    private GameObject[] _debugSpheres;
 
     private readonly Queue<LootableContainer> _priorityLootableContainers = [];
     private readonly Queue<Player> _priorityCorpses = [];
@@ -183,6 +184,14 @@ public class LootFinder : MonoBehaviour
         if (_corpseLootingEnabled)
         {
             _botOwner.BotPersonalStats.OnKillTarget -= OnKilledEnemyPlayer;
+        }
+
+        if (_debugSpheres != null)
+        {
+            foreach (var sphere in _debugSpheres)
+            {
+                Destroy(sphere);
+            }
         }
     }
 
@@ -575,7 +584,7 @@ public class LootFinder : MonoBehaviour
         return !sightBlocked;
     }
 
-    private static Vector3 GetDestination(Vector3 center)
+    private Vector3 GetDestination(Vector3 center)
     {
         // Try to snap the desired destination point to the nearest NavMesh to ensure the bot can draw a navigable path to the point
         var pointNearbyContainer = NavMesh.SamplePosition(center, out var navMeshAlignedPoint, 1f, NavMesh.AllAreas)
@@ -595,9 +604,14 @@ public class LootFinder : MonoBehaviour
 
         if (LootingBots.DebugLootNavigation.Value)
         {
-            GameObjectHelper.DrawSphere(center, 0.5f, Color.red);
-            GameObjectHelper.DrawSphere(pointNearbyContainer, 0.5f, Color.green);
-            GameObjectHelper.DrawSphere(destination, 0.5f, Color.blue);
+            if (_debugSpheres == null)
+            {
+                InitializeDebugSpheres();
+            }
+
+            _debugSpheres[0].transform.position = center;
+            _debugSpheres[1].transform.position = pointNearbyContainer;
+            _debugSpheres[2].transform.position = destination;
         }
 
         return destination;
@@ -637,6 +651,14 @@ public class LootFinder : MonoBehaviour
                 _log.LogError(task.Exception!.ToString());
             }
         }
+    }
+
+    private void InitializeDebugSpheres()
+    {
+        _debugSpheres = new GameObject[3];
+        _debugSpheres[0] = GameObjectHelper.DrawSphere(Vector3.zero, 0.5f, Color.red);
+        _debugSpheres[1] = GameObjectHelper.DrawSphere(Vector3.zero, 0.5f, Color.green);
+        _debugSpheres[2] = GameObjectHelper.DrawSphere(Vector3.zero, 0.5f, Color.blue);
     }
 }
 
