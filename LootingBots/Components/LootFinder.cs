@@ -286,7 +286,7 @@ public class LootFinder : MonoBehaviour
                         && !rootItem.QuestItem // Item is not a quest item
                         && (
                             rootItem is SearchableItem // If the item is something that can be searched, consider it lootable
-                            || (rootItem is ArmoredEquipment armor && _lootingBrain.InventoryController.IsBetterArmorThanEquipped(armor))
+                            || (_lootingBrain.InventoryController.IsBetterArmorThanEquipped(rootItem))
                             || (_lootingBrain.IsValuableEnough(rootItem) && availableGridSpaces > rootItem.GetItemSize())
                         )
                     )

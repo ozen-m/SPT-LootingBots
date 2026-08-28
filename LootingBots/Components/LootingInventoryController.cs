@@ -90,46 +90,32 @@ public class LootingInventoryController
 
     public readonly BotStats Stats = new();
 
-    public ArmorComponent CurrentArmorVest
+    public Item CurrentArmorVest
+    {
+        get { return _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.ArmorVest).ContainedItem; }
+    }
+
+    public Item CurrentArmorRig
     {
         get
         {
-            var chest = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.ArmorVest).ContainedItem;
-            return chest?.GetItemComponent<ArmorComponent>();
+            var tacVest = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem;
+            return tacVest?.GetItemComponent<ArmorHolderComponent>()?.Item;
         }
     }
 
-    public ArmorComponent CurrentArmorRig
-    {
-        get
-        {
-            var tacVest = (SearchableItem)_botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem;
-            return tacVest?.GetItemComponent<ArmorComponent>();
-        }
-    }
-
-    public ArmorComponent CurrentHeadArmor
+    public Item CurrentHeadArmor
     {
         get
         {
             var helmet = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Headwear).ContainedItem;
-            return helmet?.GetItemComponent<ArmorComponent>();
+            return helmet?.GetItemComponent<ArmorHolderComponent>()?.Item;
         }
     }
 
-    public ArmorComponent CurrentTorsoArmor
+    public Item CurrentTorsoArmor
     {
         get { return CurrentArmorRig ?? CurrentArmorVest; }
-    }
-
-    public int CurrentTorsoArmorClass
-    {
-        get { return CurrentTorsoArmor?.ArmorClass ?? 0; }
-    }
-
-    public int CurrentHeadArmorClass
-    {
-        get { return CurrentHeadArmor?.ArmorClass ?? 0; }
     }
 
     // Represents the value in roubles of the current item
@@ -963,10 +949,23 @@ public class LootingInventoryController
     /// <summary>
     /// Given a piece of armor, compare it against what is current
     /// </summary>
-    public bool IsBetterArmorThanEquipped(ArmoredEquipment newArmor)
+    public bool IsBetterArmorThanEquipped(Item potentialLoot)
     {
-        var equippedArmor = EquipmentTypeUtils.IsHelmet(newArmor) ? CurrentHeadArmor : CurrentTorsoArmor;
-        return GetArmorDifference(newArmor, equippedArmor?.Item) > 0;
+        Item equippedArmor;
+        if (EquipmentTypeUtils.IsHelmet(potentialLoot))
+        {
+            equippedArmor = CurrentHeadArmor;
+        }
+        else if (EquipmentTypeUtils.IsChestArmor(potentialLoot) || EquipmentTypeUtils.IsArmoredRig(potentialLoot))
+        {
+            equippedArmor = CurrentTorsoArmor;
+        }
+        else
+        {
+            // Potential loot is not armor
+            return false;
+        }
+        return GetArmorDifference(potentialLoot, equippedArmor) > 0;
     }
 
     /// <summary>
