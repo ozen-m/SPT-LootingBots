@@ -64,6 +64,7 @@ public class LootingBots : BaseUnityPlugin
     public static ConfigEntry<double> TransactionDelay;
     public static ConfigEntry<bool> UseExamineTime;
     public static ConfigEntry<bool> ValueFromMods;
+    public static ConfigEntry<bool> ValueFromPlates;
     public static ConfigEntry<bool> CanStripAttachments;
     public static ConfigEntry<int> LootTimeout;
 
@@ -276,7 +277,7 @@ public class LootingBots : BaseUnityPlugin
             new ConfigDescription(
                 "When enabled, bots will always try to close a container after they have finished looting. If the bot is inturrupted while looting, the container may remain open.",
                 null,
-                new ConfigurationManagerAttributes { Order = 13 }
+                new ConfigurationManagerAttributes { Order = 14 }
             )
         );
         UseMarketPrices = Config.Bind(
@@ -286,7 +287,7 @@ public class LootingBots : BaseUnityPlugin
             new ConfigDescription(
                 "Bots will query more accurate ragfair prices to do item value checks. Will make a query to get ragfair prices when the client is first started",
                 null,
-                new ConfigurationManagerAttributes { Order = 12 }
+                new ConfigurationManagerAttributes { Order = 13 }
             )
         );
         ValueFromMods = Config.Bind(
@@ -295,6 +296,16 @@ public class LootingBots : BaseUnityPlugin
             true,
             new ConfigDescription(
                 "Calculate weapon value by looking up each attachment. More accurate than just looking at the base weapon template but a slightly more expensive check",
+                null,
+                new ConfigurationManagerAttributes { Order = 12 }
+            )
+        );
+        ValueFromPlates = Config.Bind(
+            "Loot Settings",
+            "Calculate armor value from slotted items",
+            true,
+            new ConfigDescription(
+                "Calculate armor value by looking up each slot containing plates/faceshields etc. More accurate than just looking at the base armor template but a slightly more expensive check",
                 null,
                 new ConfigurationManagerAttributes { Order = 11 }
             )

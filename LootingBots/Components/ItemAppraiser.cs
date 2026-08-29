@@ -61,6 +61,7 @@ public class ItemAppraiser(Log _log)
     /// <summary>
     /// Will either get the lootItem's price using the ragfair service or the handbook depending on the option selected in the mod menu.
     /// If the item is a weapon, will calculate its value based off its attachments if the mod setting is enabled.
+    /// If the item is an armor, will calculate its value based off its slots containing plates/shields if the mod setting is enabled.
     /// </summary>
     public float GetItemPrice(Item lootItem, BotLog log)
     {
@@ -74,15 +75,30 @@ public class ItemAppraiser(Log _log)
             }
         }
 
-        var valueFromMods = LootingBots.ValueFromMods.Value;
         if (LootingBots.UseMarketPrices.Value && MarketData != null)
         {
-            return lootItem is Weapon weapon && valueFromMods ? GetWeaponMarketPrice(weapon, log) : GetItemMarketPrice(lootItem, log);
+            if (lootItem is Weapon weapon && LootingBots.ValueFromMods.Value)
+            {
+                return GetWeaponMarketPrice(weapon, log);
+            }
+            if (LootingBots.ValueFromPlates.Value && lootItem.TryGetItemComponent(out ArmorHolderComponent _))
+            {
+                return GetArmorMarketPrice((CompoundItem)lootItem, log);
+            }
+            return GetItemMarketPrice(lootItem, log);
         }
 
         if (HandbookData != null)
         {
-            return lootItem is Weapon weapon && valueFromMods ? GetWeaponHandbookPrice(weapon, log) : GetItemHandbookPrice(lootItem, log);
+            if (lootItem is Weapon weapon && LootingBots.ValueFromMods.Value)
+            {
+                return GetWeaponHandbookPrice(weapon, log);
+            }
+            if (LootingBots.ValueFromPlates.Value && lootItem.TryGetItemComponent(out ArmorHolderComponent _))
+            {
+                return GetArmorHandbookPrice((CompoundItem)lootItem, log);
+            }
+            return GetItemHandbookPrice(lootItem, log);
         }
 
         if (_log.DebugEnabled)
@@ -133,6 +149,55 @@ public class ItemAppraiser(Log _log)
             else
             {
                 _log.LogDebug($"Final price of attachments: {finalPrice} compared to full item {GetItemHandbookPrice(lootWeapon, null)}");
+            }
+        }
+
+        return finalPrice;
+    }
+
+    /// <summary>
+    /// Get the price of an armor from the sum of its slots containing armor items, using the default handbook prices to appraise each plate.
+    /// </summary>
+    public float GetArmorHandbookPrice(CompoundItem lootArmor, BotLog log)
+    {
+        if (_log.DebugEnabled)
+        {
+            if (log != null)
+            {
+                log.LogDebug($"Getting value of armor {lootArmor.Name.Localized()}");
+            }
+            else
+            {
+                _log.LogDebug($"Getting value of armor {lootArmor.Name.Localized()}");
+            }
+        }
+
+        var finalPrice = 0f;
+
+        // These don't have movable plates, but can have faceshields
+        if (lootArmor is Headwear or FaceCover)
+        {
+            finalPrice += GetItemHandbookPrice(lootArmor, log);
+        }
+
+        // Iterate over each armor plate and accumulate the price
+        foreach (var slot in lootArmor.Slots)
+        {
+            if (slot.ContainedItem is ArmoredEquipment armoredEquipment)
+            {
+                finalPrice += GetItemHandbookPrice(armoredEquipment, log);
+            }
+        }
+
+        if (_log.DebugEnabled)
+        {
+            if (log != null)
+            {
+                log.LogDebug($"Final price of armor: {finalPrice} compared to item template {GetItemHandbookPrice(lootArmor, log)}");
+            }
+            else
+            {
+                _log.LogDebug($"Final price of armor: {finalPrice} compared to item template {GetItemHandbookPrice(lootArmor, null)}");
             }
         }
 
@@ -197,6 +262,55 @@ public class ItemAppraiser(Log _log)
             else
             {
                 _log.LogDebug($"Final price of attachments: {finalPrice} compared to item template {GetItemMarketPrice(lootWeapon, null)}");
+            }
+        }
+
+        return finalPrice;
+    }
+
+    /// <summary>
+    /// Get the price of an armor from the sum of its slots containing armor items, using the ragfair prices to appraise each plate.
+    /// </summary>
+    public float GetArmorMarketPrice(CompoundItem lootArmor, BotLog log)
+    {
+        if (_log.DebugEnabled)
+        {
+            if (log != null)
+            {
+                log.LogDebug($"Getting value of armor {lootArmor.Name.Localized()}");
+            }
+            else
+            {
+                _log.LogDebug($"Getting value of armor {lootArmor.Name.Localized()}");
+            }
+        }
+
+        var finalPrice = 0f;
+
+        // These don't have movable plates, but can have faceshields
+        if (lootArmor is Headwear or FaceCover)
+        {
+            finalPrice += GetItemMarketPrice(lootArmor, log);
+        }
+
+        // Iterate over each armor plate and accumulate the price
+        foreach (var slot in lootArmor.Slots)
+        {
+            if (slot.ContainedItem is ArmoredEquipment armoredEquipment)
+            {
+                finalPrice += GetItemMarketPrice(armoredEquipment, log);
+            }
+        }
+
+        if (_log.DebugEnabled)
+        {
+            if (log != null)
+            {
+                log.LogDebug($"Final price of armor: {finalPrice} compared to item template {GetItemMarketPrice(lootArmor, log)}");
+            }
+            else
+            {
+                _log.LogDebug($"Final price of armor: {finalPrice} compared to item template {GetItemMarketPrice(lootArmor, null)}");
             }
         }
 
