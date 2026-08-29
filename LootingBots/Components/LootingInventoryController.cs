@@ -1072,7 +1072,7 @@ public class LootingInventoryController
 
             if (_log.DebugEnabled)
             {
-                _log.LogDebug($"No nested items found to loot in {parentItem.Name}");
+                _log.LogDebug($"No nested items found to loot in {parentItem.Name.Localized()}");
             }
 
             return true;
@@ -1159,7 +1159,7 @@ public class LootingInventoryController
 
             if (_log.DebugEnabled)
             {
-                _log.LogDebug($"No undervalued items found to throw in {parentItem.Name}");
+                _log.LogDebug($"No undervalued items found to throw in {parentItem.Name.Localized()}");
             }
         }
         finally
