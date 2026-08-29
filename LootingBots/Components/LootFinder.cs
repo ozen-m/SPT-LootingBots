@@ -21,12 +21,7 @@ public class LootFinder : MonoBehaviour
 
     private float _scanTimer;
     private bool _lockUntilNextScan;
-
-    private const int MaxEmptyAttempts = 3;
-    private const float EmptyAttemptsCooldown = 180f;
     private int _emptyAttempts;
-
-    // TODO: Add empty attempts config?
 
     // Bot specific config
     private bool _containerLootingEnabled;
@@ -390,13 +385,17 @@ public class LootFinder : MonoBehaviour
         }
         finally
         {
-            if (!_lootingBrain.HasActiveLootable && ++_emptyAttempts > MaxEmptyAttempts)
+            if (
+                LootingBots.MaxEmptyAttempts.Value > 0
+                && !_lootingBrain.HasActiveLootable
+                && ++_emptyAttempts >= LootingBots.MaxEmptyAttempts.Value
+            )
             {
-                if (_log.DebugEnabled)
+                if (_log.InfoEnabled)
                 {
-                    _log.LogDebug($"Max empty attempts reached, preventing looting for {EmptyAttemptsCooldown}s");
+                    _log.LogInfo($"Max empty attempts reached, preventing looting for {LootingBots.EmptyAttemptsCooldown.Value}s");
                 }
-                OverrideNextScanTime(EmptyAttemptsCooldown);
+                OverrideNextScanTime(LootingBots.EmptyAttemptsCooldown.Value);
                 _emptyAttempts = 0;
             }
 

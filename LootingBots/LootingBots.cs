@@ -85,6 +85,8 @@ public class LootingBots : BaseUnityPlugin
     public static ConfigEntry<int> MaxActiveLootingBots;
     public static ConfigEntry<int> LimitDistanceFromPlayer;
     public static ConfigEntry<int> MaxConcurrentScans;
+    public static ConfigEntry<int> MaxEmptyAttempts;
+    public static ConfigEntry<int> EmptyAttemptsCooldown;
 
     public void LootFinderSettings()
     {
@@ -440,6 +442,26 @@ public class LootingBots : BaseUnityPlugin
                 "Max number of bots that can scan for loot at the same time. Takes effect next raid. A value of 0 represents no limit",
                 new AcceptableValueRange<int>(0, 35),
                 new ConfigurationManagerAttributes { Order = 9 }
+            )
+        );
+        MaxEmptyAttempts = Config.Bind(
+            "Performance",
+            "Maximum unsuccessful attempts",
+            2,
+            new ConfigDescription(
+                "Max number of unsuccessful attempts a bot can try to find loot before taking a break. A value of 0 represents no limit",
+                new AcceptableValueRange<int>(0, 10),
+                new ConfigurationManagerAttributes { Order = 8 }
+            )
+        );
+        EmptyAttemptsCooldown = Config.Bind(
+            "Performance",
+            "Empty attempts cooldown",
+            180,
+            new ConfigDescription(
+                "How long (in seconds) to wait before trying to find loot when max attempts is reached.",
+                new AcceptableValueRange<int>(0, 10),
+                new ConfigurationManagerAttributes { Order = 7 }
             )
         );
     }
