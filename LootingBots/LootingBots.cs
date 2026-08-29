@@ -537,7 +537,7 @@ public class LootingBots : BaseUnityPlugin
             }
         }
 
-        if (Singleton<Handbook>.Instance == null || Singleton<ClientApplication<IEftSession>>.Instance == null)
+        if (Singleton<Handbook>.Instance is null || Singleton<ClientApplication<IEftSession>>.Instance == null)
         {
             return;
         }

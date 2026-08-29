@@ -109,7 +109,7 @@ public class LootingTransactionController(InventoryController inventoryControlle
 
         // Check to see if we can equip the item
         var ableToEquip = inventoryController.FindSlotToPickUp(item);
-        if (ableToEquip == null)
+        if (ableToEquip is null)
         {
             if (log.DebugEnabled)
             {
@@ -178,7 +178,7 @@ public class LootingTransactionController(InventoryController inventoryControlle
         token.ThrowIfCancellationRequested();
 
         // No address was given, try equipping or picking up
-        if (location == null)
+        if (location is null)
         {
             return await TryEquipItemAsync(item, token) || await TryPickupItemAsync(item, token);
         }
@@ -289,7 +289,7 @@ public class LootingTransactionController(InventoryController inventoryControlle
     {
         token.ThrowIfCancellationRequested();
 
-        if (toItem == null)
+        if (toItem is null)
         {
             log.LogWarning($"Cannot merge item {toMove} to NULL target item!");
             return false;

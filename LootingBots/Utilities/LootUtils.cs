@@ -155,7 +155,7 @@ public static class LootUtils
         // Use the item's template id to search for the same item in the inventory
         foreach (var foundItem in controller.Inventory.GetAllItemByTemplate(item.TemplateId))
         {
-            if (foundItem == null)
+            if (foundItem is null)
             {
                 continue;
             }
@@ -224,7 +224,7 @@ public static class LootUtils
         {
             var slot = equipment.GetSlot(slotName);
             var item = slot.ContainedItem;
-            if (item == null)
+            if (item is null)
             {
                 continue;
             }
@@ -235,7 +235,7 @@ public static class LootUtils
                 unlootableComponent != null
                 && equipmentOwner != botOwner
                 && unlootableComponent.IsUnlootableFrom(item.Parent.Container)
-                && item is not Pockets // Include pockets to loot list. TODO: Verify
+                && item is not Pockets // Include pockets to loot list
             )
             {
                 continue;
@@ -320,7 +320,7 @@ public static class LootUtils
 
     public static Item GetFirstItem(this IEnumerable<Item> items)
     {
-        if (items == null)
+        if (items is null)
         {
             return null;
         }

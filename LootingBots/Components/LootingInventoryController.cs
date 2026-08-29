@@ -314,7 +314,7 @@ public class LootingInventoryController
             {
                 token.ThrowIfCancellationRequested();
 
-                if (item.Name == null)
+                if (string.IsNullOrEmpty(item.Name))
                 {
                     if (_log.DebugEnabled)
                     {
@@ -506,7 +506,7 @@ public class LootingInventoryController
         }
 
         var weaponSelector = _botOwner.WeaponManager?.Selector;
-        if (weaponSelector == null)
+        if (weaponSelector is null)
         {
             return;
         }
@@ -779,7 +779,7 @@ public class LootingInventoryController
 
         if (isPistol)
         {
-            if (holster == null)
+            if (holster is null)
             {
                 if (_log.DebugEnabled)
                 {
@@ -811,7 +811,7 @@ public class LootingInventoryController
 
         // If we have no primary, equip the weapon to primary
         // Then swap if it's not better than secondary
-        if (primary == null)
+        if (primary is null)
         {
             if (_log.DebugEnabled)
             {
@@ -837,7 +837,7 @@ public class LootingInventoryController
 
         // If there is no secondary, equip the weapon to secondary
         // Then swap if it's better than primary
-        if (secondary == null)
+        if (secondary is null)
         {
             if (_log.DebugEnabled)
             {
@@ -932,7 +932,7 @@ public class LootingInventoryController
     /// </summary>
     public bool ShouldSwapGear(Item equipped, Item itemToLoot)
     {
-        if (equipped == null)
+        if (equipped is null)
         {
             return false;
         }
@@ -1064,7 +1064,7 @@ public class LootingInventoryController
             }
 
             var armorComponent = armoredEquipment.Armor;
-            if (armorComponent == null)
+            if (armorComponent is null)
             {
                 continue;
             }
@@ -1087,7 +1087,7 @@ public class LootingInventoryController
     /// </summary>
     public bool IsWeaponBetter(Weapon potentialWeapon, Weapon equippedWeapon, bool moreValuable)
     {
-        if (equippedWeapon == null)
+        if (equippedWeapon is null)
         {
             return true;
         }
@@ -1240,6 +1240,7 @@ public class LootingInventoryController
                     || (nestedItem is Magazine mag && IsUsableMag(mag)) // Mag can be used
                     || (nestedItem is Ammo ammo && IsUsableAmmo(ammo)) // Ammo can be used
                     || nestedItem is Meds // Do not throw med items
+                    || nestedItem is BarterOther // Do not throw dog tags
                 )
                 {
                     continue;
@@ -1392,12 +1393,11 @@ public class LootingInventoryController
         var pickupNotRestricted = isPmc
             ? LootingBots.PMCGearToPickup.Value.IsItemEligible(lootItem, true)
             : LootingBots.ScavGearToPickup.Value.IsItemEligible(lootItem, true);
-        var isMoney = lootItem.Template is MoneyTemplate;
 
         // All usable mags and money should be considered eligible to loot. Otherwise, all other items fall subject to the mod settings for restricting pickup and loot value thresholds
         return IsUsableMag(lootItem as Magazine)
             || IsUsableAmmo(lootItem as Ammo)
-            || isMoney
+            || lootItem is Money
             || (
                 pickupNotRestricted
                 && (

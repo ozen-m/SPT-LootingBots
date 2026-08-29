@@ -326,7 +326,7 @@ public class LootFinder : MonoBehaviour
                 var destination = GetDestination(center);
 
                 // Check if we can perform distance and LOS checks
-                if (_botOwner.Mover == null)
+                if (_botOwner.Mover is null)
                 {
                     if (_log.WarningEnabled)
                     {
@@ -335,7 +335,7 @@ public class LootFinder : MonoBehaviour
 
                     return;
                 }
-                if (_botOwner.LookSensor == null)
+                if (_botOwner.LookSensor is null)
                 {
                     if (_log.WarningEnabled)
                     {
@@ -604,7 +604,7 @@ public class LootFinder : MonoBehaviour
 
         if (LootingBots.DebugLootNavigation.Value)
         {
-            if (_debugSpheres == null)
+            if (_debugSpheres is null)
             {
                 InitializeDebugSpheres();
             }
@@ -669,7 +669,7 @@ public static class PathExtensions
     /// </summary>
     public static bool CalculatePathLengthWithMaxRange(this Vector3[] corners, float range, out float length)
     {
-        if (corners == null || corners.Length < 2)
+        if (corners is null || corners.Length < 2)
         {
             length = -1f;
             return false;

@@ -373,7 +373,7 @@ public class LootingBrain : MonoBehaviour
         try
         {
             var item = ActiveLoot.GetRootItem();
-            if (item == null)
+            if (item is null)
             {
                 if (_log.WarningEnabled)
                 {
@@ -436,7 +436,7 @@ public class LootingBrain : MonoBehaviour
     /// </summary>
     public bool IsLootIgnored(string lootId)
     {
-        return lootId == null || IgnoredLootIds.Contains(lootId);
+        return string.IsNullOrEmpty(lootId) || IgnoredLootIds.Contains(lootId);
     }
 
     /// <summary>

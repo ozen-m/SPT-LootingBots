@@ -53,7 +53,7 @@ internal class LootingLogic : CustomLogic
 
         // If a player picks up an item that was marked as active by a bot, its ItemOwner?.RootItem will be null.
         // In this case cleanup the active item
-        if (_lootingBrain.ActiveLootType == LootFinder.LootType.Item && _lootingBrain.ActiveLoot.GetRootItem() == null)
+        if (_lootingBrain.ActiveLootType == LootFinder.LootType.Item && _lootingBrain.ActiveLoot.GetRootItem() is null)
         {
             _lootingBrain.CleanupLoot(false);
             return;
