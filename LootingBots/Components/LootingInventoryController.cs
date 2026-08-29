@@ -28,10 +28,10 @@ public class ValuePair(string _id, float _value)
         Value = value;
     }
 
-    public void UpdatePair(ValuePair pair)
+    public static void SwapPair(ValuePair pair1, ValuePair pair2)
     {
-        Id = pair.Id;
-        Value = pair.Value;
+        (pair1.Id, pair2.Id) = (pair2.Id, pair1.Id);
+        (pair1.Value, pair2.Value) = (pair2.Value, pair1.Value);
     }
 }
 
@@ -45,6 +45,9 @@ public class BotStats
     public int TotalGridSpaces;
 
     public float Looted => NetWorth - InitialNetWorth;
+    public float PrimaryValue => WeaponValues.Primary.Value;
+    public float SecondaryValue => WeaponValues.Secondary.Value;
+    public float HolsterValue => WeaponValues.Holster.Value;
 
     public void AddNetValue(float itemPrice)
     {
