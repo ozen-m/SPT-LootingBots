@@ -545,9 +545,10 @@ public class LootingInventoryController
             return false;
         }
 
-        if (lootItem.Template is WeaponTemplate && !BotTypeUtils.IsBoss(_botOwner.Profile.Info.Settings.Role))
+        // Bosses cannot swap gear as many bosses have custom logic tailored to their loadouts
+        if (lootItem is Weapon lootWeapon && !BotTypeUtils.IsBoss(_botOwner.Profile.Info.Settings.Role))
         {
-            GetWeaponEquipAction(lootItem as Weapon, lootingActions);
+            GetWeaponEquipAction(lootWeapon, lootingActions);
             return lootingActions.Count > 0;
         }
 
@@ -788,7 +789,7 @@ public class LootingInventoryController
             else
             {
                 var holsterValue = Stats.WeaponValues.Holster.Value;
-                if (lootValue > holsterValue)
+                if (IsWeaponBetter(lootWeapon, holster, lootValue > holsterValue))
                 {
                     if (_log.DebugEnabled)
                     {
@@ -805,10 +806,10 @@ public class LootingInventoryController
         else
         {
             var primaryValue = Stats.WeaponValues.Primary.Value;
-            var isBetterThanPrimary = lootValue > primaryValue;
+            var isBetterThanPrimary = IsWeaponBetter(lootWeapon, primary, lootValue > primaryValue);
 
             var secondaryValue = Stats.WeaponValues.Secondary.Value;
-            var isBetterThanSecondary = lootValue > secondaryValue;
+            var isBetterThanSecondary = IsWeaponBetter(lootWeapon, secondary, lootValue > secondaryValue);
 
             // If we have no primary, just equip the weapon to primary
             if (primary == null)
@@ -1047,6 +1048,84 @@ public class LootingInventoryController
         }
 
         return currentArmorClass;
+    }
+
+    /// <summary>
+    /// A weapon (potentialWeapon) is defined as better when:
+    ///   1. Its ammo is in the same tier or is better than the equippedWeapon
+    ///   2. It's more valuable than the equippedWeapon
+    /// TODO: Solely base on ammo penetration power?
+    /// </summary>
+    public bool IsWeaponBetter(Weapon potentialWeapon, Weapon equippedWeapon, bool moreValuable)
+    {
+        if (equippedWeapon == null)
+        {
+            return true;
+        }
+
+        var powerDifference = GetCaliberDifference(potentialWeapon, equippedWeapon);
+        if (powerDifference >= 0 && moreValuable)
+        {
+            if (_log.DebugEnabled)
+            {
+                _log.LogDebug(
+                    $"Found better weapon {potentialWeapon.Name.Localized()} versus equipped {equippedWeapon?.Name.Localized()}. Difference: {powerDifference}, IsMoreValuable: {true}"
+                );
+            }
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Gets the difference in penetration power tier.
+    /// </summary>
+    /// <param name="potentialWeapon"></param>
+    /// <param name="equippedWeapon"></param>
+    /// <returns></returns>
+    public int GetCaliberDifference(Weapon potentialWeapon, Weapon equippedWeapon)
+    {
+        return GetWeaponPenetrationPower(potentialWeapon) / 10 - GetWeaponPenetrationPower(equippedWeapon) / 10;
+    }
+
+    /// <summary>
+    /// Gives a weapon's max penetration power from its chamber and magazines.
+    /// </summary>
+    public int GetWeaponPenetrationPower(Weapon weapon)
+    {
+        if (weapon is null)
+        {
+            return 0;
+        }
+
+        var currentPower = 0;
+        var magazine = weapon.GetCurrentMagazine();
+        if (magazine != null)
+        {
+            foreach (var ammo in magazine.Cartridges._items)
+            {
+                var power = ((AmmoTemplate)ammo.Template).PenetrationPower;
+                if (power > currentPower)
+                {
+                    currentPower = power;
+                }
+            }
+        }
+
+        foreach (var shell in weapon.ShellsInChambers)
+        {
+            if (shell is null)
+            {
+                continue;
+            }
+
+            var power = shell.PenetrationPower;
+            if (power > currentPower)
+            {
+                currentPower = power;
+            }
+        }
+        return currentPower;
     }
 
     /// <summary>
