@@ -511,11 +511,6 @@ public class LootingInventoryController
             return;
         }
 
-        if (_botOwner.InventoryController.IsChangingWeaponNonLinq())
-        {
-            _botOwner.GetPlayer.HandsController.FastForwardCurrentState();
-        }
-
         if (_log.DebugEnabled)
         {
             _log.LogDebug("Updating weapons");
@@ -591,7 +586,7 @@ public class LootingInventoryController
         }
         else if (EquipmentTypeUtils.IsChestArmor(lootItem) && ShouldSwapGear(chest, lootItem))
         {
-            // TODO: Add check for chest armor vs equipped armored rig?
+            // TODO: Add check for chest armor vs equipped armored rig? Cannot guarantee a new tac vest :/
             GetSwapAction(lootItem, chest, lootingActions, true);
         }
         else if (EquipmentTypeUtils.IsTacticalRig(lootItem) && ShouldSwapGear(tacVest, lootItem))

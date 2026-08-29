@@ -19,8 +19,6 @@ public class PostLoad(
 {
     public Task OnLoadAsync(CancellationToken cancellationToken)
     {
-        // TODO: Check APBS
-
         if (!config.PmcSpawnWithLoot)
         {
             EmptyInventory(["usec", "pmcusec", "bear", "pmcbear"]);
