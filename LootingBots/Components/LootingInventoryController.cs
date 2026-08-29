@@ -207,25 +207,43 @@ public class LootingInventoryController
 
     public void CalculateInitialNetWorth()
     {
+        if (_log.DebugEnabled)
+        {
+            _log.LogDebug("Calculating initial net worth...");
+        }
+
         Stats.NetWorth = 0f;
         foreach (var slot in _botInventoryController.Inventory.Equipment._cachedSlots)
         {
-            var containedItem = slot.ContainedItem;
-            if (containedItem == null)
+            if (string.Equals(slot.Name, "securedcontainer", StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
 
-            if (containedItem is SearchableItem searchableItem)
+            var containedItem = slot.ContainedItem;
+            switch (containedItem)
             {
-                foreach (var nestedItem in searchableItem.GetFirstLevelItems())
+                case null:
+                    continue;
+                case SearchableItem searchableItem:
                 {
-                    Stats.NetWorth += _itemAppraiser.GetItemPrice(nestedItem, _log);
+                    // Get the price of the searchable item itself
+                    Stats.NetWorth += _itemAppraiser.GetItemPrice(searchableItem, _log);
+
+                    // Get the prices of items in its grids
+                    // This assumes no further items with containers
+                    foreach (var grid in searchableItem.Grids)
+                    {
+                        foreach (var item in grid.ItemCollection.ItemsList)
+                        {
+                            Stats.NetWorth += _itemAppraiser.GetItemPrice(item, _log);
+                        }
+                    }
+                    continue;
                 }
-            }
-            else
-            {
-                Stats.NetWorth += _itemAppraiser.GetItemPrice(containedItem, _log);
+                default:
+                    Stats.NetWorth += _itemAppraiser.GetItemPrice(containedItem, _log);
+                    continue;
             }
         }
         Stats.InitialNetWorth = Stats.NetWorth;
