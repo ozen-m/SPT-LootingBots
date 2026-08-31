@@ -8,7 +8,7 @@ namespace LootingBots.Components;
 
 public class LootingTransactionController(InventoryController inventoryController, BotLog log)
 {
-    private const int NetworkTransactionTimeout = 5000;
+    private const double NetworkTransactionTimeout = 5000D;
 
     private IItemOwner _rootItemOwner;
 
@@ -209,7 +209,7 @@ public class LootingTransactionController(InventoryController inventoryControlle
             return false;
         }
 
-        var moveNetworkResult = await TryRunNetworkTransactionWithTimeoutAsync(moveResult, null, token);
+        var moveNetworkResult = await TryRunNetworkTransactionWithTimeoutAsync(moveResult, token);
         if (moveNetworkResult.Failed)
         {
             if (log.ErrorEnabled)
@@ -262,7 +262,7 @@ public class LootingTransactionController(InventoryController inventoryControlle
             return false;
         }
 
-        var swapNetworkResult = await TryRunNetworkTransactionWithTimeoutAsync(swapResult, null, token);
+        var swapNetworkResult = await TryRunNetworkTransactionWithTimeoutAsync(swapResult, token);
         if (swapNetworkResult.Failed)
         {
             if (log.ErrorEnabled)
@@ -320,7 +320,7 @@ public class LootingTransactionController(InventoryController inventoryControlle
         }
 
         await SimulatePlayerDelayAsync(token: token);
-        var mergeNetworkResult = await TryRunNetworkTransactionWithTimeoutAsync(mergeResult, null, token);
+        var mergeNetworkResult = await TryRunNetworkTransactionWithTimeoutAsync(mergeResult, token);
         if (mergeNetworkResult.Failed)
         {
             if (log.ErrorEnabled)
@@ -377,38 +377,58 @@ public class LootingTransactionController(InventoryController inventoryControlle
 
     /// <summary>
     /// Try to run network transaction with timeout.
-    /// For some odd reason I can't figure out, especially when moving the bot's active weapon around, the method runs indefinitely.
-    /// So try to circumvent it by fast forwarding the current state.
     ///
-    /// It's FirearmController+Remove operation running indefinitely.
+    /// For some reason <see cref="InventoryController.TryRunNetworkTransaction"/>
+    /// runs indefinitely when moving the bot's active weapon around.
+    /// Circumvent it by checking if the operation was successful after a timeout.
     /// </summary>
-    public async Task<IResult> TryRunNetworkTransactionWithTimeoutAsync(
-        OperationResult operationResult,
-        Callback callback = null,
-        CancellationToken token = default
-    )
+    public Task<IResult> TryRunNetworkTransactionWithTimeoutAsync(OperationResult operationResult, CancellationToken token = default)
     {
-        using var timeoutSource = new CancellationTokenSource(TimeSpan.FromMilliseconds(NetworkTransactionTimeout));
-
-        var networkTask = inventoryController.TryRunNetworkTransaction(operationResult, callback);
-
-        await Task.WhenAny(networkTask, Task.Delay(Timeout.Infinite, timeoutSource.Token), Task.Delay(Timeout.Infinite, token));
-
-        if (timeoutSource.Token.IsCancellationRequested)
+        if (operationResult.Failed)
         {
-            var playerInvCont = (Player.PlayerInventoryController)inventoryController;
-            if (log.WarningEnabled)
+            return Task.FromResult<IResult>(new FailedResult(operationResult.Error!.ToString()));
+        }
+        if (operationResult.Value.CanExecute(inventoryController))
+        {
+            return RunNetworkTransactionWithTimeoutAsync(operationResult, token);
+        }
+        return Task.FromResult<IResult>(new FailedResult("InventoryController cannot execute this operation"));
+    }
+
+    /// <summary>
+    /// A modified <see cref="InventoryController.RunNetworkTransaction"/> that includes a timeout
+    /// </summary>
+    private async Task<IResult> RunNetworkTransactionWithTimeoutAsync(OperationResult operationResult, CancellationToken token = default)
+    {
+        using var callbackSource = new CallbackTaskCompletionSource<IResult>(token);
+
+        var operation = inventoryController.ConvertOperationResultToOperation(operationResult.Value);
+        inventoryController.Execute(operation, callbackSource.TrySetResult);
+
+        using var timeoutSource = new CancellationTokenSource();
+        var timeoutTask = Task.Delay(TimeSpan.FromMilliseconds(NetworkTransactionTimeout), timeoutSource.Token);
+
+        var completedTask = await Task.WhenAny(callbackSource.Task, timeoutTask);
+        if (completedTask == timeoutTask)
+        {
+            if (operation.Status is EOperationStatus.Succeeded)
             {
-                log.LogWarning("Timed out on network transaction, trying to fast forward...");
+                callbackSource.TrySetResult(new SuccessfulResult());
             }
-            playerInvCont.Player.FastForwardCurrentOperations();
+            else
+            {
+                operation.Dispose();
+                callbackSource.TrySetResult(
+                    new FailedResult($"Timed out on network transaction, operation status: {operation.Status.ToString()}")
+                );
+            }
         }
         else
         {
-            token.ThrowIfCancellationRequested();
+            timeoutSource.Cancel();
         }
 
-        return await networkTask;
+        return await callbackSource.Task;
     }
 
     /// <summary>
@@ -421,7 +441,7 @@ public class LootingTransactionController(InventoryController inventoryControlle
             delay = LootingBots.TransactionDelay.Value;
         }
 
-        return Task.Delay(TimeSpan.FromMilliseconds(delay), cancellationToken: token);
+        return Task.Delay(TimeSpan.FromMilliseconds(delay), token);
     }
 
     /// <summary>
