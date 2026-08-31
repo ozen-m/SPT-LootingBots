@@ -222,6 +222,11 @@ public class LootingBrain : MonoBehaviour
     {
         LootTaskRunning = true;
         _lootTimer.Restart();
+        if (_lootingCts is not null)
+        {
+            _lootingCts.Cancel();
+            _lootingCts.Dispose();
+        }
         _lootingCts = new CancellationTokenSource(LootingBots.LootTimeout.Value * 1000);
 
         if (_log.InfoEnabled)
