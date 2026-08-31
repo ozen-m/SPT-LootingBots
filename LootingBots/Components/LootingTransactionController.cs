@@ -6,9 +6,10 @@ using LootingBots.Utilities;
 
 namespace LootingBots.Components;
 
-public class LootingTransactionController(InventoryController inventoryController, BotLog log)
+public class LootingTransactionController(BotOwner owner, InventoryController inventoryController, BotLog log)
 {
-    private const double NetworkTransactionTimeout = 5000D;
+    private const float NetworkTransactionTimeout = 5f;
+    private readonly TimeoutController _timeoutController = owner.GetOrAddComponent<TimeoutController>();
 
     private IItemOwner _rootItemOwner;
 
@@ -209,7 +210,7 @@ public class LootingTransactionController(InventoryController inventoryControlle
             return false;
         }
 
-        var moveNetworkResult = await TryRunNetworkTransactionWithTimeoutAsync(moveResult, token);
+        var moveNetworkResult = await TryRunNetworkTransactionWithTimeoutAsync(moveResult);
         if (moveNetworkResult.Failed)
         {
             if (log.ErrorEnabled)
@@ -262,7 +263,7 @@ public class LootingTransactionController(InventoryController inventoryControlle
             return false;
         }
 
-        var swapNetworkResult = await TryRunNetworkTransactionWithTimeoutAsync(swapResult, token);
+        var swapNetworkResult = await TryRunNetworkTransactionWithTimeoutAsync(swapResult);
         if (swapNetworkResult.Failed)
         {
             if (log.ErrorEnabled)
@@ -320,7 +321,7 @@ public class LootingTransactionController(InventoryController inventoryControlle
         }
 
         await SimulatePlayerDelayAsync(token: token);
-        var mergeNetworkResult = await TryRunNetworkTransactionWithTimeoutAsync(mergeResult, token);
+        var mergeNetworkResult = await TryRunNetworkTransactionWithTimeoutAsync(mergeResult);
         if (mergeNetworkResult.Failed)
         {
             if (log.ErrorEnabled)
@@ -382,7 +383,7 @@ public class LootingTransactionController(InventoryController inventoryControlle
     /// runs indefinitely when moving the bot's active weapon around.
     /// Circumvent it by checking if the operation was successful after a timeout.
     /// </summary>
-    public Task<IResult> TryRunNetworkTransactionWithTimeoutAsync(OperationResult operationResult, CancellationToken token = default)
+    public Task<IResult> TryRunNetworkTransactionWithTimeoutAsync(OperationResult operationResult)
     {
         if (operationResult.Failed)
         {
@@ -390,7 +391,7 @@ public class LootingTransactionController(InventoryController inventoryControlle
         }
         if (operationResult.Value.CanExecute(inventoryController))
         {
-            return RunNetworkTransactionWithTimeoutAsync(operationResult, token);
+            return RunNetworkTransactionWithTimeoutAsync(operationResult);
         }
         return Task.FromResult<IResult>(new FailedResult("InventoryController cannot execute this operation"));
     }
@@ -398,37 +399,29 @@ public class LootingTransactionController(InventoryController inventoryControlle
     /// <summary>
     /// A modified <see cref="InventoryController.RunNetworkTransaction"/> that includes a timeout
     /// </summary>
-    private async Task<IResult> RunNetworkTransactionWithTimeoutAsync(OperationResult operationResult, CancellationToken token = default)
+    private async Task<IResult> RunNetworkTransactionWithTimeoutAsync(OperationResult operationResult)
     {
-        using var callbackSource = new CallbackTaskCompletionSource<IResult>(token);
+        var timeoutToken = _timeoutController.Timeout(NetworkTransactionTimeout);
+        using var callbackSource = new CallbackTaskCompletionSource<IResult>(timeoutToken);
 
         var operation = inventoryController.ConvertOperationResultToOperation(operationResult.Value);
         inventoryController.Execute(operation, callbackSource.TrySetResult);
 
-        using var timeoutSource = new CancellationTokenSource();
-        var timeoutTask = Task.Delay(TimeSpan.FromMilliseconds(NetworkTransactionTimeout), timeoutSource.Token);
-
-        var completedTask = await Task.WhenAny(callbackSource.Task, timeoutTask);
-        if (completedTask == timeoutTask)
+        try
+        {
+            var result = await callbackSource.Task;
+            _timeoutController.ResetTimer();
+            return result;
+        }
+        catch (OperationCanceledException) when (_timeoutController.IsTimeout)
         {
             if (operation.Status is EOperationStatus.Succeeded)
             {
-                callbackSource.TrySetResult(new SuccessfulResult());
+                return new SuccessfulResult();
             }
-            else
-            {
-                operation.Dispose();
-                callbackSource.TrySetResult(
-                    new FailedResult($"Timed out on network transaction, operation status: {operation.Status.ToString()}")
-                );
-            }
+            operation.Dispose();
+            return new FailedResult($"Timed out on network transaction, operation status: {operation.Status.ToString()}");
         }
-        else
-        {
-            timeoutSource.Cancel();
-        }
-
-        return await callbackSource.Task;
     }
 
     /// <summary>
