@@ -6,8 +6,8 @@
 /// </summary>
 public class CallbackTaskCompletionSource<TResult> : TaskCompletionSource<TResult>, IDisposable
 {
-    private readonly CancellationToken? _token;
-    private readonly CancellationTokenRegistration? _registration;
+    private readonly CancellationToken _token;
+    private readonly CancellationTokenRegistration _registration;
 
     /// <inheritdoc/>
     /// <param name="token">A <see cref="CancellationToken"/> that can cancel the underlying <see cref="TaskCompletionSource{TResult}"/>.Task</param>
@@ -17,6 +17,7 @@ public class CallbackTaskCompletionSource<TResult> : TaskCompletionSource<TResul
         {
             return;
         }
+
         _token = token;
         _registration = token.Register(static tcs => ((CallbackTaskCompletionSource<TResult>)tcs).TrySetCanceled(), this);
     }
@@ -25,7 +26,7 @@ public class CallbackTaskCompletionSource<TResult> : TaskCompletionSource<TResul
     /// <inheritdoc cref="TaskCompletionSource{TResult}.TrySetCanceled()" />
     public new void TrySetCanceled()
     {
-        base.TrySetCanceled(_token ?? CancellationToken.None);
+        base.TrySetCanceled(_token);
     }
 
     /// <returns></returns>
@@ -51,6 +52,6 @@ public class CallbackTaskCompletionSource<TResult> : TaskCompletionSource<TResul
 
     public void Dispose()
     {
-        _registration?.Dispose();
+        _registration.Dispose();
     }
 }
