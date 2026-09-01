@@ -13,6 +13,10 @@ internal class LootingLayer : CustomLayer
     private readonly LootingBrain _lootingBrain;
     private readonly LootFinder _lootFinder;
 
+    private readonly Action _lootingLogic;
+    private readonly Action _findLootLogic;
+    private readonly Action _peacefulLogic;
+
     public LootingLayer(BotOwner botOwner, int priority)
         : base(botOwner, priority)
     {
@@ -23,6 +27,10 @@ internal class LootingLayer : CustomLayer
 
         _lootingBrain = lootingBrain;
         _lootFinder = lootFinder;
+
+        _lootingLogic = new Action(typeof(LootingLogic), "Looting");
+        _findLootLogic = new Action(typeof(FindLootLogic), "Loot Scan");
+        _peacefulLogic = new Action(typeof(PeacefulLogic), "Peaceful");
     }
 
     public override string GetName()
@@ -55,15 +63,15 @@ internal class LootingLayer : CustomLayer
     {
         if (_lootingBrain.IsBotLooting)
         {
-            return new Action(typeof(LootingLogic), "Looting");
+            return _lootingLogic;
         }
 
         if (_lootFinder.IsScheduledScan)
         {
-            return new Action(typeof(FindLootLogic), "Loot Scan");
+            return _findLootLogic;
         }
 
-        return new Action(typeof(PeacefulLogic), "Peaceful");
+        return _peacefulLogic;
     }
 
     public override bool IsCurrentActionEnding()
