@@ -110,14 +110,12 @@ public class LootingBrain : MonoBehaviour
     private float _performanceTimer;
     private BotLog _log;
     private TimeoutController _lootingCtsSource;
-    private Action<Task> _handleExceptionAction;
     private Action _exitPickupStateAction;
 
     public void Init(BotOwner botOwner)
     {
         _log = new BotLog(LootingBots.LootLog, botOwner);
         _lootingCtsSource = gameObject.AddComponent<TimeoutController>();
-        _handleExceptionAction = ExceptionHandler;
         _exitPickupStateAction = ExitPickupState;
 
         BotOwner = botOwner;
@@ -237,13 +235,13 @@ public class LootingBrain : MonoBehaviour
         switch (ActiveLootType)
         {
             case LootFinder.LootType.Corpse:
-                _ = LootCorpseAsync(token).ContinueWith(_handleExceptionAction, TaskScheduler.Current);
+                _ = LootCorpseAsync(token);
                 break;
             case LootFinder.LootType.Container:
-                _ = LootContainerAsync(token).ContinueWith(_handleExceptionAction, TaskScheduler.Current);
+                _ = LootContainerAsync(token);
                 break;
             case LootFinder.LootType.Item:
-                _ = LootItemAsync(token).ContinueWith(_handleExceptionAction, TaskScheduler.Current);
+                _ = LootItemAsync(token);
                 break;
         }
     }
@@ -299,6 +297,10 @@ public class LootingBrain : MonoBehaviour
             InventoryController.SetRootItemOwner(corpseInventoryEquipment.Owner);
             isSuccessful = await InventoryController.TryAddItemsToBotAsync(_itemsToLoot, token);
         }
+        catch (Exception e)
+        {
+            ExceptionHandler(e);
+        }
         finally
         {
             BotOwner.GetPlayer.SetInventoryOpened(false);
@@ -352,6 +354,10 @@ public class LootingBrain : MonoBehaviour
                 await BotOwner.InteractAsync(container, EInteractionType.Close);
             }
         }
+        catch (Exception e)
+        {
+            ExceptionHandler(e);
+        }
         finally
         {
             BotOwner.GetPlayer.SetInventoryOpened(false);
@@ -398,6 +404,10 @@ public class LootingBrain : MonoBehaviour
                 BotOwner.GetPlayer.CurrentManagedState.Pickup(true, _exitPickupStateAction);
             }
         }
+        catch (Exception e)
+        {
+            ExceptionHandler(e);
+        }
         finally
         {
             BotOwner.GetPlayer.MovementContext._isInPatrol = false;
@@ -415,7 +425,6 @@ public class LootingBrain : MonoBehaviour
     public void OnLootTaskEnd(bool lootingSuccessful)
     {
         _lootTimer.Stop();
-        _lootingCtsSource.ResetTimer();
 
         // Only ignore if looting was successful.
         CleanupLoot(lootingSuccessful);
@@ -515,9 +524,9 @@ public class LootingBrain : MonoBehaviour
         }
     }
 
-    private void ExceptionHandler(Task task)
+    private void ExceptionHandler(Exception exception)
     {
-        if (task.IsCanceled)
+        if (exception is OperationCanceledException)
         {
             if (_lootingCtsSource.IsTimeout)
             {
@@ -525,16 +534,18 @@ public class LootingBrain : MonoBehaviour
                 {
                     _log.LogWarning($"Looting interrupted due to timeout ({LootingBots.LootTimeout.Value}s)");
                 }
+                return;
             }
-            else if (_log.DebugEnabled)
+
+            if (_log.DebugEnabled)
             {
                 _log.LogDebug("Looting interrupted");
             }
+            _lootingCtsSource.ResetTimer();
+            return;
         }
-        else if (task.IsFaulted)
-        {
-            _log.LogError("Exception while trying to loot:");
-            _log.LogError(task.Exception!.ToString());
-        }
+
+        _log.LogError("Exception while trying to loot:");
+        _log.LogError(exception.ToString());
     }
 }
