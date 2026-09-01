@@ -59,9 +59,10 @@ public class LootFinder : MonoBehaviour
         Item = 3,
     }
 
-    public bool IsScanRunning { get; private set; }
+    public bool IsScanRunning => _lootTask is not null && !_lootTask.IsCompleted;
+
+    private Task _lootTask;
     private CancellationTokenSource _lootFinderCts;
-    private Action<Task> _handleExceptionAction;
     private GameObject[] _debugSpheres;
 
     private readonly Queue<LootableContainer> _priorityLootableContainers = [];
@@ -73,7 +74,7 @@ public class LootFinder : MonoBehaviour
         _botOwner = botOwner;
         _lootingBrain = _botOwner.GetPlayer.gameObject.GetComponent<LootingBrain>();
         _log = new BotLog(LootingBots.LootLog, _botOwner);
-        _handleExceptionAction = ExceptionHandler;
+        _lootFinderCts = new CancellationTokenSource();
 
         _containerLootingEnabled = LootingBots.ContainerLootingEnabled.Value.IsBotEnabled(_lootingBrain);
         _needsContainerSight = LootingBots.DetectContainerNeedsSight.Value.IsBotEnabled(_lootingBrain);
@@ -104,13 +105,16 @@ public class LootFinder : MonoBehaviour
 
     public void BeginSearch(int ticket)
     {
-        IsScanRunning = true;
-
         StopFindingLoot();
-        _lootFinderCts = new CancellationTokenSource();
+        if (_lootFinderCts.IsCancellationRequested)
+        {
+            _lootFinderCts.Dispose();
+            _lootFinderCts = new CancellationTokenSource();
+        }
+
         if (!FindPrioritizedLoot(ticket))
         {
-            _ = FindLootAsync(ticket, _lootFinderCts.Token).ContinueWith(_handleExceptionAction, TaskScheduler.Current);
+            _lootTask = FindLootAsync(ticket, _lootFinderCts.Token);
         }
 
         SetLockUntilNextScan(false);
@@ -136,14 +140,12 @@ public class LootFinder : MonoBehaviour
 
     public void StopFindingLoot()
     {
-        if (_lootFinderCts is null)
+        if (!IsScanRunning)
         {
             return;
         }
 
         _lootFinderCts.Cancel();
-        _lootFinderCts.Dispose();
-        _lootFinderCts = null;
     }
 
     public void EnqueuePriorityCorpse(string corpseProfileId)
@@ -170,6 +172,7 @@ public class LootFinder : MonoBehaviour
     public void OnDestroy()
     {
         StopFindingLoot();
+        _lootFinderCts.Dispose();
 
         if (_containerLootingEnabled)
         {
@@ -192,8 +195,6 @@ public class LootFinder : MonoBehaviour
 
     private async Task FindLootAsync(int queue, CancellationToken token)
     {
-        IsScanRunning = true;
-
         var colliders = _colliderPool.Rent(3000);
 
         try
@@ -383,6 +384,23 @@ public class LootFinder : MonoBehaviour
                 return;
             }
         }
+        catch (Exception e)
+        {
+            if (e is OperationCanceledException)
+            {
+                if (_log.DebugEnabled)
+                {
+                    _log.LogDebug("Loot scan interrupted");
+                }
+                return;
+            }
+
+            if (_log.ErrorEnabled)
+            {
+                _log.LogError("Exception while trying to scan for loot:");
+                _log.LogError(e.ToString());
+            }
+        }
         finally
         {
             if (
@@ -391,6 +409,7 @@ public class LootFinder : MonoBehaviour
                 && ++_emptyAttempts >= LootingBots.MaxEmptyAttempts.Value
             )
             {
+                // Note: Cancellations count towards emptyAttempts
                 if (_log.InfoEnabled)
                 {
                     _log.LogInfo($"Max empty attempts reached, preventing looting for {LootingBots.EmptyAttemptsCooldown.Value}s");
@@ -402,7 +421,6 @@ public class LootFinder : MonoBehaviour
             _colliderPool.Return(colliders, true);
             ScanScheduler.Return(queue);
             _lootingBrain.ForceBrainEnabled = false;
-            IsScanRunning = false;
         }
     }
 
@@ -448,7 +466,6 @@ public class LootFinder : MonoBehaviour
 
             ScanScheduler.Return(ticket);
             _lootingBrain.ForceBrainEnabled = false;
-            IsScanRunning = false;
             return true;
         }
 
@@ -524,7 +541,6 @@ public class LootFinder : MonoBehaviour
 
             ScanScheduler.Return(ticket);
             _lootingBrain.ForceBrainEnabled = false;
-            IsScanRunning = false;
             return true;
         }
 
@@ -629,27 +645,6 @@ public class LootFinder : MonoBehaviour
     private void OnKilledEnemyPlayer(string victimProfileId, DamageInfo damageInfo)
     {
         EnqueuePriorityCorpse(victimProfileId);
-    }
-
-    private void ExceptionHandler(Task task)
-    {
-        if (task.IsCanceled)
-        {
-            if (_log.DebugEnabled)
-            {
-                _log.LogDebug("Loot scan interrupted");
-            }
-            return;
-        }
-
-        if (task.IsFaulted)
-        {
-            if (_log.ErrorEnabled)
-            {
-                _log.LogError("Exception while trying to scan for loot:");
-                _log.LogError(task.Exception!.ToString());
-            }
-        }
     }
 
     private void InitializeDebugSpheres()
