@@ -36,7 +36,7 @@ public sealed class TimeoutController : MonoBehaviour
         {
             throw new InvalidOperationException("A timeout is already running.");
         }
-        if (IsTimeout)
+        if (IsCanceled)
         {
             _timeoutSource.Dispose();
             _timeoutSource = new CancellationTokenSource();
@@ -58,8 +58,10 @@ public sealed class TimeoutController : MonoBehaviour
 
     /// <summary>
     /// Manually cancels the currently running timeout.
-    /// This cancellation is distinguished from cancellation caused by the timeout elapsing.
+    /// This cancellation is different from cancellation caused by the timeout elapsing.
     /// </summary>
+    /// <seealso cref="IsCanceled"/>
+    /// <seealso cref="IsTimeout"/>
     public void Cancel()
     {
         _isCanceledExternally = true;
