@@ -9,7 +9,7 @@ namespace LootingBots.Components;
 public class LootingTransactionController(BotOwner owner, InventoryController inventoryController, BotLog log)
 {
     private const float NetworkTransactionTimeout = 5f;
-    private readonly TimeoutController _timeoutController = owner.GetOrAddComponent<TimeoutController>();
+    private readonly TimeoutController _networkTimeout = owner.GetPlayer.gameObject.AddComponent<TimeoutController>();
 
     private IItemOwner _rootItemOwner;
 
@@ -401,7 +401,7 @@ public class LootingTransactionController(BotOwner owner, InventoryController in
     /// </summary>
     private async Task<IResult> RunNetworkTransactionWithTimeoutAsync(OperationResult operationResult)
     {
-        var timeoutToken = _timeoutController.Timeout(NetworkTransactionTimeout);
+        var timeoutToken = _networkTimeout.Timeout(NetworkTransactionTimeout);
         using var callbackSource = new CallbackTaskCompletionSource<IResult>(timeoutToken);
 
         var operation = inventoryController.ConvertOperationResultToOperation(operationResult.Value);
@@ -410,10 +410,10 @@ public class LootingTransactionController(BotOwner owner, InventoryController in
         try
         {
             var result = await callbackSource.Task;
-            _timeoutController.ResetTimer();
+            _networkTimeout.ResetTimer();
             return result;
         }
-        catch (OperationCanceledException) when (_timeoutController.IsTimeout)
+        catch (OperationCanceledException) when (_networkTimeout.IsTimeout)
         {
             if (operation.Status is EOperationStatus.Succeeded)
             {
