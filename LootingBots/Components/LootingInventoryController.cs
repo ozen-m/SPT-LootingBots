@@ -442,8 +442,9 @@ public class LootingInventoryController
 
                     // Do post-equip actions
                     // We looted a weapon, calculate gear value
-                    if (item is Weapon)
+                    if (item is Weapon weapon)
                     {
+                        _transactionController.AddExtraAmmo(weapon);
                         CalculateGearValue();
                     }
 

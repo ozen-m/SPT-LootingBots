@@ -13,104 +13,109 @@ public class LootingTransactionController
     private readonly TimeoutController _networkTimeout;
 
     private readonly InventoryController _inventoryController;
+    private readonly Player _player;
     private readonly BotLog _log;
+
+    private readonly List<Ammo> _extraAmmoScratch = [];
 
     private IItemOwner _rootItemOwner;
 
     public LootingTransactionController(BotOwner owner, InventoryController inventoryController, BotLog log)
     {
         _inventoryController = inventoryController;
+        _player = owner.GetPlayer;
         _log = log;
-        _networkTimeout = owner.GetPlayer.gameObject.AddComponent<TimeoutController>();
-        owner.GetPlayer.OnIPlayerDeadOrUnspawn += DestroyNetworkTimeoutController;
+        _networkTimeout = _player.gameObject.AddComponent<TimeoutController>();
+        _player.OnIPlayerDeadOrUnspawn += DestroyNetworkTimeoutController;
     }
 
     /// <summary>
     /// Tries to add extra spare ammo for the weapon being looted into the bot's secure container,
     /// so that the bots are able to refill their mags properly in their reload logic.
-    ///
-    /// Incompatible with Fika.
     /// </summary>
-    public bool AddExtraAmmo(Weapon weapon)
+    public void AddExtraAmmo(Weapon weapon)
     {
-        try
+        var securedContainer = (SearchableItem)
+            _inventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.SecuredContainer).ContainedItem;
+        if (securedContainer is null)
         {
-            var secureContainer = (SearchableItem)
-                _inventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.SecuredContainer).ContainedItem;
-
-            var container = secureContainer.Grids.FirstOrDefault();
-
-            // Try to get the current ammo used by the weapon by checking the contents of the magazine.
-            // If it's empty, try to create an instance of the ammo using the Weapon's CurrentAmmoTemplate
-            var ammoToAdd =
-                weapon.GetCurrentMagazine()?.FirstRealAmmo()
-                ?? Singleton<ItemFactory>.Instance.CreateItem(MongoID.Generate(), weapon.CurrentAmmoTemplate._id, null);
-
-            // Check to see if there already is ammo that meets the weapon's caliber in the secure container
-            var alreadyHasAmmo = false;
-
-            foreach (var item in secureContainer.GetAllItems())
+            if (_log.WarningEnabled)
             {
-                if (item is Ammo bullet && bullet.Caliber.Equals(((Ammo)ammoToAdd).Caliber))
-                {
-                    alreadyHasAmmo = true;
-                    break; // Early exit as soon as a match is found
-                }
+                _log.LogWarning($"Could not find secured container to check extra ammo for {weapon.Name.Localized()}");
             }
+            return;
+        }
 
-            // If we don't have any ammo,
-            // attempt to add 10 max ammo stacks into the bot's secure container for use in the bot's internal reloading code
-            if (!alreadyHasAmmo)
+        // Get the weapons chamber to check
+        var weaponChamber = weapon.HasChambers ? weapon.Chambers[0] : null;
+        if (weaponChamber is null)
+        {
+            return;
+        }
+
+        // Get all ammo items in the secured container
+        // then check to see if there already is ammo that meets the weapon's caliber in the secure container
+        _extraAmmoScratch.Clear();
+        securedContainer.GetAllItemsNonAlloc(_extraAmmoScratch);
+        foreach (var bullet in _extraAmmoScratch)
+        {
+            if (weaponChamber.CanAccept(bullet))
             {
                 if (_log.DebugEnabled)
                 {
-                    _log.LogDebug($"Trying to add ammo");
+                    _log.LogDebug($"Already has ammo for {weapon.Name.Localized()}");
                 }
+                return; // Early exit as soon as a match is found
+            }
+        }
 
-                var ammoAdded = 0;
+        // If we don't have any ammo,
+        // attempt to add 10 max ammo stacks into the bot's secure container for use in the bot's internal reloading code
+        if (_log.DebugEnabled)
+        {
+            _log.LogDebug($"Trying to add ammo");
+        }
 
-                for (var i = 0; i < 10; i++)
+        // Try to get the current ammo used by the weapon by checking the weapon's chamber.
+        // If it's empty, check the contents of the magazine.
+        // If it's still empty, try to create an instance of the ammo using the Weapon's CurrentAmmoTemplate.
+        var ammoToAdd =
+            weaponChamber.ContainedItem
+            ?? weapon.GetCurrentMagazine()?.FirstRealAmmo()
+            ?? Singleton<ItemFactory>.Instance.CreateItem(MongoID.Generate(), weapon.CurrentAmmoTemplate._id, null);
+
+        var ammoAdded = 0;
+        var container = securedContainer.Grids[0];
+
+        for (var i = 0; i < 10; i++)
+        {
+            var ammo = ammoToAdd.CloneItem();
+            ammo.StackObjectsCount = ammo.StackMaxSize;
+
+            var location = container.FindFreeSpace(ammo);
+            if (location != null)
+            {
+                var result = container.AddItemWithoutRestrictions(ammo, location);
+                if (result.Succeeded)
                 {
-                    var ammo = ammoToAdd.CloneItem();
-                    ammo.StackObjectsCount = ammo.StackMaxSize;
-
-                    var location = container.FindFreeSpace(ammo);
-
-                    if (location != null)
-                    {
-                        var result = container.AddItemWithoutRestrictions(ammo, location);
-                        if (result.Succeeded)
-                        {
-                            ammoAdded += ammo.StackObjectsCount;
-                        }
-                        else if (_log.ErrorEnabled)
-                        {
-                            _log.LogError($"Failed to add {ammo.Name.Localized()} to secure container");
-                        }
-                    }
-                    else if (_log.ErrorEnabled)
-                    {
-                        _log.LogError($"Cannot find location in secure container for {ammo.Name.Localized()}");
-                    }
+                    ammoAdded += ammo.StackObjectsCount;
+                    FikaHandler.TrySendAmmoAddedPacket(_player, ammo);
                 }
-
-                if (ammoAdded > 0 && _log.DebugEnabled)
+                else if (_log.ErrorEnabled)
                 {
-                    _log.LogDebug($"Successfully added {ammoAdded} round of {ammoToAdd.Name.Localized()}");
+                    _log.LogError($"Failed to add {ammo.Name.Localized()} to secure container: {result.Error}");
                 }
             }
             else if (_log.DebugEnabled)
             {
-                _log.LogDebug($"Already has ammo for {weapon.Name.Localized()}");
+                _log.LogDebug($"Cannot find location in secure container for {ammo.Name.Localized()}");
             }
         }
-        catch (Exception e)
-        {
-            _log.LogError(e);
-            return false;
-        }
 
-        return true;
+        if (ammoAdded > 0 && _log.DebugEnabled)
+        {
+            _log.LogDebug($"Successfully added {ammoAdded} round of {ammoToAdd.Name.Localized()}");
+        }
     }
 
     /// <summary>
