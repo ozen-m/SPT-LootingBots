@@ -494,7 +494,7 @@ public class LootingBrain : MonoBehaviour
             lootFinder.EnqueuePriorityCorpse(corpse.PlayerProfileID);
         }
 
-        ActiveLootCache.Cleanup(CachedActiveLootId);
+        ActiveLootCache.Cleanup(CachedActiveLootId, BotOwner);
         SetLoot(null, LootFinder.LootType.None, Vector3.zero, Vector3.zero, string.Empty);
     }
 

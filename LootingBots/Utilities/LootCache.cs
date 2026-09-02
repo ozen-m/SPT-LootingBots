@@ -1,19 +1,28 @@
 using Comfort.Common;
 using EFT;
+using UnityEngine.Pool;
 
 namespace LootingBots.Utilities;
 
 /// <summary>
-/// Tracks lootable objects currently targeted by bots to prevent multiple bots
+/// Tracks lootable objects currently targeted by bots to prevent multiple friendly bots
 /// from navigating to the same lootable simultaneously.
 /// </summary>
 public static class ActiveLootCache
 {
-    // Handle to the players instance for use in friendly checks
+    /// <summary>
+    /// Handle to the players instance for use in distance checks
+    /// </summary>
     private static readonly List<IPlayer> _activePlayers = [];
 
-    private static readonly Dictionary<string, BotOwner> _activeLoot = [];
+    /// <summary>
+    /// Handle to the looters(BotOwner) of loot id
+    /// </summary>
+    private static readonly Dictionary<string, HashSet<BotOwner>> _activeLoot = [];
 
+    /// <summary>
+    /// Initialize the bot players list for distance checks
+    /// </summary>
     public static void Init()
     {
         if (_activePlayers.Count > 0)
@@ -39,29 +48,68 @@ public static class ActiveLootCache
 
     public static void Reset()
     {
+        foreach (var (_, looters) in _activeLoot)
+        {
+            looters.Clear();
+            HashSetPool<BotOwner>.Release(looters);
+        }
         _activeLoot.Clear();
         _activePlayers.Clear();
     }
 
     public static bool CacheActiveLootId(string lootId, BotOwner botOwner)
     {
-        return botOwner != null && !string.IsNullOrEmpty(lootId) && _activeLoot.TryAdd(lootId, botOwner);
+        if (botOwner == null || string.IsNullOrEmpty(lootId))
+        {
+            return false;
+        }
+
+        if (!_activeLoot.TryGetValue(lootId, out var looters))
+        {
+            looters = HashSetPool<BotOwner>.Get();
+            _activeLoot.Add(lootId, looters);
+        }
+        return looters.Add(botOwner);
     }
 
-    public static bool IsLootInUse(string lootId)
+    public static bool IsLootInUse(string lootId, BotOwner botOwner)
     {
-        return _activeLoot.ContainsKey(lootId);
+        if (_activeLoot.TryGetValue(lootId, out var looters))
+        {
+            foreach (var looter in looters)
+            {
+                if (!botOwner.BotsGroup.IsPlayerEnemy(looter))
+                {
+                    return true; // botOwner is friendly to looter, disallow looting the same loot
+                }
+            }
+            return false; // No friendlies looting
+        }
+
+        return false; // lootId is not being looted
     }
 
-    public static void Cleanup(string lootId)
+    public static void Cleanup(string lootId, BotOwner botOwner)
     {
-        if (string.IsNullOrEmpty(lootId))
+        if (botOwner == null || string.IsNullOrEmpty(lootId))
         {
             return;
         }
 
-        if (_activeLoot.Remove(lootId, out _))
+        if (_activeLoot.TryGetValue(lootId, out var looters))
         {
+            if (!looters.Remove(botOwner))
+            {
+                if (LootingBots.LootLog.WarningEnabled)
+                {
+                    LootingBots.LootLog.LogWarning($"Could not find bot owner to remove from ActiveLootCache: {lootId}");
+                }
+            }
+            if (looters.Count == 0)
+            {
+                _activeLoot.Remove(lootId);
+                HashSetPool<BotOwner>.Release(looters);
+            }
             return;
         }
 

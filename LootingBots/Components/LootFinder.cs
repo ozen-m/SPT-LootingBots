@@ -304,7 +304,7 @@ public class LootFinder : MonoBehaviour
 
                 // If object has been ignored, skip to the next object detected
                 var rootItemId = rootItem.Id;
-                if (_lootingBrain.IsLootIgnored(rootItemId) || ActiveLootCache.IsLootInUse(rootItemId))
+                if (_lootingBrain.IsLootIgnored(rootItemId) || ActiveLootCache.IsLootInUse(rootItemId, _botOwner))
                 {
                     await Task.Yield();
 
@@ -489,7 +489,7 @@ public class LootFinder : MonoBehaviour
             {
                 continue;
             }
-            if (ActiveLootCache.IsLootInUse(rootItemId))
+            if (ActiveLootCache.IsLootInUse(rootItemId, _botOwner))
             {
                 if (_log.DebugEnabled)
                 {
