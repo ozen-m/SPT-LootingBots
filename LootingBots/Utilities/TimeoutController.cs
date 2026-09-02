@@ -20,9 +20,20 @@ public sealed class TimeoutController : MonoBehaviour
     private bool _isRunning;
     private bool _isCanceledExternally;
 
-    public bool IsActive => _isRunning;
-    public bool IsCanceled => _timeoutSource.IsCancellationRequested;
-    public bool IsTimeout => _timeoutSource.IsCancellationRequested && !_isCanceledExternally;
+    public bool IsActive
+    {
+        get { return _isRunning; }
+    }
+
+    public bool IsCanceled
+    {
+        get { return _timeoutSource.IsCancellationRequested; }
+    }
+
+    public bool IsTimeout
+    {
+        get { return _timeoutSource.IsCancellationRequested && !_isCanceledExternally; }
+    }
 
     /// <summary>
     /// Starts a timeout and returns a CancellationToken

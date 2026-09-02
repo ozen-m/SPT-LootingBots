@@ -55,7 +55,6 @@ public static class External
             if (lootingBrain.IsBrainEnabled)
             {
                 lootFinder.OverrideNextScanTime(duration);
-
                 lootingBrain.StopLooting();
             }
 

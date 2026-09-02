@@ -44,10 +44,25 @@ public class BotStats
     public int AvailableGridSpaces;
     public int TotalGridSpaces;
 
-    public float Looted => NetWorth - InitialNetWorth;
-    public float PrimaryValue => WeaponValues.Primary.Value;
-    public float SecondaryValue => WeaponValues.Secondary.Value;
-    public float HolsterValue => WeaponValues.Holster.Value;
+    public float Looted
+    {
+        get { return NetWorth - InitialNetWorth; }
+    }
+
+    public float PrimaryValue
+    {
+        get { return WeaponValues.Primary.Value; }
+    }
+
+    public float SecondaryValue
+    {
+        get { return WeaponValues.Secondary.Value; }
+    }
+
+    public float HolsterValue
+    {
+        get { return WeaponValues.Holster.Value; }
+    }
 
     public void AddNetValue(float itemPrice)
     {
@@ -82,16 +97,22 @@ public class BotStats
 
 public class LootingInventoryController
 {
-    private readonly BotLog _log;
-    private readonly LootingTransactionController _transactionController;
     private readonly BotOwner _botOwner;
     private readonly InventoryController _botInventoryController;
     private readonly LootingBrain _lootingBrain;
+    private readonly LootingTransactionController _transactionController;
+    private readonly BotLog _log;
     private readonly ItemAppraiser _itemAppraiser;
+
+    public readonly BotStats Stats = new();
+
     private readonly Action _updateActiveWeaponAction;
     private readonly Callback<IHandsController> _onWeaponTakenCallback;
 
-    public readonly BotStats Stats = new();
+    // Represents the value in roubles of the current item
+    public float CurrentItemPrice;
+
+    public bool ShouldSort = true;
 
     public Item CurrentArmorVest
     {
@@ -120,11 +141,6 @@ public class LootingInventoryController
     {
         get { return CurrentArmorRig ?? CurrentArmorVest; }
     }
-
-    // Represents the value in roubles of the current item
-    public float CurrentItemPrice;
-
-    public bool ShouldSort = true;
 
     public LootingInventoryController(BotOwner botOwner, LootingBrain lootingBrain)
     {
@@ -646,8 +662,7 @@ public class LootingInventoryController
     {
         foreach (var weaponSlot in _weaponSlots)
         {
-            var slot = equipment.GetSlot(weaponSlot);
-            if (slot?.ContainedItem is not Weapon weapon)
+            if (equipment.GetSlot(weaponSlot).ContainedItem is not Weapon weapon)
             {
                 continue;
             }
@@ -666,8 +681,7 @@ public class LootingInventoryController
     {
         foreach (var weaponSlot in _weaponSlots)
         {
-            var slot = equipment.GetSlot(weaponSlot);
-            if (slot?.ContainedItem is not Weapon weapon)
+            if (equipment.GetSlot(weaponSlot).ContainedItem is not Weapon weapon)
             {
                 continue;
             }
@@ -769,10 +783,10 @@ public class LootingInventoryController
         var secondary = (Weapon)_botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.SecondPrimaryWeapon).ContainedItem;
         var holster = (Weapon)_botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Holster).ContainedItem;
 
-        var isPistol = lootWeapon.WeapClass.Equals("pistol");
         var lootValue = CurrentItemPrice;
 
-        if (isPistol)
+        // Loot weapon is a pistol for the holster slot
+        if (lootWeapon.WeapClass.Equals("pistol"))
         {
             if (holster is null)
             {

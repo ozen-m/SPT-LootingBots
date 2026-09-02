@@ -36,6 +36,11 @@ public class LootFinder : MonoBehaviour
         get { return _scanTimer < Time.time; }
     }
 
+    public bool IsScanRunning
+    {
+        get { return _lootTask is not null && !_lootTask.IsCompleted; }
+    }
+
     private static float DetectCorpseDistance
     {
         get { return LootingBots.DetectCorpseDistance.Value; }
@@ -51,22 +56,12 @@ public class LootFinder : MonoBehaviour
         get { return LootingBots.DetectItemDistance.Value; }
     }
 
-    public enum LootType : byte
-    {
-        None = 0,
-        Corpse = 1,
-        Container = 2,
-        Item = 3,
-    }
-
-    public bool IsScanRunning => _lootTask is not null && !_lootTask.IsCompleted;
+    private readonly Queue<LootableContainer> _priorityLootableContainers = [];
+    private readonly Queue<Player> _priorityCorpses = [];
 
     private Task _lootTask;
     private CancellationTokenSource _lootFinderCts;
     private GameObject[] _debugSpheres;
-
-    private readonly Queue<LootableContainer> _priorityLootableContainers = [];
-    private readonly Queue<Player> _priorityCorpses = [];
 
     public void Init(BotOwner botOwner)
     {
@@ -653,6 +648,14 @@ public class LootFinder : MonoBehaviour
         _debugSpheres[0] = GameObjectHelper.DrawSphere(Vector3.zero, 0.5f, Color.red);
         _debugSpheres[1] = GameObjectHelper.DrawSphere(Vector3.zero, 0.5f, Color.green);
         _debugSpheres[2] = GameObjectHelper.DrawSphere(Vector3.zero, 0.5f, Color.blue);
+    }
+
+    public enum LootType : byte
+    {
+        None = 0,
+        Corpse = 1,
+        Container = 2,
+        Item = 3,
     }
 }
 
