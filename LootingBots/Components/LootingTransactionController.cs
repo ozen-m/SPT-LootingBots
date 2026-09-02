@@ -434,6 +434,11 @@ public class LootingTransactionController
             operation.Dispose();
             return new FailedResult($"Timed out on network transaction, operation status: {operation.Status.ToString()}");
         }
+        catch (Exception)
+        {
+            _networkTimeout.ResetTimer();
+            throw;
+        }
     }
 
     /// <summary>

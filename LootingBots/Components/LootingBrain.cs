@@ -425,6 +425,7 @@ public class LootingBrain : MonoBehaviour
     public void OnLootTaskEnd(bool lootingSuccessful)
     {
         _lootTimer.Stop();
+        _lootingCtsSource.ResetTimer();
 
         // Only ignore if looting was successful.
         CleanupLoot(lootingSuccessful);
@@ -541,7 +542,6 @@ public class LootingBrain : MonoBehaviour
             {
                 _log.LogDebug("Looting interrupted");
             }
-            _lootingCtsSource.ResetTimer();
             return;
         }
 
