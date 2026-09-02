@@ -26,23 +26,33 @@ internal class FindLootLogic : CustomLogic
 
     public override void Update(CustomLayer.ActionData data)
     {
-        if (!_lootingBrain.HasFreeSpace)
+        if (_lootFinder.IsScanRunning)
         {
-            // Need to disable LockUntilNextScan if the bot has no free space to prevent an infinite looting loop
-            _lootFinder.SetLockUntilNextScan(false);
+            return;
+        }
 
+        // Do not scan if we don't have free space for loot, unless the bot is forced
+        if (!_lootingBrain.HasFreeSpace && !_lootingBrain.ForceBrainEnabled)
+        {
             return;
         }
 
         // Trigger a scan if one is not running already
-        if (!_lootFinder.IsScanRunning && ScanScheduler.CanStartScan(out var ticket))
+        if (ScanScheduler.CanStartScan(out var ticket))
         {
             if (_log.DebugEnabled)
             {
                 _log.LogDebug(
-                    $"Starting scan ({ticket}) - free space: {_lootingBrain.HasFreeSpace}. isScanRunning: {_lootFinder.IsScanRunning}"
+                    $"Starting scan ({ticket}) - HasFreeSpace: {_lootingBrain.HasFreeSpace}, IsScanRunning: {_lootFinder.IsScanRunning}, ForceBrainEnabled: {_lootingBrain.ForceBrainEnabled}"
                 );
             }
+
+            // Need to disable LockUntilNextScan if the bot has no free space and brain is force enabled to prevent an infinite looting loop
+            if (_lootingBrain.ForceBrainEnabled)
+            {
+                _lootFinder.SetLockUntilNextScan(false);
+            }
+
             _lootFinder.BeginSearch(ticket);
         }
     }
