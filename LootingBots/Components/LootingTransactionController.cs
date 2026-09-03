@@ -73,7 +73,7 @@ public class LootingTransactionController
         // attempt to add 10 max ammo stacks into the bot's secure container for use in the bot's internal reloading code
         if (_log.DebugEnabled)
         {
-            _log.LogDebug($"Trying to add ammo");
+            _log.LogDebug($"Trying to add extra ammo for new weapon {weapon.Name.Localized()}");
         }
 
         // Try to get the current ammo used by the weapon by checking the weapon's chamber.
@@ -114,7 +114,9 @@ public class LootingTransactionController
 
         if (ammoAdded > 0 && _log.DebugEnabled)
         {
-            _log.LogDebug($"Successfully added {ammoAdded} round of {ammoToAdd.Name.Localized()}");
+            _log.LogDebug(
+                $"Successfully added {ammoAdded} rounds of {ammoToAdd.Name.Localized()} for new weapon {weapon.Name.Localized()}"
+            );
         }
     }
 
@@ -140,7 +142,6 @@ public class LootingTransactionController
         {
             _log.LogInfo($"Equipping: {item.Name.Localized()} [place: {ableToEquip.Container.ID.Localized()}]");
         }
-
         return MoveItemAsync(item, ableToEquip, token);
     }
 
@@ -156,11 +157,6 @@ public class LootingTransactionController
         var mergeableItem = _inventoryController.FindItemToMerge(item);
         if (mergeableItem != null)
         {
-            if (_log.DebugEnabled)
-            {
-                _log.LogDebug($"Merging: {item.Name.Localized()} [with: {mergeableItem.Name.Localized()}]");
-            }
-
             return MergeItemAsync(item, mergeableItem, token);
         }
 
@@ -175,7 +171,6 @@ public class LootingTransactionController
             {
                 _log.LogInfo($"Picking up: {item.Name.Localized()} [place: {gridAddress.GetRootItem()?.Name.Localized()}]");
             }
-
             return MoveItemAsync(item, gridAddress, token);
         }
 
@@ -183,7 +178,6 @@ public class LootingTransactionController
         {
             _log.LogDebug($"Could not find a place to pickup: {item.Name.Localized()}");
         }
-
         return Task.FromResult(false);
     }
 
@@ -218,7 +212,7 @@ public class LootingTransactionController
         var moveResult = ItemManipulator.Move(item, location, _inventoryController, true);
         if (moveResult.Failed)
         {
-            if (_log.ErrorEnabled)
+            if (_log.WarningEnabled)
             {
                 _log.LogWarning(
                     $"Failed to move {item.Name.Localized()} to {location.Container.ID.Localized()} [{location.GetRootItem()?.Name.Localized()}]. Error: {moveResult.Error}"
@@ -245,7 +239,6 @@ public class LootingTransactionController
                 $"Moving {item.Name.Localized()} to: {location.Container.ID.Localized()} [{location.GetRootItem()?.Name.Localized()}]...done"
             );
         }
-
         return true;
     }
 
@@ -296,7 +289,6 @@ public class LootingTransactionController
         {
             _log.LogInfo($"Swapping {item.Name.Localized()} with {toSwap.Name.Localized()}...done");
         }
-
         return true;
     }
 
@@ -309,7 +301,10 @@ public class LootingTransactionController
 
         if (toItem is null)
         {
-            _log.LogWarning($"Cannot merge item {toMove} to NULL target item!");
+            if (_log.WarningEnabled)
+            {
+                _log.LogWarning($"Cannot merge item {toMove} to NULL target item!");
+            }
             return false;
         }
 
@@ -354,7 +349,6 @@ public class LootingTransactionController
         {
             _log.LogInfo($"Merged with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount})...done");
         }
-
         return true;
     }
 
@@ -389,7 +383,6 @@ public class LootingTransactionController
         {
             _log.LogInfo($"Throwing item: {toThrow.Name.Localized()}...done");
         }
-
         return true;
     }
 
@@ -490,7 +483,7 @@ public class LootingTransactionController
 
         if (_log.DebugEnabled)
         {
-            _log.LogDebug($"Cannot reach {item}, with owner: {item.Owner}");
+            _log.LogDebug($"Cannot reach {item.Name.Localized()} [with owner: {item.Owner}, location: {item.Parent}]");
         }
         return false;
     }

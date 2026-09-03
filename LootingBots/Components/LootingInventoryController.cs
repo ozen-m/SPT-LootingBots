@@ -1479,9 +1479,9 @@ public class LootingInventoryController
             }
             if (++weaponSelector._errorCounter >= 20)
             {
-                if (_log.DebugEnabled)
+                if (_log.WarningEnabled)
                 {
-                    _log.LogWarning("Unable to Selector.TakeMainWeapon");
+                    _log.LogWarning("Unable to UpdateActiveWeapon");
                 }
                 return;
             }
