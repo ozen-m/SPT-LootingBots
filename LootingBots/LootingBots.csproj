@@ -26,6 +26,9 @@
     <Reference Include="DrakiaXYZ-BigBrain">
       <HintPath>..\References\DrakiaXYZ-BigBrain.dll</HintPath>
     </Reference>
+    <Reference Include="Fika.Core">
+      <HintPath>..\References\Fika.Core.dll</HintPath>
+    </Reference>
     <Reference Include="Sirenix.Serialization">
       <HintPath>..\References\Sirenix.Serialization.dll</HintPath>
     </Reference>
