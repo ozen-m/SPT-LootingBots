@@ -479,7 +479,6 @@ public class LootingInventoryController
                 if (AllowedToPickup(item, itemSize) && await _transactionController.TryPickupItemAsync(item, token))
                 {
                     Stats.AddNetValue(CurrentItemPrice);
-                    UpdateGridStats();
                 }
                 else if (item is Weapon weapon && LootingBots.CanStripAttachments.Value)
                 {

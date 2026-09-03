@@ -57,6 +57,11 @@ internal class FindLootLogic : CustomLogic
         }
     }
 
+    public override void Start()
+    {
+        _lootingBrain.UpdateGridStats();
+    }
+
     public override void Stop()
     {
         _lootFinder.ResetScanTimer();

@@ -47,14 +47,12 @@ internal class LootingLayer : CustomLayer
 
     public override void Start()
     {
-        _lootingBrain.UpdateGridStats();
         BotOwner.PatrollingData.Pause();
         base.Start();
     }
 
     public override void Stop()
     {
-        _lootingBrain.UpdateGridStats();
         BotOwner.PatrollingData.Unpause();
         base.Stop();
     }
