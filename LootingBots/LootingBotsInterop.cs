@@ -1,72 +1,60 @@
-﻿using System;
-using System.Reflection;
-using BepInEx.Bootstrap;
+﻿using BepInEx.Bootstrap;
 using EFT;
-using EFT.Interactive;
+using EFT.InventoryLogic;
 using HarmonyLib;
+using Version = System.Version;
 
 namespace LootingBots;
 
 internal static class LootingBotsInterop
 {
-    private static bool _LootingBotsLoadedChecked;
-    private static bool _LootingBotsInteropInited;
+    private static readonly Version _requiredVersion = new(1, 8, 0);
 
-    private static bool _IsLootingBotsLoaded;
-    private static Type _LootingBotsExternalType;
-    private static MethodInfo _ForceBotToScanLootMethod;
-    private static MethodInfo _PreventBotFromLootingMethod;
-    private static MethodInfo _CheckIfInventoryFullMethod;
-    private static MethodInfo _GetNetLootValueMethod;
-    private static MethodInfo _GetItemPriceMethod;
+    private static bool? _isLootingBotsLoaded;
+    private static Func<BotOwner, bool> _forceBotToScanLootMethod;
+    private static Func<BotOwner, float, bool> _preventBotFromLootingMethod;
+    private static Func<BotOwner, bool> _checkIfInventoryFullMethod;
+    private static Func<BotOwner, float> _getNetLootValueMethod;
+    private static Func<Item, float> _getItemPriceMethod;
 
     /// <summary>
-    /// Checks if Looting Bots is loaded in the client
+    /// Checks if Looting Bots is loaded in the client and initialize the Looting Bots interop class data.
     /// </summary>
-    /// <returns>True if Looting Bots is loaded in the client</returns>
-    public static bool IsLootingBotsLoaded()
-    {
-        // Only check for LB once
-        if (!_LootingBotsLoadedChecked)
-        {
-            _LootingBotsLoadedChecked = true;
-            _IsLootingBotsLoaded = Chainloader.PluginInfos.ContainsKey("me.skwizzy.lootingbots");
-        }
-
-        return _IsLootingBotsLoaded;
-    }
-
-    /// <summary>
-    /// Initialize the Looting Bots interop class data.
-    /// </summary>
-    /// <returns>True on success</returns>
+    /// <returns>True if Looting Bots is loaded in the client and initialized successfully</returns>
     public static bool Init()
     {
-        if (!IsLootingBotsLoaded())
+        if (_isLootingBotsLoaded.HasValue)
         {
-            return false;
+            return _isLootingBotsLoaded.Value;
         }
 
-        // Only check for the External class once
-        if (!_LootingBotsInteropInited)
+        _isLootingBotsLoaded =
+            Chainloader.PluginInfos.TryGetValue("me.skwizzy.lootingbots", out var pluginInfo)
+            && pluginInfo.Metadata.Version >= _requiredVersion;
+        if (_isLootingBotsLoaded.Value)
         {
-            _LootingBotsInteropInited = true;
-
-            _LootingBotsExternalType = Type.GetType("LootingBots.External, skwizzy.LootingBots");
-
-            // Only try to get the methods if we have the type
-            if (_LootingBotsExternalType != null)
+            var lootingBotsExternalType = Type.GetType("LootingBots.External, Skwizzy.LootingBots");
+            var forceBotToScanLootMethod = AccessTools.Method(lootingBotsExternalType, "ForceBotToScanLoot");
+            var preventBotFromLootingMethod = AccessTools.Method(lootingBotsExternalType, "PreventBotFromLooting");
+            var checkIfInventoryFullMethod = AccessTools.Method(lootingBotsExternalType, "CheckIfInventoryFull");
+            var getNetLootValueMethod = AccessTools.Method(lootingBotsExternalType, "GetNetLootValue");
+            var getItemPriceMethod = AccessTools.Method(lootingBotsExternalType, "GetItemPrice");
+            try
             {
-                _ForceBotToScanLootMethod = AccessTools.Method(_LootingBotsExternalType, "ForceBotToScanLoot");
-                _PreventBotFromLootingMethod = AccessTools.Method(_LootingBotsExternalType, "PreventBotFromLooting");
-                _CheckIfInventoryFullMethod = AccessTools.Method(_LootingBotsExternalType, "CheckIfInventoryFull");
-                _GetNetLootValueMethod = AccessTools.Method(_LootingBotsExternalType, "GetNetLootValue");
-                _GetItemPriceMethod = AccessTools.Method(_LootingBotsExternalType, "GetItemPrice");
+                _forceBotToScanLootMethod = AccessTools.MethodDelegate<Func<BotOwner, bool>>(forceBotToScanLootMethod);
+                _preventBotFromLootingMethod = AccessTools.MethodDelegate<Func<BotOwner, float, bool>>(preventBotFromLootingMethod);
+                _checkIfInventoryFullMethod = AccessTools.MethodDelegate<Func<BotOwner, bool>>(checkIfInventoryFullMethod);
+                _getNetLootValueMethod = AccessTools.MethodDelegate<Func<BotOwner, float>>(getNetLootValueMethod);
+                _getItemPriceMethod = AccessTools.MethodDelegate<Func<Item, float>>(getItemPriceMethod);
+            }
+            catch (Exception)
+            {
+                // Failed to successfully initialized the interop class
+                _isLootingBotsLoaded = false;
             }
         }
 
-        // If we found the External class, at least some of the methods are (probably) available
-        return _LootingBotsExternalType != null;
+        return _isLootingBotsLoaded.Value;
     }
 
     /// <summary>
@@ -75,16 +63,7 @@ internal static class LootingBotsInterop
     /// <returns>True if successful</returns>
     public static bool TryForceBotToScanLoot(BotOwner botOwner)
     {
-        if (!Init())
-        {
-            return false;
-        }
-        if (_ForceBotToScanLootMethod == null)
-        {
-            return false;
-        }
-
-        return (bool)_ForceBotToScanLootMethod.Invoke(null, [botOwner]);
+        return Init() && _forceBotToScanLootMethod(botOwner);
     }
 
     /// <summary>
@@ -94,33 +73,16 @@ internal static class LootingBotsInterop
     /// <returns>True if successful</returns>
     public static bool TryPreventBotFromLooting(BotOwner botOwner, float duration)
     {
-        if (!Init())
-        {
-            return false;
-        }
-        if (_PreventBotFromLootingMethod == null)
-        {
-            return false;
-        }
-
-        return (bool)_PreventBotFromLootingMethod.Invoke(null, [botOwner, duration]);
+        return Init() && _preventBotFromLootingMethod(botOwner, duration);
     }
 
     /// <summary>
     /// Checks if a bot's inventory is full or not.
     /// </summary>
+    /// <returns>True if inventory is full.</returns>
     public static bool CheckIfInventoryFull(BotOwner botOwner)
     {
-        if (!Init())
-        {
-            return false;
-        }
-        if (_CheckIfInventoryFullMethod == null)
-        {
-            return false;
-        }
-
-        return (bool)_CheckIfInventoryFullMethod.Invoke(null, [botOwner]);
+        return Init() && _checkIfInventoryFullMethod(botOwner);
     }
 
     /// <summary>
@@ -128,33 +90,15 @@ internal static class LootingBotsInterop
     /// </summary>
     public static float GetNetLootValue(BotOwner botOwner)
     {
-        if (!Init())
-        {
-            return 0f;
-        }
-        if (_GetNetLootValueMethod == null)
-        {
-            return 0f;
-        }
-
-        return (float)_GetNetLootValueMethod.Invoke(null, [botOwner]);
+        return Init() ? _getNetLootValueMethod(botOwner) : 0f;
     }
 
     /// <summary>
     /// Checks the price of a loot item using LB ItemAppraiser.
-    /// Note: Not per slot pricing.
     /// </summary>
-    public static float GetItemPrice(LootItem item)
+    /// <returns>Price of an item. Note: Not per slot pricing.</returns>
+    public static float GetItemPrice(Item item)
     {
-        if (!Init())
-        {
-            return 0f;
-        }
-        if (_GetItemPriceMethod == null)
-        {
-            return 0f;
-        }
-
-        return (float)_GetItemPriceMethod.Invoke(null, [item]);
+        return Init() ? _getItemPriceMethod(item) : 0f;
     }
 }
