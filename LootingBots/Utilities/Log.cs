@@ -42,14 +42,16 @@ public class BotLog
     private readonly BotOwner _botOwner;
     private readonly string _botString;
 
-    private string _currentBotFilter
+    /// <summary>
+    /// Log is shown when the current bot filter is 0 (no filter), or this BotLog instance matches the filter
+    /// </summary>
+    private bool IsLogShown
     {
-        get { return LootingBots.FilterLogsOnBot.Value.ToString(); }
-    }
-
-    private bool _isLogShown
-    {
-        get { return _currentBotFilter == "0" || _botOwner.name.Equals("Bot" + _currentBotFilter); }
+        get
+        {
+            return LootingBots.FilterLogsOnBot.Value == 0
+                || string.Equals(_botOwner.name, "Bot" + LootingBots.FilterLogsOnBot.Value, StringComparison.Ordinal);
+        }
     }
 
     public bool DebugEnabled
@@ -78,7 +80,7 @@ public class BotLog
 
     public void LogDebug(object msg)
     {
-        if (_isLogShown)
+        if (IsLogShown)
         {
             _log.LogDebug(FormatMessage(msg));
         }
@@ -86,7 +88,7 @@ public class BotLog
 
     public void LogInfo(object msg)
     {
-        if (_isLogShown)
+        if (IsLogShown)
         {
             _log.LogInfo(FormatMessage(msg));
         }
@@ -94,7 +96,7 @@ public class BotLog
 
     public void LogWarning(object msg)
     {
-        if (_isLogShown)
+        if (IsLogShown)
         {
             _log.LogWarning(FormatMessage(msg));
         }
@@ -102,7 +104,7 @@ public class BotLog
 
     public void LogError(object msg)
     {
-        if (_isLogShown)
+        if (IsLogShown)
         {
             _log.LogError(FormatMessage(msg));
         }
