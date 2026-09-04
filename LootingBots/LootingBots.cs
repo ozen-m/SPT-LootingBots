@@ -188,7 +188,7 @@ public class LootingBots : BaseUnityPlugin
         LootingLogLevels = Config.Bind(
             "Loot Finder",
             "Debug: Log Levels",
-            LogLevel.Error,
+            LogLevel.Default,
             new ConfigDescription(
                 "Enable different levels of log messages to show in the logs",
                 null,
@@ -198,7 +198,7 @@ public class LootingBots : BaseUnityPlugin
         InteropLogLevels = Config.Bind(
             "Loot Finder",
             "Debug: Interop Log Levels",
-            LogLevel.Error,
+            LogLevel.Default,
             new ConfigDescription(
                 "Enable different levels of log messages specific to the mod interop methods",
                 null,
@@ -220,7 +220,7 @@ public class LootingBots : BaseUnityPlugin
             "Debug: Show navigation points",
             false,
             new ConfigDescription(
-                "Renders shperes where bots are trying to navigate when container looting. (Red): Container position. (Black): 'Optimized' container position. (Green): Calculated bot destination. (Blue): NavMesh corrected destination (where the bot will move).",
+                "Renders spheres where bots are trying to navigate when container looting. (Red): Container position. (Black): 'Optimized' container position. (Green): Calculated bot destination. (Blue): NavMesh corrected destination (where the bot will move).",
                 null,
                 new ConfigurationManagerAttributes { Order = -3, IsAdvanced = true }
             )
@@ -276,7 +276,7 @@ public class LootingBots : BaseUnityPlugin
             "Bots always close containers",
             true,
             new ConfigDescription(
-                "When enabled, bots will always try to close a container after they have finished looting. If the bot is inturrupted while looting, the container may remain open.",
+                "When enabled, bots will always try to close a container after they have finished looting. If the bot is interrupted while looting, the container may remain open.",
                 null,
                 new ConfigurationManagerAttributes { Order = 14 }
             )
@@ -324,7 +324,7 @@ public class LootingBots : BaseUnityPlugin
         LootTimeout = Config.Bind(
             "Loot Settings",
             "Loot Timeout",
-            180,
+            300,
             new ConfigDescription(
                 "Time in seconds before a looting bot is timed out and stops looting",
                 null,
@@ -417,7 +417,7 @@ public class LootingBots : BaseUnityPlugin
             "Debug: Item Appraiser Log Levels",
             LogLevel.Error,
             new ConfigDescription(
-                "Enables logs for the item apprasier that calcualtes the weapon values",
+                "Enables logs for the item appraiser that calculates the weapon values",
                 null,
                 new ConfigurationManagerAttributes { Order = 0, IsAdvanced = true }
             )
@@ -472,7 +472,7 @@ public class LootingBots : BaseUnityPlugin
             180,
             new ConfigDescription(
                 "How long (in seconds) to wait before trying to find loot when max attempts is reached.",
-                new AcceptableValueRange<int>(0, 10),
+                null,
                 new ConfigurationManagerAttributes { Order = 7 }
             )
         );
