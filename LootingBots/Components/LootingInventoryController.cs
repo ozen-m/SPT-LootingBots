@@ -1185,14 +1185,22 @@ public class LootingInventoryController
         var items = UnityEngine.Pool.ListPool<Item>.Get();
         try
         {
-            foreach (var nestedItem in parentItem.GetFirstLevelItems())
+            // Slot must not be locked and is not a quest item
+            foreach (var slot in parentItem.Slots)
             {
-                // Check the conditions to filter out items
-                var isItemLocked = nestedItem.CurrentAddress?.Container is Slot slot && slot.Locked;
-
-                if (nestedItem.Id != parentItem.Id && !nestedItem.QuestItem && !isItemLocked)
+                if (!slot.Locked && slot.ContainedItem is not null && !slot.ContainedItem.QuestItem)
                 {
-                    items.Add(nestedItem);
+                    items.Add(slot.ContainedItem);
+                }
+            }
+            foreach (var grid in parentItem.Grids)
+            {
+                foreach (var containedItem in grid.ItemCollection.ItemsList)
+                {
+                    if (!containedItem.QuestItem)
+                    {
+                        items.Add(containedItem);
+                    }
                 }
             }
 
