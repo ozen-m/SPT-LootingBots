@@ -108,6 +108,7 @@ public class LootingInventoryController
 
     private readonly Action _updateActiveWeaponAction;
     private readonly Callback<IHandsController> _onWeaponTakenCallback;
+    private readonly List<Item> _itemsScratch = [];
 
     // Represents the value in roubles of the current item
     public float CurrentItemPrice;
@@ -246,18 +247,8 @@ public class LootingInventoryController
                     continue;
                 case SearchableItem searchableItem:
                 {
-                    // Get the price of the searchable item itself
-                    Stats.NetWorth += _itemAppraiser.GetItemPrice(searchableItem, _log);
-
-                    // Get the prices of items in its grids
-                    // This assumes no further items with containers
-                    foreach (var grid in searchableItem.Grids)
-                    {
-                        foreach (var item in grid.ItemCollection.ItemsList)
-                        {
-                            Stats.NetWorth += _itemAppraiser.GetItemPrice(item, _log);
-                        }
-                    }
+                    // Get the price of the searchable item and its contained items
+                    Stats.NetWorth += _itemAppraiser.GetItemPrice(searchableItem, _log) + GetAllContainedItemsValue(searchableItem);
                     continue;
                 }
                 default:
@@ -466,6 +457,7 @@ public class LootingInventoryController
                     Stats.AddNetValue(CurrentItemPrice);
                     if (item is SearchableItem)
                     {
+                        Stats.AddNetValue(GetAllContainedItemsValue(item));
                         UpdateGridStats();
                     }
                     continue;
@@ -486,7 +478,7 @@ public class LootingInventoryController
                 // Check to see if we can pick up the item
                 if (AllowedToPickup(item, itemSize) && await _transactionController.TryPickupItemAsync(item, token))
                 {
-                    Stats.AddNetValue(CurrentItemPrice);
+                    Stats.AddNetValue(CurrentItemPrice + GetAllContainedItemsValue(item));
                     Stats.AvailableGridSpaces -= itemSize;
                 }
                 else if (item is Weapon weapon && LootingBots.CanStripAttachments.Value)
@@ -1437,12 +1429,17 @@ public class LootingInventoryController
     {
         var toEquipValue = CurrentItemPrice;
         var toSwapValue = _itemAppraiser.GetItemPrice(toSwap, _log);
+
         if (_log.DebugEnabled)
         {
             _log.LogDebug(
                 $"Trying to equip {toEquip.Name.Localized()} (₽{toEquipValue:N0}) and swap with {toSwap.Name.Localized()} (₽{toSwapValue:N0}){(transferItems ? $" then loot {toSwap.Name.Localized()}" : string.Empty)}"
             );
         }
+
+        // Include contained items in calculating NetWorthDelta
+        toEquipValue += GetAllContainedItemsValue(toEquip);
+        toSwapValue += GetAllContainedItemsValue(toSwap);
 
         var swapAction = LootingSwapAction.Rent(toEquip, toSwap, toEquipValue - toSwapValue, transferItems);
         lootingActions.Add(swapAction);
@@ -1451,6 +1448,20 @@ public class LootingInventoryController
     public void SetRootItemOwner(IItemOwner owner)
     {
         _transactionController.SetRootItemOwner(owner);
+    }
+
+    private float GetAllContainedItemsValue(Item item)
+    {
+        var price = 0f;
+
+        item.GetAllContainedItems(_itemsScratch);
+        foreach (var containedItem in _itemsScratch)
+        {
+            price += _itemAppraiser.GetItemPrice(containedItem, _log);
+        }
+        _itemsScratch.Clear();
+
+        return price;
     }
 
     /// <summary>

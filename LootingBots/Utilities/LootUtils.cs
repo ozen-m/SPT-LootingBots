@@ -333,4 +333,25 @@ public static class LootUtils
         using var enumerator = items.GetEnumerator();
         return enumerator.MoveNext() ? enumerator.Current : null;
     }
+
+    /// <summary>
+    /// Gets all contained items (grid) of an item and its children
+    /// </summary>
+    /// <remarks>Iterates through an item's grid, as opposed to its Slots in </remarks>
+    public static void GetAllContainedItems(this Item item, List<Item> preAllocatedList)
+    {
+        if (item is not CompoundItem compoundItem)
+        {
+            return;
+        }
+
+        foreach (var grid in compoundItem.Grids)
+        {
+            foreach (var containedItem in grid.ItemCollection.ItemsList)
+            {
+                preAllocatedList.Add(containedItem);
+                containedItem.GetAllContainedItems(preAllocatedList);
+            }
+        }
+    }
 }
