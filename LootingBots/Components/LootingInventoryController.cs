@@ -1186,13 +1186,6 @@ public class LootingInventoryController
         try
         {
             // Slot must not be locked and is not a quest item
-            foreach (var slot in parentItem.Slots)
-            {
-                if (!slot.Locked && slot.ContainedItem is not null && !slot.ContainedItem.QuestItem)
-                {
-                    items.Add(slot.ContainedItem);
-                }
-            }
             foreach (var grid in parentItem.Grids)
             {
                 foreach (var containedItem in grid.ItemCollection.ItemsList)
@@ -1201,6 +1194,13 @@ public class LootingInventoryController
                     {
                         items.Add(containedItem);
                     }
+                }
+            }
+            foreach (var slot in parentItem.Slots)
+            {
+                if (!slot.Locked && slot.ContainedItem is not null && !slot.ContainedItem.QuestItem)
+                {
+                    items.Add(slot.ContainedItem);
                 }
             }
 
