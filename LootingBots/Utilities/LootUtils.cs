@@ -94,27 +94,27 @@ public static class LootUtils
     }
 
     /// <summary>
-    /// Calculates the amount of empty grid slots in the container
+    /// Calculates the amount of total and available grid slots in a container
     /// </summary>
-    public static int GetAvailableGridSlots(Grid[] grids)
+    /// <returns>(Total Size Grid Slots, Available Grid Slots)</returns>
+    public static (int total, int available) GetTotalAndAvailableGridSlots(Grid[] grids)
     {
         if (grids is null)
         {
-            return 0;
+            return (0, 0);
         }
 
-        // Initialize freeSpaces to 0
-        var freeSpaces = 0;
+        var gridSize = 0;
+        var containedSize = 0;
 
-        // Loop through each grid and calculate the free spaces
+        // Loop through each grid and calculate the total and contained spaces
         foreach (var grid in grids)
         {
-            var gridSize = grid.GridHeight * grid.GridWidth;
-            var containedItemSize = grid.GetSizeOfContainedItems();
-            freeSpaces += gridSize - containedItemSize;
+            gridSize += grid.GridHeight * grid.GridWidth;
+            containedSize += grid.GetSizeOfContainedItems();
         }
 
-        return freeSpaces;
+        return (gridSize, gridSize - containedSize);
     }
 
     /// <summary>

@@ -274,15 +274,15 @@ public class LootingInventoryController
     public void UpdateGridStats()
     {
         var tacVest = (SearchableItem)_botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem;
-        var backpack = (SearchableItem)_botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Backpack).ContainedItem;
         var pockets = (SearchableItem)_botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Pockets).ContainedItem;
+        var backpack = (SearchableItem)_botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Backpack).ContainedItem;
 
-        var freePockets = LootUtils.GetAvailableGridSlots(pockets?.Grids);
-        var freeTacVest = LootUtils.GetAvailableGridSlots(tacVest?.Grids);
-        var freeBackpack = LootUtils.GetAvailableGridSlots(backpack?.Grids);
+        var tacVestGrids = LootUtils.GetTotalAndAvailableGridSlots(tacVest?.Grids);
+        var pocketsGrids = LootUtils.GetTotalAndAvailableGridSlots(pockets?.Grids);
+        var backpackGrids = LootUtils.GetTotalAndAvailableGridSlots(backpack?.Grids);
 
-        Stats.AvailableGridSpaces = freeBackpack + freePockets + freeTacVest;
-        Stats.TotalGridSpaces = (tacVest?.Grids?.Length ?? 0) + (backpack?.Grids?.Length ?? 0) + (pockets?.Grids?.Length ?? 0);
+        Stats.AvailableGridSpaces = tacVestGrids.available + pocketsGrids.available + backpackGrids.available;
+        Stats.TotalGridSpaces = tacVestGrids.total + pocketsGrids.total + backpackGrids.total;
     }
 
     /// <summary>
@@ -447,6 +447,10 @@ public class LootingInventoryController
                         _transactionController.AddExtraAmmo(weapon);
                         CalculateGearValue();
                     }
+                    if (item is SearchableItem)
+                    {
+                        UpdateGridStats();
+                    }
 
                     if (_log.DebugEnabled)
                     {
@@ -460,6 +464,10 @@ public class LootingInventoryController
                 if (AllowedToEquip(item) && await _transactionController.TryEquipItemAsync(item, token))
                 {
                     Stats.AddNetValue(CurrentItemPrice);
+                    if (item is SearchableItem)
+                    {
+                        UpdateGridStats();
+                    }
                     continue;
                 }
 
@@ -479,6 +487,7 @@ public class LootingInventoryController
                 if (AllowedToPickup(item, itemSize) && await _transactionController.TryPickupItemAsync(item, token))
                 {
                     Stats.AddNetValue(CurrentItemPrice);
+                    Stats.AvailableGridSpaces -= itemSize;
                 }
                 else if (item is Weapon weapon && LootingBots.CanStripAttachments.Value)
                 {
@@ -763,6 +772,7 @@ public class LootingInventoryController
                     _log.LogDebug($"Thrown {mag.ShortName.Localized()} (-{magPrice:N0}₽)");
                 }
                 Stats.SubtractNetValue(magPrice);
+                Stats.AvailableGridSpaces += mag.GetItemSize();
                 _lootingBrain.IgnoreLoot(mag.Id);
             }
         }
@@ -1287,6 +1297,7 @@ public class LootingInventoryController
                         _log.LogDebug($"Thrown {toThrow.Name.Localized()} (-{value:N0}₽)");
                     }
                     Stats.SubtractNetValue(value);
+                    Stats.AvailableGridSpaces += toThrow.GetItemSize();
                     _lootingBrain.IgnoreLoot(toThrow.Id);
                 }
 
