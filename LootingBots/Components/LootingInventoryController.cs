@@ -1246,34 +1246,38 @@ public class LootingInventoryController
         var itemsToThrow = DictionaryPool<Item, float>.Get();
         try
         {
-            var botType = _botOwner.Profile.Info.Settings.Role;
-            var isPmc = botType.IsPMC();
+            var minimumValue = _botOwner.Profile.Info.Settings.Role.IsPMC()
+                ? LootingBots.PMCMinLootThreshold.Value
+                : LootingBots.ScavMinLootThreshold.Value;
 
-            foreach (var nestedItem in parentItem.GetFirstLevelItems())
+            foreach (var grid in parentItem.Grids)
             {
-                // Check the conditions to filter out items
-                if (
-                    nestedItem.Id == parentItem.Id
-                    || nestedItem.QuestItem
-                    || (nestedItem.CurrentAddress?.Container is Slot slot && slot.Locked) // Slot is locked
-                    || (nestedItem is Magazine mag && IsUsableMag(mag)) // Mag can be used
-                    || (nestedItem is Ammo ammo && IsUsableAmmo(ammo)) // Ammo can be used
-                    || nestedItem is Meds // Do not throw med items
-                    || nestedItem is BarterOther // Do not throw dog tags
-                )
+                foreach (var childItem in grid.ItemCollection.ItemsList)
                 {
-                    continue;
-                }
+                    // Iterate and throw useless items for child container
+                    if (childItem is SearchableItem)
+                    {
+                        await ThrowUndervaluedItemsAsync(childItem, token);
+                        continue;
+                    }
 
-                var value = _itemAppraiser.GetItemPrice(nestedItem, _log);
-                var minimumValue = isPmc ? LootingBots.PMCMinLootThreshold.Value : LootingBots.ScavMinLootThreshold.Value;
-                var isUnderValued = value < minimumValue;
-                if (!isUnderValued)
-                {
-                    continue;
-                }
+                    // Check the conditions to filter out items to keep
+                    if (
+                        childItem.QuestItem
+                        || childItem is Meds or BarterOther
+                        || IsUsableMag(childItem as Magazine)
+                        || IsUsableAmmo(childItem as Ammo)
+                    )
+                    {
+                        continue;
+                    }
 
-                itemsToThrow.Add(nestedItem, value);
+                    var value = _itemAppraiser.GetItemPrice(item, _log);
+                    if (value < minimumValue)
+                    {
+                        itemsToThrow.Add(childItem, value);
+                    }
+                }
             }
 
             if (itemsToThrow.Count > 0)
