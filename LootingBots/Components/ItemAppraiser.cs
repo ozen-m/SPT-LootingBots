@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Comfort.Common;
 using EFT;
 using EFT.HandBook;
@@ -10,7 +9,8 @@ namespace LootingBots.Components;
 
 public class ItemAppraiser(Log _log)
 {
-    public readonly Stopwatch LastPriceUpdate = Stopwatch.StartNew();
+    private const float PriceUpdateInterval = 1800f; // 30 minutes
+    public float NextPriceUpdate = -1f;
 
     public Dictionary<MongoID, HandbookData> HandbookData;
     public Dictionary<MongoID, float> MarketData;
@@ -53,7 +53,7 @@ public class ItemAppraiser(Log _log)
         }
         finally
         {
-            LastPriceUpdate.Restart();
+            NextPriceUpdate = Time.time + PriceUpdateInterval;
             IsUpdatingPrices = false;
         }
     }

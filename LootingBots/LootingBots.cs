@@ -7,6 +7,7 @@ using EFT.HandBook;
 using LootingBots.Components;
 using LootingBots.Utilities;
 using SPT.Reflection.Patching;
+using UnityEngine;
 
 namespace LootingBots;
 
@@ -559,8 +560,7 @@ public class LootingBots : BaseUnityPlugin
 
         if (UseMarketPrices.Value)
         {
-            // 30 minutes
-            if (ItemAppraiser.LastPriceUpdate.ElapsedMilliseconds < 1800000f && ItemAppraiser.MarketData is not null)
+            if (ItemAppraiser.NextPriceUpdate > Time.time && ItemAppraiser.MarketData is not null)
             {
                 return;
             }
