@@ -24,11 +24,8 @@ public class LootFinder : MonoBehaviour
     private int _emptyAttempts;
 
     // Bot specific config
-    private bool _containerLootingEnabled;
     private bool _needsContainerSight;
-    private bool _itemLootingEnabled;
     private bool _needsItemSight;
-    private bool _corpseLootingEnabled;
     private bool _needsCorpseSight;
 
     public bool IsScheduledScan
@@ -71,19 +68,16 @@ public class LootFinder : MonoBehaviour
         _log = new BotLog(LootingBots.LootLog, _botOwner);
         _lootFinderCts = new CancellationTokenSource();
 
-        _containerLootingEnabled = LootingBots.ContainerLootingEnabled.Value.IsBotEnabled(_lootingBrain);
         _needsContainerSight = LootingBots.DetectContainerNeedsSight.Value.IsBotEnabled(_lootingBrain);
-        _itemLootingEnabled = LootingBots.LooseItemLootingEnabled.Value.IsBotEnabled(_lootingBrain);
         _needsItemSight = LootingBots.DetectItemNeedsSight.Value.IsBotEnabled(_lootingBrain);
-        _corpseLootingEnabled = LootingBots.CorpseLootingEnabled.Value.IsBotEnabled(_lootingBrain);
         _needsCorpseSight = LootingBots.DetectCorpseNeedsSight.Value.IsBotEnabled(_lootingBrain);
 
-        if (_containerLootingEnabled)
+        if (_lootingBrain.ContainerLootingEnabled)
         {
             OnAirdropLandedPatch.OnAirdropLanded += OnAirdropLanded;
         }
 
-        if (_corpseLootingEnabled)
+        if (_lootingBrain.CorpseLootingEnabled)
         {
             botOwner.BotPersonalStats.OnKillTarget += OnKilledEnemyPlayer;
         }
@@ -169,12 +163,12 @@ public class LootFinder : MonoBehaviour
         StopFindingLoot();
         _lootFinderCts.Dispose();
 
-        if (_containerLootingEnabled)
+        if (_lootingBrain.ContainerLootingEnabled)
         {
             OnAirdropLandedPatch.OnAirdropLanded -= OnAirdropLanded;
         }
 
-        if (_corpseLootingEnabled)
+        if (_lootingBrain.CorpseLootingEnabled)
         {
             _botOwner.BotPersonalStats.OnKillTarget -= OnKilledEnemyPlayer;
         }
@@ -255,7 +249,7 @@ public class LootFinder : MonoBehaviour
 
                 // Get InteractableObject once and check derived type
                 var interactableObject = collider.gameObject.GetComponentInParent<InteractableObject>();
-                if (_corpseLootingEnabled && interactableObject is Corpse corpse)
+                if (_lootingBrain.CorpseLootingEnabled && interactableObject is Corpse corpse)
                 {
                     var player = collider.gameObject.GetComponentInParent<Player>();
                     if (
@@ -267,7 +261,7 @@ public class LootFinder : MonoBehaviour
                         lootType = LootType.Corpse;
                     }
                 }
-                else if (_containerLootingEnabled && interactableObject is LootableContainer container)
+                else if (_lootingBrain.ContainerLootingEnabled && interactableObject is LootableContainer container)
                 {
                     rootItem = container.ItemOwner?.RootItem;
                     if (
@@ -278,7 +272,7 @@ public class LootFinder : MonoBehaviour
                         lootType = LootType.Container;
                     }
                 }
-                else if (_itemLootingEnabled && interactableObject is LootItem lootItem && lootItem is not Corpse)
+                else if (_lootingBrain.ItemLootingEnabled && interactableObject is LootItem lootItem && lootItem is not Corpse)
                 {
                     rootItem = lootItem.ItemOwner?.RootItem;
                     if (

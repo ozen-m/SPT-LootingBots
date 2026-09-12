@@ -37,19 +37,17 @@ public class LootingBrain : MonoBehaviour
     // Allows external methods to force the looting brain for a bot to be enabled regardless of performance settings
     public bool ForceBrainEnabled;
 
+    // Allowed categories to loot
+    public bool CorpseLootingEnabled;
+    public bool ContainerLootingEnabled;
+    public bool ItemLootingEnabled;
+
     public bool IsBrainEnabled
     {
         get
         {
             return ForceBrainEnabled
-                || (
-                    !_isDisabledForPerformance
-                    && (
-                        LootingBots.ContainerLootingEnabled.Value.IsBotEnabled(this)
-                        || LootingBots.LooseItemLootingEnabled.Value.IsBotEnabled(this)
-                        || LootingBots.CorpseLootingEnabled.Value.IsBotEnabled(this)
-                    )
-                );
+                || (!_isDisabledForPerformance && (CorpseLootingEnabled || ContainerLootingEnabled || ItemLootingEnabled));
         }
     }
 
@@ -120,6 +118,10 @@ public class LootingBrain : MonoBehaviour
 
         BotOwner = botOwner;
         InventoryController = new LootingInventoryController(BotOwner, this);
+
+        CorpseLootingEnabled = LootingBots.CorpseLootingEnabled.Value.IsBotEnabled(this);
+        ContainerLootingEnabled = LootingBots.ContainerLootingEnabled.Value.IsBotEnabled(this);
+        ItemLootingEnabled = LootingBots.LooseItemLootingEnabled.Value.IsBotEnabled(this);
     }
 
     /// <summary>
