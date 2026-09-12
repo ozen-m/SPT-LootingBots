@@ -1412,6 +1412,11 @@ public class LootingInventoryController
     /// </summary>
     public bool AllowedToPickup(Item lootItem, int itemSize = 1)
     {
+        if (!_lootingBrain.HasFreeSpace)
+        {
+            return false;
+        }
+
         var botType = _botOwner.Profile.Info.Settings.Role;
         var isPmc = botType.IsPMC();
         var pickupNotRestricted = isPmc
@@ -1419,9 +1424,9 @@ public class LootingInventoryController
             : LootingBots.ScavGearToPickup.Value.IsItemEligible(lootItem, true);
 
         // All usable mags and money should be considered eligible to loot. Otherwise, all other items fall subject to the mod settings for restricting pickup and loot value thresholds
-        return IsUsableMag(lootItem as Magazine)
+        return lootItem is Money
+            || IsUsableMag(lootItem as Magazine)
             || IsUsableAmmo(lootItem as Ammo)
-            || lootItem is Money
             || (
                 pickupNotRestricted
                 && (
