@@ -88,8 +88,7 @@ internal class LootingLogic : CustomLogic
     private void TryLoot()
     {
         // Check if the bot is close enough to the destination to commence looting
-        var isCloseEnough = IsCloseEnough();
-        if (isCloseEnough)
+        if (IsCloseEnough())
         {
             // Crouch and look to item
             BotOwner.SetPose(0f);
@@ -104,8 +103,7 @@ internal class LootingLogic : CustomLogic
         }
 
         // Try moving to loot. Will return false if the bot is not able to navigate
-        var canMove = TryMoveToLoot();
-        if (!canMove)
+        if (!TryMoveToLoot())
         {
             // There is no valid path to the loot, ignore the loot forever
             _lootingBrain.CleanupLoot();
@@ -152,8 +150,8 @@ internal class LootingLogic : CustomLogic
     /// </summary>
     public bool TryMoveToLoot()
     {
-        var isBotStuck = _stuckCount > 1;
-        if (isBotStuck)
+        // Check if bot is stuck and can't reach
+        if (_stuckCount > 1)
         {
             if (_log.WarningEnabled)
             {

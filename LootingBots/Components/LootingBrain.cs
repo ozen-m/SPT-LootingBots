@@ -20,14 +20,14 @@ public class LootingBrain : MonoBehaviour
     // Current lootable object type that the bot will try to loot
     public LootFinder.LootType ActiveLootType = LootFinder.LootType.None;
 
+    // ActiveLoot's id for clean up
+    public string ActiveLootId;
+
     // Final destination of the bot when moving to loot something
     public Vector3 Destination;
 
     // Collider.transform.position for the active lootable. Used in LOS checks to make sure bots dont loot through walls
     public Vector3 LootObjectPosition;
-
-    // ActiveLoot's id for clean up
-    public string CachedActiveLootId;
 
     // Object ids that the bot has looted or failed to reach even though a valid path exists
     public readonly HashSet<string> IgnoredLootIds = [];
@@ -79,7 +79,7 @@ public class LootingBrain : MonoBehaviour
     public const double LootingStartDelay = 2500D;
 
     // Interval for the performance check to disable the looting brain
-    const float PeformanceTimerInterval = 3f;
+    private const float PerformanceTimerInterval = 3f;
 
     // Max distance from the player a bot can be before their looting brain is disabled
     private double DistanceLimit
@@ -107,13 +107,13 @@ public class LootingBrain : MonoBehaviour
     private bool _isDisabledForPerformance;
     private float _performanceTimer;
     private BotLog _log;
-    private TimeoutController _lootingCtsSource;
+    private TimeoutController _lootingSource;
     private Action _exitPickupStateAction;
 
     public void Init(BotOwner botOwner)
     {
         _log = new BotLog(LootingBots.LootLog, botOwner);
-        _lootingCtsSource = gameObject.AddComponent<TimeoutController>();
+        _lootingSource = gameObject.AddComponent<TimeoutController>();
         _exitPickupStateAction = ExitPickupState;
 
         BotOwner = botOwner;
@@ -132,13 +132,13 @@ public class LootingBrain : MonoBehaviour
     public void Start()
     {
         IsPlayerScav = BotOwner.WillBeAPlayerScav();
-        _performanceTimer = Time.time + PeformanceTimerInterval;
+        _performanceTimer = Time.time + PerformanceTimerInterval;
         ActiveLootCache.Init();
         ScanScheduler.Init();
 
         if (ActiveBotCache.IsCacheActive)
         {
-            // If there is space in the BotCache, add the bot to the cache. Otherwise disable the looting brain until there is space available in the cache
+            // If there is space in the BotCache, add the bot to the cache. Otherwise, disable the looting brain until there is space available in the cache
             if (ForceBrainEnabled || (ActiveBotCache.IsAbleToCache && IsCloseToPlayer))
             {
                 ActiveBotCache.Add(BotOwner);
@@ -203,7 +203,7 @@ public class LootingBrain : MonoBehaviour
 
             // The performance check should occur every 3 seconds at the minimum.
             // If the loot scan interval is faster, we should do the performance check at the loot scan interval
-            _performanceTimer = Time.time + Math.Min(PeformanceTimerInterval, LootingBots.LootScanInterval.Value);
+            _performanceTimer = Time.time + Math.Min(PerformanceTimerInterval, LootingBots.LootScanInterval.Value);
         }
 
         // This does not work with Fika
@@ -223,11 +223,11 @@ public class LootingBrain : MonoBehaviour
     {
         LootTaskRunning = true;
         _lootTimer.Restart();
-        if (_lootingCtsSource.IsActive)
+        if (_lootingSource.IsActive)
         {
-            _lootingCtsSource.Cancel();
+            _lootingSource.Cancel();
         }
-        var token = _lootingCtsSource.Timeout(LootingBots.LootTimeout.Value);
+        var token = _lootingSource.Timeout(LootingBots.LootTimeout.Value);
 
         if (_log.InfoEnabled)
         {
@@ -253,17 +253,17 @@ public class LootingBrain : MonoBehaviour
     /// </summary>
     public void StopLooting()
     {
-        if (!_lootingCtsSource.IsActive)
+        if (!_lootingSource.IsActive)
         {
             CleanupLoot(false);
             return;
         }
-        _lootingCtsSource.Cancel();
+        _lootingSource.Cancel();
     }
 
     public void OnDestroy()
     {
-        Destroy(_lootingCtsSource);
+        Destroy(_lootingSource);
     }
 
     private readonly Stopwatch _lootTimer = new();
@@ -427,7 +427,7 @@ public class LootingBrain : MonoBehaviour
     public void OnLootTaskEnd(bool lootingSuccessful)
     {
         _lootTimer.Stop();
-        _lootingCtsSource.ResetTimer();
+        _lootingSource.ResetTimer();
 
         // Only ignore if looting was successful.
         CleanupLoot(lootingSuccessful);
@@ -489,14 +489,14 @@ public class LootingBrain : MonoBehaviour
 
         if (ignore)
         {
-            IgnoreLoot(CachedActiveLootId);
+            IgnoreLoot(ActiveLootId);
         }
         else if (ActiveLoot is Corpse corpse && BotOwner.GetPlayer != null && BotOwner.GetPlayer.TryGetComponent(out LootFinder lootFinder))
         {
             lootFinder.EnqueuePriorityCorpse(corpse.PlayerProfileID);
         }
 
-        ActiveLootCache.Cleanup(CachedActiveLootId, BotOwner);
+        ActiveLootCache.Cleanup(ActiveLootId, BotOwner);
         SetLoot(null, LootFinder.LootType.None, Vector3.zero, Vector3.zero, string.Empty);
     }
 
@@ -513,7 +513,7 @@ public class LootingBrain : MonoBehaviour
         ActiveLootType = lootType;
         LootObjectPosition = position;
         Destination = destination;
-        CachedActiveLootId = lootId;
+        ActiveLootId = lootId;
         DistanceToLoot = dist != float.MaxValue ? dist * dist : dist;
     }
 
@@ -531,7 +531,7 @@ public class LootingBrain : MonoBehaviour
     {
         if (exception is OperationCanceledException)
         {
-            if (_lootingCtsSource.IsTimeout)
+            if (_lootingSource.IsTimeout)
             {
                 if (_log.WarningEnabled)
                 {

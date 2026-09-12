@@ -21,7 +21,7 @@ public static class ActiveLootCache
     private static readonly Dictionary<string, HashSet<BotOwner>> _activeLoot = [];
 
     /// <summary>
-    /// Initialize the bot players list for distance checks
+    /// Initialize the players list for distance checks
     /// </summary>
     public static void Init()
     {

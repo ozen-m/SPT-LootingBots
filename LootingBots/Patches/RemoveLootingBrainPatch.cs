@@ -3,6 +3,7 @@ using EFT;
 using LootingBots.Components;
 using LootingBots.Utilities;
 using SPT.Reflection.Patching;
+using Object = UnityEngine.Object;
 
 namespace LootingBots.Patches;
 
@@ -18,7 +19,7 @@ public class RemoveLootingBrainPatch : ModulePatch
     {
         if (botOwner.GetPlayer.TryGetComponent<LootingBrain>(out var lootingBrain))
         {
-            UnityEngine.Object.Destroy(lootingBrain);
+            Object.Destroy(lootingBrain);
         }
         else if (BotHasLootingLayer(botOwner))
         {
@@ -27,7 +28,7 @@ public class RemoveLootingBrainPatch : ModulePatch
 
         if (botOwner.GetPlayer.TryGetComponent<LootFinder>(out var lootFinder))
         {
-            UnityEngine.Object.Destroy(lootFinder);
+            Object.Destroy(lootFinder);
         }
         else if (BotHasLootingLayer(botOwner))
         {

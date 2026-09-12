@@ -17,10 +17,10 @@ public class GearValue
     public readonly ValuePair Holster = new(string.Empty, 0f);
 }
 
-public class ValuePair(string _id, float _value)
+public class ValuePair(string id, float value)
 {
-    public string Id = _id;
-    public float Value = _value;
+    public string Id = id;
+    public float Value = value;
 
     public void UpdatePair(string id, float value)
     {
@@ -72,11 +72,6 @@ public class BotStats
     public void SubtractNetValue(float itemPrice)
     {
         NetWorth -= itemPrice;
-    }
-
-    public void ApplyNetValueDelta(float itemPrice)
-    {
-        NetWorth += itemPrice;
     }
 
     public void StatsDebugPanel(StringBuilder debugPanel)
@@ -373,7 +368,7 @@ public class LootingInventoryController
                         var actionResult = await action.ExecuteAsync(_transactionController, token);
                         if (actionResult)
                         {
-                            Stats.ApplyNetValueDelta(action.NetWorthDelta);
+                            Stats.AddNetValue(action.NetWorthDelta);
                         }
                         else
                         {
@@ -1417,9 +1412,7 @@ public class LootingInventoryController
             return false;
         }
 
-        var botType = _botOwner.Profile.Info.Settings.Role;
-        var isPmc = botType.IsPMC();
-        var pickupNotRestricted = isPmc
+        var pickupNotRestricted = _botOwner.Profile.Info.Settings.Role.IsPMC()
             ? LootingBots.PMCGearToPickup.Value.IsItemEligible(lootItem, true)
             : LootingBots.ScavGearToPickup.Value.IsItemEligible(lootItem, true);
 

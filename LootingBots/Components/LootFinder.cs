@@ -466,7 +466,7 @@ public class LootFinder : MonoBehaviour
                 _log.LogDebug($"Trying to find prioritized corpse: {player.AIData?.BotOwner.Name()}");
             }
 
-            var corpse = LootUtils._playerCorpseField(player);
+            var corpse = LootUtils.PlayerCorpseField(player);
             if (corpse == null)
             {
                 if (_log.DebugEnabled)

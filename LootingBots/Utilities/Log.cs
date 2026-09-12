@@ -1,3 +1,5 @@
+using BepInEx.Configuration;
+using BepInEx.Logging;
 using EFT;
 
 namespace LootingBots.Utilities;
@@ -121,7 +123,7 @@ public class BotLog
     }
 }
 
-public class Log(BepInEx.Logging.ManualLogSource logger, BepInEx.Configuration.ConfigEntry<LogLevel> logLevels)
+public class Log(ManualLogSource logger, ConfigEntry<LogLevel> logLevels)
 {
     public bool DebugEnabled
     {

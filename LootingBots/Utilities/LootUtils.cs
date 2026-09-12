@@ -1,7 +1,6 @@
 using EFT;
 using EFT.Interactive;
 using EFT.InventoryLogic;
-using EFT.NextObservedPlayer.Operations;
 using HarmonyLib;
 using UnityEngine;
 using Grid = EFT.InventoryLogic.Grid;
@@ -13,16 +12,16 @@ public static class LootUtils
     public const int RESERVED_SLOT_COUNT = 2;
     public static readonly int LowPolyMask = LayerMask.GetMask("LowPolyCollider");
     public static readonly int LootMask = LayerMask.GetMask("Interactive", "Loot", "Deadbody");
-    public static readonly AccessTools.FieldRef<Player, Corpse> _playerCorpseField = AccessTools.FieldRefAccess<Player, Corpse>("Corpse");
+    public static readonly AccessTools.FieldRef<Player, Corpse> PlayerCorpseField = AccessTools.FieldRefAccess<Player, Corpse>("Corpse");
 
-    private static readonly EquipmentSlot[] WeaponSlots =
+    private static readonly EquipmentSlot[] _weaponSlots =
     [
         EquipmentSlot.Holster,
         EquipmentSlot.FirstPrimaryWeapon,
         EquipmentSlot.SecondPrimaryWeapon,
     ];
 
-    private static readonly EquipmentSlot[] StorageSlots =
+    private static readonly EquipmentSlot[] _storageSlots =
     [
         EquipmentSlot.Backpack,
         EquipmentSlot.ArmorVest,
@@ -30,7 +29,7 @@ public static class LootUtils
         EquipmentSlot.Pockets,
     ];
 
-    private static readonly EquipmentSlot[] OtherSlots =
+    private static readonly EquipmentSlot[] _otherSlots =
     [
         EquipmentSlot.ArmBand,
         EquipmentSlot.Headwear,
@@ -126,8 +125,8 @@ public static class LootUtils
     {
         var containedItemSize = 0;
 
-        // Loop through each item in grid.Items and accumulate the item size
-        foreach (var item in grid.Items)
+        // Loop through each item in grid.Items (same as grid.ItemCollection.ItemsList) and accumulate the item size
+        foreach (var item in grid.ItemCollection.ItemsList)
         {
             containedItemSize += item.GetItemSize();
         }
@@ -198,22 +197,22 @@ public static class LootUtils
         List<Item> preallocatedList
     )
     {
-        var hasBackpack = botEquipment.GetSlot(EquipmentSlot.Backpack).ContainedItem != null;
-        var hasTacVest = botEquipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem != null;
-
         // Add slots in priority order
-        if (hasBackpack || hasTacVest)
+        if (
+            botEquipment.GetSlot(EquipmentSlot.Backpack).ContainedItem != null
+            || botEquipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem != null
+        )
         {
-            GetItemInSlotsToLootNonAlloc(corpseEquipment, preallocatedList, WeaponSlots);
-            GetItemInSlotsToLootNonAlloc(corpseEquipment, preallocatedList, StorageSlots);
+            GetItemInSlotsToLootNonAlloc(corpseEquipment, preallocatedList, _weaponSlots);
+            GetItemInSlotsToLootNonAlloc(corpseEquipment, preallocatedList, _storageSlots);
         }
         else
         {
-            GetItemInSlotsToLootNonAlloc(corpseEquipment, preallocatedList, StorageSlots);
-            GetItemInSlotsToLootNonAlloc(corpseEquipment, preallocatedList, WeaponSlots);
+            GetItemInSlotsToLootNonAlloc(corpseEquipment, preallocatedList, _storageSlots);
+            GetItemInSlotsToLootNonAlloc(corpseEquipment, preallocatedList, _weaponSlots);
         }
 
-        GetItemInSlotsToLootNonAlloc(corpseEquipment, preallocatedList, OtherSlots);
+        GetItemInSlotsToLootNonAlloc(corpseEquipment, preallocatedList, _otherSlots);
     }
 
     private static void GetItemInSlotsToLootNonAlloc(InventoryEquipment equipment, List<Item> preallocatedList, EquipmentSlot[] slots)
@@ -280,7 +279,7 @@ public static class LootUtils
     /// <summary>
     /// Check if moving an item to a slot is blocked.
     /// Except chest/rig armor.
-    /// Based on <see cref="Slot.method_3"/>
+    /// Based on <see cref="Slot.GetConflictingSlot"/>
     /// </summary>
     public static bool HasBlockingItem(this Slot slot, Item incomingItem, out Item conflictingItem)
     {
@@ -297,11 +296,10 @@ public static class LootUtils
             return false;
         }
 
-        var slotNames = slotBlocker.ConflictingSlotNames;
-        for (var i = 0; i < slotNames.Length; i++)
+        foreach (var conflictingSlotName in slotBlocker.ConflictingSlotNames)
         {
             if (
-                conflictingSlots.TryGetValue(slotNames[i], out var conflictingSlot)
+                conflictingSlots.TryGetValue(conflictingSlotName, out var conflictingSlot)
                 && conflictingSlot != slot // Exclude checking the same slot
                 && conflictingSlot.ContainedItem is { } conflictItem
                 && conflictItem is not Armor and not Vest // Exclude chest/rig armor
@@ -317,19 +315,24 @@ public static class LootUtils
 
     public static Item GetFirstItem(this IEnumerable<Item> items)
     {
-        if (items is null)
+        switch (items)
         {
-            return null;
+            case null:
+                return null;
+            case List<Item> list:
+                return list.Count > 0 ? list[0] : null;
+            default:
+            {
+                using var enumerator = items.GetEnumerator();
+                return enumerator.MoveNext() ? enumerator.Current : null;
+            }
         }
-
-        using var enumerator = items.GetEnumerator();
-        return enumerator.MoveNext() ? enumerator.Current : null;
     }
 
     /// <summary>
     /// Gets all contained items (grid) of an item and its children
     /// </summary>
-    /// <remarks>Iterates through an item's grid, as opposed to its Slots in </remarks>
+    /// <remarks>Does not get items in its Slots</remarks>
     public static void GetAllContainedItems(this Item item, List<Item> preAllocatedList)
     {
         if (item is not CompoundItem compoundItem)

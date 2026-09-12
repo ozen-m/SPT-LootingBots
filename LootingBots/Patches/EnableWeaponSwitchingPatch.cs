@@ -1,5 +1,4 @@
 ﻿using System.Reflection;
-using EFT;
 using LootingBots.Utilities;
 using SPT.Reflection.Patching;
 
