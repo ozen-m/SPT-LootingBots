@@ -71,7 +71,12 @@ public static class LootUtils
     /// <summary>
     /// Triggers a container to open/close.
     /// </summary>
-    public static Task InteractAsync(this BotOwner botOwner, WorldInteractiveObject worldInteractiveObject, EInteractionType action)
+    public static Task InteractAsync(
+        this BotOwner botOwner,
+        WorldInteractiveObject worldInteractiveObject,
+        EInteractionType action,
+        CancellationToken token = default
+    )
     {
         if (worldInteractiveObject == null)
         {
@@ -82,8 +87,8 @@ public static class LootUtils
 
         // NOTE: This method MUST be used for Fika compatibility
         var interactionResult = new InteractionResult(action);
-        var source = new SafeTaskCompleteSource();
-        botOwner.GetPlayer.StartInteraction(worldInteractiveObject, interactionResult, source.Complete);
+        var source = new CallbackTaskCompletionSource(token);
+        botOwner.GetPlayer.StartInteraction(worldInteractiveObject, interactionResult, source.CompleteWithDispose);
 
         return source.Task;
     }

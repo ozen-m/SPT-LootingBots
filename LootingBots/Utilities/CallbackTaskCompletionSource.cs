@@ -55,3 +55,12 @@ public class CallbackTaskCompletionSource<TResult> : TaskCompletionSource<TResul
         _registration.Dispose();
     }
 }
+
+public class CallbackTaskCompletionSource(CancellationToken token = default) : CallbackTaskCompletionSource<bool>(token)
+{
+    public void CompleteWithDispose()
+    {
+        TrySetResult(true);
+        Dispose();
+    }
+}
