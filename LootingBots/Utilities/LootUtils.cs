@@ -204,27 +204,20 @@ public static class LootUtils
         // Add slots in priority order
         if (hasBackpack || hasTacVest)
         {
-            GetItemInSlotsNonAlloc(corpseEquipment, botEquipment, preallocatedList, WeaponSlots);
-            GetItemInSlotsNonAlloc(corpseEquipment, botEquipment, preallocatedList, StorageSlots);
+            GetItemInSlotsToLootNonAlloc(corpseEquipment, preallocatedList, WeaponSlots);
+            GetItemInSlotsToLootNonAlloc(corpseEquipment, preallocatedList, StorageSlots);
         }
         else
         {
-            GetItemInSlotsNonAlloc(corpseEquipment, botEquipment, preallocatedList, StorageSlots);
-            GetItemInSlotsNonAlloc(corpseEquipment, botEquipment, preallocatedList, WeaponSlots);
+            GetItemInSlotsToLootNonAlloc(corpseEquipment, preallocatedList, StorageSlots);
+            GetItemInSlotsToLootNonAlloc(corpseEquipment, preallocatedList, WeaponSlots);
         }
 
-        GetItemInSlotsNonAlloc(corpseEquipment, botEquipment, preallocatedList, OtherSlots);
+        GetItemInSlotsToLootNonAlloc(corpseEquipment, preallocatedList, OtherSlots);
     }
 
-    private static void GetItemInSlotsNonAlloc(
-        InventoryEquipment equipment,
-        InventoryEquipment botEquipment,
-        List<Item> preallocatedList,
-        EquipmentSlot[] slots
-    )
+    private static void GetItemInSlotsToLootNonAlloc(InventoryEquipment equipment, List<Item> preallocatedList, EquipmentSlot[] slots)
     {
-        var equipmentOwner = equipment.Parent.GetOwner();
-        var botOwner = botEquipment.Parent.GetOwner();
         foreach (var slotName in slots)
         {
             var slot = equipment.GetSlot(slotName);
@@ -238,7 +231,6 @@ public static class LootUtils
             var unlootableComponent = item.GetItemComponent<UnlootableComponent>();
             if (
                 unlootableComponent != null
-                && equipmentOwner != botOwner
                 && unlootableComponent.IsUnlootableFrom(item.Parent.Container)
                 && item is not Pockets // Include pockets to loot list
             )
