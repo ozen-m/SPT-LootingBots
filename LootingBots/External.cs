@@ -19,7 +19,14 @@ public static class External
         {
             var log = GetOrCreateInteropLog(bot);
 
-            if (!lootingBrain.HasFreeSpace)
+            if (!lootingBrain.LootingEnabled)
+            {
+                if (log.WarningEnabled)
+                {
+                    log.LogWarning("Forcing a scan but bot cannot scan and loot corpses, or containers, or loose items");
+                }
+            }
+            else if (!lootingBrain.HasFreeSpace)
             {
                 if (log.WarningEnabled)
                 {

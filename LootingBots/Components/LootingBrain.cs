@@ -32,25 +32,21 @@ public class LootingBrain : MonoBehaviour
     // Object ids that the bot has looted or failed to reach even though a valid path exists
     public readonly HashSet<string> IgnoredLootIds = [];
 
+    // This bot is a player scav
     public bool IsPlayerScav;
+
+    // This bot is allowed to loot: containers, or corpses, or loose items
+    public bool LootingEnabled;
 
     // Allows external methods to force the looting brain for a bot to be enabled regardless of performance settings
     public bool ForceBrainEnabled;
 
+    // Brain is enabled when:
+    //   It can scan for any of the categories (containers/corpses/loose items)
+    //   AND it is not disabled, or bot is forced to loot
     public bool IsBrainEnabled
     {
-        get
-        {
-            return ForceBrainEnabled
-                || (
-                    !_isDisabledForPerformance
-                    && (
-                        LootingBots.ContainerLootingEnabled.Value.IsBotEnabled(this)
-                        || LootingBots.LooseItemLootingEnabled.Value.IsBotEnabled(this)
-                        || LootingBots.CorpseLootingEnabled.Value.IsBotEnabled(this)
-                    )
-                );
-        }
+        get { return LootingEnabled && (!_isDisabledForPerformance || ForceBrainEnabled); }
     }
 
     public BotStats Stats
@@ -120,6 +116,11 @@ public class LootingBrain : MonoBehaviour
 
         BotOwner = botOwner;
         InventoryController = new LootingInventoryController(BotOwner, this);
+
+        LootingEnabled =
+            LootingBots.ContainerLootingEnabled.Value.IsBotEnabled(this)
+            || LootingBots.LooseItemLootingEnabled.Value.IsBotEnabled(this)
+            || LootingBots.CorpseLootingEnabled.Value.IsBotEnabled(this);
     }
 
     /// <summary>
