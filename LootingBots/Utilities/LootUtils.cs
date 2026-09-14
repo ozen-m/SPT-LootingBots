@@ -354,4 +354,14 @@ public static class LootUtils
             }
         }
     }
+
+    public static void GetAcceptableItemsInStorageSlotsNonAlloc<TItem>(
+        this InventoryController inventoryController,
+        IList<TItem> preAllocatedList,
+        Predicate<TItem> predicate = null
+    )
+        where TItem : Item
+    {
+        inventoryController.GetAcceptableItemsNonAlloc(_storageSlots, preAllocatedList, predicate);
+    }
 }

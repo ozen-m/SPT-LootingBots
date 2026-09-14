@@ -747,7 +747,7 @@ public class LootingInventoryController
         var holsterMagSlot = holster?.GetMagazineSlot();
 
         _throwUselessMagsScratch.Clear();
-        _botInventoryController.GetReachableItemsOfTypeNonAlloc(_throwUselessMagsScratch);
+        _botInventoryController.GetAcceptableItemsInStorageSlotsNonAlloc(_throwUselessMagsScratch);
 
         if (_log.DebugEnabled)
         {
