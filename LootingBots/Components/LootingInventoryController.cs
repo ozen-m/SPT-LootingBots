@@ -1319,20 +1319,12 @@ public class LootingInventoryController
         var itemsToAdd = UnityEngine.Pool.ListPool<Item>.Get();
         try
         {
-            foreach (var weaponSlot in weapon.Slots)
+            foreach (var mod in weapon.Mods)
             {
-                if (weaponSlot.Required)
+                // Check if the mod's slot is not required, can be modded in raid, and is not a magazine
+                if (mod.Parent.Container is Slot { Required: false } && mod is { RaidModdable: true } and not Magazine)
                 {
-                    continue;
-                }
-
-                foreach (var weaponMod in weaponSlot.Items)
-                {
-                    // check if the weaponMod is an actual mod and if it can be modded in raid
-                    if (weaponMod is Mod mod && mod.RaidModdable)
-                    {
-                        itemsToAdd.Add(weaponMod);
-                    }
+                    itemsToAdd.Add(mod);
                 }
             }
 
@@ -1350,8 +1342,7 @@ public class LootingInventoryController
                     return false;
                 }
             }
-
-            if (_log.DebugEnabled)
+            else if (_log.DebugEnabled)
             {
                 _log.LogDebug($"No attachments to strip for weapon: {weapon.Name.Localized()}");
             }
