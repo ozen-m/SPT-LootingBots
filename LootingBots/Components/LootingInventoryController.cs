@@ -600,39 +600,71 @@ public class LootingInventoryController
         }
         else if (EquipmentTypeUtils.IsChestArmor(lootItem) && ShouldSwapGear(chest, lootItem))
         {
-            // TODO: Add check for chest armor vs equipped armored rig? Cannot guarantee a new tac vest :/
             GetSwapAction(lootItem, chest, lootingActions, true);
         }
-        else if (EquipmentTypeUtils.IsTacticalRig(lootItem) && ShouldSwapGear(tacVest, lootItem))
+        else if (EquipmentTypeUtils.IsTacticalRig(lootItem))
         {
-            // If we have a chest armor equipped and the tac vest we are looting is armored,
-            // check if the armored rig is higher armor class than the chest,
-            // then make sure to drop the chest and pick up the armored rig
-            if (chest is not null && EquipmentTypeUtils.IsArmoredRig(lootItem))
+            if (ShouldSwapGear(tacVest, lootItem))
             {
-                if (ShouldSwapGear(chest, lootItem))
+                // If we have a chest armor equipped and the tac vest we are looting is armored,
+                // check if the armored rig is higher armor class than the chest,
+                // then make sure to drop the chest and pick up the armored rig
+                if (chest is not null && EquipmentTypeUtils.IsArmoredRig(lootItem))
                 {
-                    if (_log.DebugEnabled)
+                    if (ShouldSwapGear(chest, lootItem))
                     {
-                        _log.LogDebug("Trying to drop chest armor then loot armored rig");
-                    }
+                        if (_log.DebugEnabled)
+                        {
+                            _log.LogDebug(
+                                $"Trying to drop chest armor [{chest.Name.Localized()}] then loot armored rig [{lootItem.Name.Localized()}]"
+                            );
+                        }
 
-                    var chestValue = _itemAppraiser.GetItemPrice(chest, _log);
-                    var throwAction = LootingThrowAction.Rent(chest, -chestValue);
-                    lootingActions.Add(throwAction);
-                    GetSwapAction(lootItem, tacVest, lootingActions, true);
+                        var chestValue = _itemAppraiser.GetItemPrice(chest, _log);
+                        var throwAction = LootingThrowAction.Rent(chest, -chestValue);
+                        lootingActions.Add(throwAction);
+                        GetSwapAction(lootItem, tacVest, lootingActions, true);
+                    }
+                    else
+                    {
+                        if (_log.DebugEnabled)
+                        {
+                            _log.LogDebug($"Equipped chest armor is better than or equal to found armored rig {lootItem.Name.Localized()}");
+                        }
+                    }
                 }
                 else
                 {
-                    if (_log.DebugEnabled)
-                    {
-                        _log.LogDebug($"Equipped chest armor is better than or equal to found armored rig {lootItem.Name.Localized()}");
-                    }
+                    GetSwapAction(lootItem, tacVest, lootingActions, true);
                 }
             }
-            else
+            else if (
+                EquipmentTypeUtils.IsArmoredRig(tacVest) && _lootingBrain.ActiveLoot.GetRootItem() is InventoryEquipment corpseEquipment
+            )
             {
-                GetSwapAction(lootItem, tacVest, lootingActions, true);
+                // The bot has an equipped armored rig, check if the corpse's chest has better armor
+                // If it has better armor OR same armor but larger container,
+                // drop the current armored rig then loot the armor and tac vest
+                var corpseChestArmor = corpseEquipment.GetSlot(EquipmentSlot.ArmorVest).ContainedItem;
+                var armorDifference = GetArmorDifference(corpseChestArmor, tacVest);
+                if (
+                    (armorDifference > 0 || armorDifference == 0 && LootHasLargerContainer(lootItem, tacVest))
+                    && AllowedToEquip(corpseChestArmor)
+                )
+                {
+                    if (_log.DebugEnabled)
+                    {
+                        _log.LogDebug(
+                            $"Trying to loot chest armor [{corpseChestArmor.Name.Localized()}] and tac vest [{lootItem.Name.Localized()}] and drop current armored rig [{tacVest.Name.Localized()}]. Armor difference: {armorDifference}"
+                        );
+                    }
+
+                    // Throw the corpse's chest armor so we can swap the vests
+                    lootingActions.Add(LootingThrowAction.Rent(corpseChestArmor, 0f, false));
+                    GetSwapAction(lootItem, tacVest, lootingActions, true);
+
+                    // No need to equip the chest armor here, it will be looted next. Hopefully the bot does not get interrupted...
+                }
             }
         }
 

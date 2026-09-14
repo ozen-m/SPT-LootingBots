@@ -24,8 +24,8 @@ public static class LootUtils
     private static readonly EquipmentSlot[] _storageSlots =
     [
         EquipmentSlot.Backpack,
-        EquipmentSlot.ArmorVest,
         EquipmentSlot.TacticalVest,
+        EquipmentSlot.ArmorVest,
         EquipmentSlot.Pockets,
     ];
 
