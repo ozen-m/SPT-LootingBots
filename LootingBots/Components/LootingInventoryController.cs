@@ -98,6 +98,7 @@ public class LootingInventoryController
     private readonly LootingTransactionController _transactionController;
     private readonly BotLog _log;
     private readonly ItemAppraiser _itemAppraiser;
+    private readonly bool _isPMC;
 
     public readonly BotStats Stats = new();
 
@@ -151,6 +152,7 @@ public class LootingInventoryController
         _botInventoryController = botOwner.GetPlayer.InventoryController;
         _botOwner = botOwner;
         _transactionController = new LootingTransactionController(botOwner, _botInventoryController, _log);
+        _isPMC = _botOwner.Profile.Info.Settings.Role.IsPMC();
 
         CalculateGearValue();
         CalculateInitialNetWorth();
@@ -1241,9 +1243,7 @@ public class LootingInventoryController
         var itemsToThrow = DictionaryPool<Item, float>.Get();
         try
         {
-            var minimumValue = _botOwner.Profile.Info.Settings.Role.IsPMC()
-                ? LootingBots.PMCMinLootThreshold.Value
-                : LootingBots.ScavMinLootThreshold.Value;
+            var minimumValue = _isPMC ? LootingBots.PMCMinLootThreshold.Value : LootingBots.ScavMinLootThreshold.Value;
 
             foreach (var grid in parentItem.Grids)
             {
@@ -1373,12 +1373,9 @@ public class LootingInventoryController
     /// </summary>
     public bool IsValuableEnough(float itemPrice)
     {
-        var botType = _botOwner.Profile.Info.Settings.Role;
-        var isPmc = botType.IsPMC();
-
         // If the bot is a PMC, compare the price against the PMC loot threshold. For all other bot types use the scav threshold
-        var min = (isPmc ? LootingBots.PMCMinLootThreshold : LootingBots.ScavMinLootThreshold).Value;
-        var max = (isPmc ? LootingBots.PMCMaxLootThreshold : LootingBots.ScavMaxLootThreshold).Value;
+        var min = (_isPMC ? LootingBots.PMCMinLootThreshold : LootingBots.ScavMinLootThreshold).Value;
+        var max = (_isPMC ? LootingBots.PMCMaxLootThreshold : LootingBots.ScavMaxLootThreshold).Value;
 
         // If max is set to 0, do not check against max threshold
         return itemPrice >= min && (max == 0f || itemPrice <= max);
@@ -1390,14 +1387,9 @@ public class LootingInventoryController
     /// </summary>
     public bool AllowedToEquip(Item lootItem)
     {
-        var eligiblePmcGear = (EquipmentType)LootingBots.PMCGearToEquip.Value;
-        var eligibleScavGear = (EquipmentType)LootingBots.ScavGearToEquip.Value;
-
-        var botType = _botOwner.Profile.Info.Settings.Role;
-        var isPmc = botType.IsPMC();
-        var allowedToEquip = isPmc ? eligiblePmcGear.IsItemEligible(lootItem) : eligibleScavGear.IsItemEligible(lootItem);
-
-        return allowedToEquip;
+        return _isPMC
+            ? ((EquipmentType)LootingBots.PMCGearToEquip.Value).IsItemEligible(lootItem)
+            : ((EquipmentType)LootingBots.ScavGearToEquip.Value).IsItemEligible(lootItem);
     }
 
     /// <summary>
@@ -1412,7 +1404,7 @@ public class LootingInventoryController
             return false;
         }
 
-        var pickupNotRestricted = _botOwner.Profile.Info.Settings.Role.IsPMC()
+        var pickupNotRestricted = _isPMC
             ? LootingBots.PMCGearToPickup.Value.IsItemEligible(lootItem, true)
             : LootingBots.ScavGearToPickup.Value.IsItemEligible(lootItem, true);
 
