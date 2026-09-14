@@ -128,25 +128,22 @@ public static class External
 
     private static bool GetLootingBrain(BotOwner bot, out LootingBrain lootingBrain)
     {
-        lootingBrain = bot.GetPlayer.gameObject.GetComponent<LootingBrain>();
-        return lootingBrain != null;
+        return bot.GetPlayer.TryGetComponent(out lootingBrain);
     }
 
     private static bool GetLootFinder(BotOwner bot, out LootFinder lootFinder)
     {
-        lootFinder = bot.GetPlayer.gameObject.GetComponent<LootFinder>();
-        return lootFinder != null;
+        return bot.GetPlayer.TryGetComponent(out lootFinder);
     }
 
     private static BotLog GetOrCreateInteropLog(BotOwner bot)
     {
-        if (_interopLogs.TryGetValue(bot, out var log))
+        if (!_interopLogs.TryGetValue(bot, out var log))
         {
-            return log;
+            log = new BotLog(LootingBots.InteropLog, bot);
+            _interopLogs.Add(bot, log);
         }
 
-        log = new BotLog(LootingBots.InteropLog, bot);
-        _interopLogs.Add(bot, log);
         return log;
     }
 }
