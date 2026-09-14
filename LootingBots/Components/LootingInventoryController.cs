@@ -975,19 +975,8 @@ public class LootingInventoryController
             return true;
         }
 
-        var foundBiggerContainer = false;
-
-        // If the item is a container, calculate the size and see if it's bigger than what is equipped
-        if (equipped.IsContainer)
-        {
-            var equippedSize = (equipped as SearchableItem).GetContainerSize();
-            var itemToLootSize = (itemToLoot as SearchableItem).GetContainerSize();
-
-            foundBiggerContainer = itemToLootSize > equippedSize;
-        }
-
-        // If the item is bigger than what is equipped, only equip it if the armor class is the same
-        if (armorDifference == 0 && foundBiggerContainer)
+        // If the item is a container and is bigger than what is equipped, only equip it if the armor class is the same
+        if (armorDifference == 0 && LootHasLargerContainer(itemToLoot, equipped))
         {
             if (_log.DebugEnabled)
             {
@@ -1007,6 +996,14 @@ public class LootingInventoryController
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Compare if <paramref name="potentialLoot"/> has a larger container than <paramref name="equipped"/>
+    /// </summary>
+    public bool LootHasLargerContainer(Item potentialLoot, Item equipped)
+    {
+        return potentialLoot.GetContainerSize() > equipped.GetContainerSize();
     }
 
     /// <summary>

@@ -43,8 +43,13 @@ public static class LootUtils
     /// <summary>
     /// Calculate the size of a container
     /// </summary>
-    public static int GetContainerSize(this SearchableItem container)
+    public static int GetContainerSize(this Item item)
     {
+        if (item is not SearchableItem container)
+        {
+            return 0;
+        }
+
         var grids = container.Grids;
         var gridSize = 0;
 
