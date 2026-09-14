@@ -71,22 +71,20 @@ public class LootFinder : MonoBehaviour
         _log = new BotLog(LootingBots.LootLog, _botOwner);
         _lootFinderCts = new CancellationTokenSource();
 
+        UpdateFinderSettings();
+
+        OnAirdropLandedPatch.OnAirdropLanded += OnAirdropLanded;
+        _botOwner.BotPersonalStats.OnKillTarget += OnKilledEnemyPlayer;
+    }
+
+    public void UpdateFinderSettings()
+    {
+        _corpseLootingEnabled = LootingBots.CorpseLootingEnabled.Value.IsBotEnabled(_lootingBrain);
+        _needsCorpseSight = LootingBots.DetectCorpseNeedsSight.Value.IsBotEnabled(_lootingBrain);
         _containerLootingEnabled = LootingBots.ContainerLootingEnabled.Value.IsBotEnabled(_lootingBrain);
         _needsContainerSight = LootingBots.DetectContainerNeedsSight.Value.IsBotEnabled(_lootingBrain);
         _itemLootingEnabled = LootingBots.LooseItemLootingEnabled.Value.IsBotEnabled(_lootingBrain);
         _needsItemSight = LootingBots.DetectItemNeedsSight.Value.IsBotEnabled(_lootingBrain);
-        _corpseLootingEnabled = LootingBots.CorpseLootingEnabled.Value.IsBotEnabled(_lootingBrain);
-        _needsCorpseSight = LootingBots.DetectCorpseNeedsSight.Value.IsBotEnabled(_lootingBrain);
-
-        if (_containerLootingEnabled)
-        {
-            OnAirdropLandedPatch.OnAirdropLanded += OnAirdropLanded;
-        }
-
-        if (_corpseLootingEnabled)
-        {
-            botOwner.BotPersonalStats.OnKillTarget += OnKilledEnemyPlayer;
-        }
     }
 
     public void ResetScanTimer()
@@ -169,15 +167,8 @@ public class LootFinder : MonoBehaviour
         StopFindingLoot();
         _lootFinderCts.Dispose();
 
-        if (_containerLootingEnabled)
-        {
-            OnAirdropLandedPatch.OnAirdropLanded -= OnAirdropLanded;
-        }
-
-        if (_corpseLootingEnabled)
-        {
-            _botOwner.BotPersonalStats.OnKillTarget -= OnKilledEnemyPlayer;
-        }
+        OnAirdropLandedPatch.OnAirdropLanded -= OnAirdropLanded;
+        _botOwner.BotPersonalStats.OnKillTarget -= OnKilledEnemyPlayer;
 
         if (_debugSpheres != null)
         {
@@ -421,122 +412,130 @@ public class LootFinder : MonoBehaviour
 
     private bool FindPrioritizedLoot(int ticket)
     {
-        for (var i = 0; i < _priorityLootableContainers.Count; i++)
+        if (_containerLootingEnabled)
         {
-            var lootableContainer = _priorityLootableContainers.Dequeue();
-
-            var position = lootableContainer.TrackableTransform.position;
-            var destination = GetDestination(position);
-
-            if (!IsLootInRange(LootType.Container, destination, out var dist))
+            for (var i = 0; i < _priorityLootableContainers.Count; i++)
             {
-                if (dist != -1f)
+                var lootableContainer = _priorityLootableContainers.Dequeue();
+
+                var position = lootableContainer.TrackableTransform.position;
+                var destination = GetDestination(position);
+
+                if (!IsLootInRange(LootType.Container, destination, out var dist))
                 {
-                    if (_log.DebugEnabled)
+                    if (dist != -1f)
                     {
-                        _log.LogDebug($"Re-queuing container [{lootableContainer.GetLootName()}], not in range. Dist: {dist}");
+                        if (_log.DebugEnabled)
+                        {
+                            _log.LogDebug($"Re-queuing container [{lootableContainer.GetLootName()}], not in range. Dist: {dist}");
+                        }
+                        _priorityLootableContainers.Enqueue(lootableContainer);
                     }
-                    _priorityLootableContainers.Enqueue(lootableContainer);
+                    continue;
                 }
-                continue;
-            }
 
-            // Cache the loot and set active target
-            var rootItemId = lootableContainer.GetRootItemId();
-            if (!ActiveLootCache.CacheActiveLootId(rootItemId, _botOwner))
-            {
-                if (_log.ErrorEnabled)
+                // Cache the loot and set active target
+                var rootItemId = lootableContainer.GetRootItemId();
+                if (!ActiveLootCache.CacheActiveLootId(rootItemId, _botOwner))
                 {
-                    _log.LogError("Failed to cache and set active loot, bot owner is null or id already in the cache?");
+                    if (_log.ErrorEnabled)
+                    {
+                        _log.LogError("Failed to cache and set active loot, bot owner is null or id already in the cache?");
+                    }
+                    continue;
                 }
-                continue;
+
+                _lootingBrain.SetLoot(lootableContainer, LootType.Container, position, destination, rootItemId, dist);
+
+                if (_log.DebugEnabled)
+                {
+                    _log.LogDebug($"Setting container [{lootableContainer.GetLootName()}] as active loot. Dist: {dist}");
+                }
+
+                ScanScheduler.Return(ticket);
+                _lootingBrain.ForceBrainEnabled = false;
+                return true;
             }
-
-            _lootingBrain.SetLoot(lootableContainer, LootType.Container, position, destination, rootItemId, dist);
-
-            if (_log.DebugEnabled)
-            {
-                _log.LogDebug($"Setting container [{lootableContainer.GetLootName()}] as active loot. Dist: {dist}");
-            }
-
-            ScanScheduler.Return(ticket);
-            _lootingBrain.ForceBrainEnabled = false;
-            return true;
         }
 
-        for (var i = 0; i < _priorityCorpses.Count; i++)
+        if (_corpseLootingEnabled)
         {
-            var player = _priorityCorpses.Dequeue();
-            if (_log.DebugEnabled)
+            for (var i = 0; i < _priorityCorpses.Count; i++)
             {
-                _log.LogDebug($"Trying to find prioritized corpse: {player.AIData?.BotOwner.Name()}");
-            }
-
-            var corpse = LootUtils.PlayerCorpseField(player);
-            if (corpse == null)
-            {
+                var player = _priorityCorpses.Dequeue();
                 if (_log.DebugEnabled)
                 {
-                    _log.LogDebug($"Removing prioritized player, corpse not found for killed player [{player.AIData?.BotOwner.Name()}]");
+                    _log.LogDebug($"Trying to find prioritized corpse: {player.AIData?.BotOwner.Name()}");
                 }
 
-                continue;
-            }
-
-            // If corpse has been ignored, continue to the next prioritized corpse
-            var rootItemId = corpse.GetRootItemId();
-            if (_lootingBrain.IsLootIgnored(rootItemId))
-            {
-                continue;
-            }
-            if (ActiveLootCache.IsLootInUse(rootItemId, _botOwner))
-            {
-                if (_log.DebugEnabled)
-                {
-                    _log.LogDebug($"Re-queuing corpse [{corpse.GetLootName()}], is currently being looted by someone else");
-                }
-                _priorityCorpses.Enqueue(player);
-                continue;
-            }
-
-            var position = corpse.TrackableTransform.position;
-            var destination = GetDestination(position);
-
-            // Check if loot is in range
-            // No need to check LOS since technically it's their kill
-            if (!IsLootInRange(LootType.Corpse, destination, out var dist))
-            {
-                if (dist != -1f)
+                var corpse = LootUtils.PlayerCorpseField(player);
+                if (corpse == null)
                 {
                     if (_log.DebugEnabled)
                     {
-                        _log.LogDebug($"Re-queuing corpse [{corpse.GetLootName()}], not in range. Dist: {dist}");
+                        _log.LogDebug(
+                            $"Removing prioritized player, corpse not found for killed player [{player.AIData?.BotOwner.Name()}]"
+                        );
+                    }
+
+                    continue;
+                }
+
+                // If corpse has been ignored, continue to the next prioritized corpse
+                var rootItemId = corpse.GetRootItemId();
+                if (_lootingBrain.IsLootIgnored(rootItemId))
+                {
+                    continue;
+                }
+                if (ActiveLootCache.IsLootInUse(rootItemId, _botOwner))
+                {
+                    if (_log.DebugEnabled)
+                    {
+                        _log.LogDebug($"Re-queuing corpse [{corpse.GetLootName()}], is currently being looted by someone else");
                     }
                     _priorityCorpses.Enqueue(player);
+                    continue;
                 }
-                continue;
-            }
 
-            // Cache the loot and set active target
-            if (!ActiveLootCache.CacheActiveLootId(rootItemId, _botOwner))
-            {
-                if (_log.ErrorEnabled)
+                var position = corpse.TrackableTransform.position;
+                var destination = GetDestination(position);
+
+                // Check if loot is in range
+                // No need to check LOS since technically it's their kill
+                if (!IsLootInRange(LootType.Corpse, destination, out var dist))
                 {
-                    _log.LogError("Failed to cache and set active loot, bot owner is null or id already in the cache?");
+                    if (dist != -1f)
+                    {
+                        if (_log.DebugEnabled)
+                        {
+                            _log.LogDebug($"Re-queuing corpse [{corpse.GetLootName()}], not in range. Dist: {dist}");
+                        }
+                        _priorityCorpses.Enqueue(player);
+                    }
+                    continue;
                 }
-                continue;
+
+                // Cache the loot and set active target
+                if (!ActiveLootCache.CacheActiveLootId(rootItemId, _botOwner))
+                {
+                    if (_log.ErrorEnabled)
+                    {
+                        _log.LogError("Failed to cache and set active loot, bot owner is null or id already in the cache?");
+                    }
+                    continue;
+                }
+
+                _lootingBrain.SetLoot(corpse, LootType.Corpse, position, destination, rootItemId, dist);
+
+                if (_log.DebugEnabled)
+                {
+                    _log.LogDebug($"Setting Corpse [{corpse.GetLootName()}] as active loot. Dist: {dist}");
+                }
+
+                ScanScheduler.Return(ticket);
+                _lootingBrain.ForceBrainEnabled = false;
+                return true;
             }
-
-            _lootingBrain.SetLoot(corpse, LootType.Corpse, position, destination, rootItemId, dist);
-
-            if (_log.DebugEnabled)
-            {
-                _log.LogDebug($"Setting Corpse [{corpse.GetLootName()}] as active loot. Dist: {dist}");
-            }
-
-            ScanScheduler.Return(ticket);
-            _lootingBrain.ForceBrainEnabled = false;
-            return true;
         }
 
         return false;

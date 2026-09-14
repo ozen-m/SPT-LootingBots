@@ -99,7 +99,7 @@ public class LootingBots : BaseUnityPlugin
             "Enable corpse looting",
             SettingsDefaults,
             new ConfigDescription(
-                "Enables corpse looting for the selected bot types. Takes effect next raid", // Technically takes effect for next bot spawns
+                "Enables corpse looting for the selected bot types",
                 null,
                 new ConfigurationManagerAttributes { Order = 10 }
             )
@@ -109,7 +109,7 @@ public class LootingBots : BaseUnityPlugin
             "Enable corpse line of sight check",
             BotType.None,
             new ConfigDescription(
-                "When scanning for loot, corpses will be ignored if they are not visible for the selected bot types. Takes effect next raid",
+                "When scanning for loot, corpses will be ignored if they are not visible for the selected bot types",
                 null,
                 new ConfigurationManagerAttributes { Order = 9 }
             )
@@ -130,7 +130,7 @@ public class LootingBots : BaseUnityPlugin
             "Enable container looting",
             SettingsDefaults,
             new ConfigDescription(
-                "Enables container looting for the selected bot types. Takes effect next raid",
+                "Enables container looting for the selected bot types",
                 null,
                 new ConfigurationManagerAttributes { Order = 7 }
             )
@@ -140,7 +140,7 @@ public class LootingBots : BaseUnityPlugin
             "Enable container line of sight check",
             BotType.None,
             new ConfigDescription(
-                "When scanning for loot, containers will be ignored if they are not visible for the selected bot types. Takes effect next raid",
+                "When scanning for loot, containers will be ignored if they are not visible for the selected bot types",
                 null,
                 new ConfigurationManagerAttributes { Order = 6 }
             )
@@ -161,7 +161,7 @@ public class LootingBots : BaseUnityPlugin
             "Enable loose item looting",
             SettingsDefaults,
             new ConfigDescription(
-                "Enables loose item looting for the selected bot types. Takes effect next raid",
+                "Enables loose item looting for the selected bot types",
                 null,
                 new ConfigurationManagerAttributes { Order = 4 }
             )
@@ -171,7 +171,7 @@ public class LootingBots : BaseUnityPlugin
             "Enable item line of sight check",
             BotType.None,
             new ConfigDescription(
-                "When scanning for loot, loose items will be ignored if they are not visible for the selected bot types. Takes effect next raid",
+                "When scanning for loot, loose items will be ignored if they are not visible for the selected bot types",
                 null,
                 new ConfigurationManagerAttributes { Order = 3 }
             )
@@ -212,7 +212,7 @@ public class LootingBots : BaseUnityPlugin
             "Debug: Filter logs on bot",
             0,
             new ConfigDescription(
-                "Filters new log entries only showing logs for the number of the bot specified. A value of 0 denotes no filter",
+                "Filters new log entries only showing logs for the number of the bot specified. A value of 0 denotes no filter.",
                 null,
                 new ConfigurationManagerAttributes { Order = -2, IsAdvanced = true }
             )
@@ -234,7 +234,7 @@ public class LootingBots : BaseUnityPlugin
             "Delay after spawn",
             6f,
             new ConfigDescription(
-                "Amount of seconds a bot will wait to start their first loot scan after spawning into raid.",
+                "Amount of seconds a bot will wait to start their first loot scan after spawning into raid",
                 null,
                 new ConfigurationManagerAttributes { Order = 3 }
             )
@@ -288,7 +288,7 @@ public class LootingBots : BaseUnityPlugin
             "Use flea market prices",
             false,
             new ConfigDescription(
-                "Bots will query more accurate ragfair prices to do item value checks. Will make a query to get ragfair prices when the client is first started",
+                "Bots will query more accurate ragfair prices to do item value checks. Will make a query to get ragfair prices when the client is first started.",
                 null,
                 new ConfigurationManagerAttributes { Order = 13 }
             )
@@ -298,7 +298,7 @@ public class LootingBots : BaseUnityPlugin
             "Calculate weapon value from attachments",
             true,
             new ConfigDescription(
-                "Calculate weapon value by looking up each attachment. More accurate than just looking at the base weapon template but a slightly more expensive check",
+                "Calculate weapon value by looking up each attachment. More accurate than just looking at the base weapon template but a slightly more expensive check.",
                 null,
                 new ConfigurationManagerAttributes { Order = 12 }
             )
@@ -308,7 +308,7 @@ public class LootingBots : BaseUnityPlugin
             "Calculate armor value from slotted items",
             true,
             new ConfigDescription(
-                "Calculate armor value by looking up each slot containing plates/faceshields etc. More accurate than just looking at the base armor template but a slightly more expensive check",
+                "Calculate armor value by looking up each slot containing plates/faceshields etc. More accurate than just looking at the base armor template but a slightly more expensive check.",
                 null,
                 new ConfigurationManagerAttributes { Order = 11 }
             )
@@ -338,7 +338,7 @@ public class LootingBots : BaseUnityPlugin
             "PMC: Min loot value threshold",
             12000f,
             new ConfigDescription(
-                "PMC bots will only loot items that exceed the specified value in roubles. When set to 0, bots will ignore the minimum value threshold",
+                "PMC bots will only loot items that exceed the specified value in roubles. When set to 0, bots will ignore the minimum value threshold.",
                 null,
                 new ConfigurationManagerAttributes { Order = 8 }
             )
@@ -348,7 +348,7 @@ public class LootingBots : BaseUnityPlugin
             "PMC: Max loot value threshold",
             0f,
             new ConfigDescription(
-                "PMC bots will NOT loot items that exceed the specified value in roubles. When set to 0, bots will ignore the maximum value threshold",
+                "PMC bots will NOT loot items that exceed the specified value in roubles. When set to 0, bots will ignore the maximum value threshold.",
                 null,
                 new ConfigurationManagerAttributes { Order = 7 }
             )
@@ -378,7 +378,7 @@ public class LootingBots : BaseUnityPlugin
             "Scav: Min loot value threshold",
             5000f,
             new ConfigDescription(
-                "All non-PMC bots will only loot items that exceed the specified value in roubles. When set to 0, bots will ignore the minimum value threshold",
+                "All non-PMC bots will only loot items that exceed the specified value in roubles. When set to 0, bots will ignore the minimum value threshold.",
                 null,
                 new ConfigurationManagerAttributes { Order = 4 }
             )
@@ -388,7 +388,7 @@ public class LootingBots : BaseUnityPlugin
             "Scav: Max loot value threshold",
             0f,
             new ConfigDescription(
-                "All non-PMC bots will NOT loot items that exceed the specified value in roubles. When set to 0, bots will ignore the maximum value threshold",
+                "All non-PMC bots will NOT loot items that exceed the specified value in roubles. When set to 0, bots will ignore the maximum value threshold.",
                 null,
                 new ConfigurationManagerAttributes { Order = 3 }
             )
@@ -433,7 +433,7 @@ public class LootingBots : BaseUnityPlugin
             "Maximum looting bots",
             20,
             new ConfigDescription(
-                "Limits the amount of bots that are able to simultaneously run looting logic. A value of 0 represents no limit",
+                "Limits the amount of bots that are able to simultaneously run looting logic. A value of 0 represents no limit.",
                 null,
                 new ConfigurationManagerAttributes { Order = 11 }
             )
@@ -443,7 +443,7 @@ public class LootingBots : BaseUnityPlugin
             "Limit looting by distance to player",
             0,
             new ConfigDescription(
-                "Any bot farther than the specified distance in meters will not run any looting logic. A value of 0 represents no limit",
+                "Any bot farther than the specified distance in meters will not run any looting logic. A value of 0 represents no limit.",
                 null,
                 new ConfigurationManagerAttributes { Order = 10 }
             )
@@ -453,7 +453,7 @@ public class LootingBots : BaseUnityPlugin
             "Maximum concurrent scans",
             3,
             new ConfigDescription(
-                "Max number of bots that can scan for loot at the same time. Takes effect next raid. A value of 0 represents no limit",
+                "Max number of bots that can scan for loot at the same time. A value of 0 represents no limit. Takes effect next raid.",
                 new AcceptableValueRange<int>(0, 35),
                 new ConfigurationManagerAttributes { Order = 9 }
             )
@@ -463,7 +463,7 @@ public class LootingBots : BaseUnityPlugin
             "Maximum unsuccessful attempts",
             2,
             new ConfigDescription(
-                "Max number of unsuccessful attempts a bot can try to find loot before taking a break. A value of 0 represents no limit",
+                "Max number of unsuccessful attempts a bot can try to find loot before taking a break. A value of 0 represents no limit.",
                 new AcceptableValueRange<int>(0, 10),
                 new ConfigurationManagerAttributes { Order = 8 }
             )
@@ -487,6 +487,7 @@ public class LootingBots : BaseUnityPlugin
         LootFinderSettings();
         LootSettings();
         PerformanceSettings();
+        Config.SettingChanged += OnSettingsChanged;
 
         LootLog = new Log(Logger, LootingLogLevels);
         InteropLog = new Log(Logger, InteropLogLevels);
@@ -581,5 +582,46 @@ public class LootingBots : BaseUnityPlugin
 
         ItemAppraiserLog.LogInfo("Updating item appraiser");
         _ = ItemAppraiser.UpdatePricesAsync();
+    }
+
+    /// <summary>
+    /// Since these settings are initialized on bot spawn, update their values for each bot when in-raid.
+    /// </summary>
+    private static void OnSettingsChanged(object obj, SettingChangedEventArgs args)
+    {
+        var gameWorld = Singleton<GameWorld>.Instance;
+        if (gameWorld == null)
+        {
+            return;
+        }
+
+        if (
+            args.ChangedSetting != ContainerLootingEnabled
+            && args.ChangedSetting != LooseItemLootingEnabled
+            && args.ChangedSetting != CorpseLootingEnabled
+            && args.ChangedSetting != DetectCorpseNeedsSight
+            && args.ChangedSetting != DetectContainerNeedsSight
+            && args.ChangedSetting != DetectItemNeedsSight
+        )
+        {
+            return;
+        }
+
+        foreach (var player in gameWorld.AllAlivePlayersList)
+        {
+            if (!player.IsAI)
+            {
+                continue;
+            }
+
+            if (player.TryGetComponent(out LootingBrain lootingBrain))
+            {
+                lootingBrain.UpdateIsLootingEnabled();
+            }
+            if (player.TryGetComponent(out LootFinder lootFinder))
+            {
+                lootFinder.UpdateFinderSettings();
+            }
+        }
     }
 }

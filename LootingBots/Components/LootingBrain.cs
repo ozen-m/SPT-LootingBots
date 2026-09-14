@@ -117,10 +117,7 @@ public class LootingBrain : MonoBehaviour
         BotOwner = botOwner;
         InventoryController = new LootingInventoryController(BotOwner, this);
 
-        LootingEnabled =
-            LootingBots.ContainerLootingEnabled.Value.IsBotEnabled(this)
-            || LootingBots.LooseItemLootingEnabled.Value.IsBotEnabled(this)
-            || LootingBots.CorpseLootingEnabled.Value.IsBotEnabled(this);
+        UpdateIsLootingEnabled();
     }
 
     /// <summary>
@@ -436,6 +433,14 @@ public class LootingBrain : MonoBehaviour
         InventoryController.SetRootItemOwner(null);
         BotOwner.AIData.CalcPower();
         LootTaskRunning = false;
+    }
+
+    public void UpdateIsLootingEnabled()
+    {
+        LootingEnabled =
+            LootingBots.ContainerLootingEnabled.Value.IsBotEnabled(this)
+            || LootingBots.LooseItemLootingEnabled.Value.IsBotEnabled(this)
+            || LootingBots.CorpseLootingEnabled.Value.IsBotEnabled(this);
     }
 
     public void UpdateGridStats()
