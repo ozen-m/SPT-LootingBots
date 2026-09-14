@@ -23,14 +23,16 @@ public static class External
             {
                 if (log.WarningEnabled)
                 {
-                    log.LogWarning("Forcing a scan but bot cannot scan and loot corpses, or containers, or loose items");
+                    log.LogWarning("Cannot force a loot scan, bot is not allowed to loot corpses, or containers, or loose items");
                 }
+                return true;
             }
-            else if (!lootingBrain.HasFreeSpace)
+
+            if (!lootingBrain.HasFreeSpace)
             {
                 if (log.WarningEnabled)
                 {
-                    log.LogWarning("Forcing a scan but bot does not have enough free space");
+                    log.LogWarning("Forcing a loot scan despite the bot not having enough free space");
                 }
             }
             else if (log.DebugEnabled)

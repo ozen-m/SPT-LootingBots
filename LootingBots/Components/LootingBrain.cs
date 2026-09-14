@@ -39,14 +39,24 @@ public class LootingBrain : MonoBehaviour
     public bool LootingEnabled;
 
     // Allows external methods to force the looting brain for a bot to be enabled regardless of performance settings
-    public bool ForceBrainEnabled;
+    public bool ForceBrainEnabled
+    {
+        get;
+        set
+        {
+            field = value;
+            if (value && ActiveBotCache.IsCacheActive)
+            {
+                // Run update to add it to ActiveBotCache and enable its brain (IsBrainEnabled)
+                _performanceTimer = -1f;
+                Update();
+            }
+        }
+    }
 
-    // Brain is enabled when:
-    //   It can scan for any of the categories (containers/corpses/loose items)
-    //   AND it is not disabled, or bot is forced to loot
     public bool IsBrainEnabled
     {
-        get { return LootingEnabled && (!_isDisabledForPerformance || ForceBrainEnabled); }
+        get { return !_isDisabledForPerformance; }
     }
 
     public BotStats Stats
@@ -135,7 +145,7 @@ public class LootingBrain : MonoBehaviour
         if (ActiveBotCache.IsCacheActive)
         {
             // If there is space in the BotCache, add the bot to the cache. Otherwise, disable the looting brain until there is space available in the cache
-            if (ForceBrainEnabled || (ActiveBotCache.IsAbleToCache && IsCloseToPlayer))
+            if (LootingEnabled && (ForceBrainEnabled || (ActiveBotCache.IsAbleToCache && IsCloseToPlayer)))
             {
                 ActiveBotCache.Add(BotOwner);
             }
@@ -144,7 +154,7 @@ public class LootingBrain : MonoBehaviour
                 if (_log.WarningEnabled)
                 {
                     _log.LogWarning(
-                        $"Looting disabled! Enabled bots: {ActiveBotCache.GetSize()}. Distance to player: {Math.Sqrt(DistanceToPlayer)}."
+                        $"Looting disabled! Enabled bots: {ActiveBotCache.GetSize()}. Distance to player: {Math.Sqrt(DistanceToPlayer):N}. Able to loot: {LootingEnabled}."
                     );
                 }
 
@@ -158,12 +168,20 @@ public class LootingBrain : MonoBehaviour
     /// </summary>
     public void Update()
     {
+        if (_performanceTimer > Time.time)
+        {
+            return;
+        }
+        // The performance check should occur every 3 seconds at the minimum.
+        // If the loot scan interval is faster, we should do the performance check at the loot scan interval
+        _performanceTimer = Time.time + Math.Min(PerformanceTimerInterval, LootingBots.LootScanInterval.Value);
+
         if (BotOwner.BotState != EBotState.Active)
         {
             return;
         }
 
-        if (ActiveBotCache.IsCacheActive && _performanceTimer < Time.time)
+        if (ActiveBotCache.IsCacheActive)
         {
             var closeEnoughToPlayer = IsCloseToPlayer;
             // For a disabled bot to be allowed to loot they must meet the following criteria:
@@ -171,7 +189,7 @@ public class LootingBrain : MonoBehaviour
             //              OR
             // 1. ActiveBotCache is not at capacity
             // 2. Bot is close enough to the player
-            if (_isDisabledForPerformance && (ForceBrainEnabled || (ActiveBotCache.IsAbleToCache && closeEnoughToPlayer)))
+            if (_isDisabledForPerformance && LootingEnabled && (ForceBrainEnabled || (ActiveBotCache.IsAbleToCache && closeEnoughToPlayer)))
             {
                 ActiveBotCache.Add(BotOwner);
                 _isDisabledForPerformance = false;
@@ -179,7 +197,10 @@ public class LootingBrain : MonoBehaviour
             // For an enabled bot to become disabled they must meet the following criteria:
             // 1. The bot has not been manually flagged for looting
             // 2. BotCache is over capacity or the bot is no longer close enough to the player
-            else if (!ForceBrainEnabled && ActiveBotCache.Has(BotOwner) && (ActiveBotCache.IsOverCapacity || !closeEnoughToPlayer))
+            else if (
+                ActiveBotCache.Has(BotOwner)
+                && (!LootingEnabled || !ForceBrainEnabled && (ActiveBotCache.IsOverCapacity || !closeEnoughToPlayer))
+            )
             {
                 if (IsBotLooting)
                 {
@@ -192,14 +213,14 @@ public class LootingBrain : MonoBehaviour
                 if (_log.WarningEnabled)
                 {
                     _log.LogWarning(
-                        $"Looting disabled! Enabled bots: {ActiveBotCache.GetSize()}. Distance to player: {Math.Sqrt(DistanceToPlayer)}."
+                        $"Looting disabled! Enabled bots: {ActiveBotCache.GetSize()}. Distance to player: {Math.Sqrt(DistanceToPlayer):N}. Able to loot: {LootingEnabled}."
                     );
                 }
             }
-
-            // The performance check should occur every 3 seconds at the minimum.
-            // If the loot scan interval is faster, we should do the performance check at the loot scan interval
-            _performanceTimer = Time.time + Math.Min(PerformanceTimerInterval, LootingBots.LootScanInterval.Value);
+        }
+        else if (_isDisabledForPerformance)
+        {
+            _isDisabledForPerformance = false;
         }
 
         // This does not work with Fika

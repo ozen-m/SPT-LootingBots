@@ -115,7 +115,7 @@ public class LootFinder : MonoBehaviour
 
     public void ForceScan()
     {
-        _scanTimer = Time.time - 1f;
+        _scanTimer = -1f;
         SetLockUntilNextScan(true);
         _lootingBrain.ForceBrainEnabled = true;
     }
