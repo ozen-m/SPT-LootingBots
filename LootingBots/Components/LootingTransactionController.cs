@@ -395,6 +395,39 @@ public class LootingTransactionController
     }
 
     /// <summary>
+    /// Try to transfer an item to a corpse's inventory or throw
+    /// </summary>
+    public Task<bool> TransferOrThrowItemAsync(Item toThrow, InventoryEquipment equipment, CancellationToken token = default)
+    {
+        if (equipment is null)
+        {
+            return ThrowItemAsync(toThrow, token);
+        }
+
+        if (_log.DebugEnabled)
+        {
+            _log.LogDebug($"Transferring or throwing item: {toThrow.Name.Localized()}...");
+        }
+
+        foreach (var grid in equipment.GetPrioritizedGridsForLoot(toThrow))
+        {
+            var location = grid.FindLocationForItem(toThrow);
+            if (location == null)
+            {
+                continue;
+            }
+            if (!ItemManipulator.DestinationCheck(toThrow.Parent, location, (CorpseItemController)equipment.Owner).Value)
+            {
+                continue;
+            }
+
+            return MoveItemAsync(toThrow, location, token);
+        }
+
+        return ThrowItemAsync(toThrow, token);
+    }
+
+    /// <summary>
     /// Try to run network transaction with timeout.
     ///
     /// For some reason <see cref="InventoryController.TryRunNetworkTransaction"/>
