@@ -673,12 +673,12 @@ public class LootingInventoryController
 
     public bool IsUsableMag(Magazine mag)
     {
-        return mag != null && HasAcceptableMagazineSlot(_botInventoryController.Inventory.Equipment, mag);
+        return HasAcceptableMagazineSlot(_botInventoryController.Inventory.Equipment, mag);
     }
 
     public bool IsUsableAmmo(Ammo ammo)
     {
-        return ammo != null && HasAcceptableAmmoSlot(_botInventoryController.Inventory.Equipment, ammo);
+        return HasAcceptableAmmoSlot(_botInventoryController.Inventory.Equipment, ammo);
     }
 
     private static readonly EquipmentSlot[] _weaponSlots =
@@ -1286,17 +1286,19 @@ public class LootingInventoryController
                     }
 
                     // Check the conditions to filter out items to keep
-                    if (
-                        childItem.QuestItem
-                        || childItem is Meds or BarterOther
-                        || IsUsableMag(childItem as Magazine)
-                        || IsUsableAmmo(childItem as Ammo)
-                    )
+                    if (childItem.QuestItem || childItem is Meds or BarterOther || (childItem is Ammo ammo && IsUsableAmmo(ammo)))
                     {
                         continue;
                     }
 
-                    var value = _itemAppraiser.GetItemPrice(item, _log);
+                    // If it's a magazine we cannot use, throw it
+                    if (childItem is Magazine mag && !IsUsableMag(mag))
+                    {
+                        itemsToThrow.Add(mag, _itemAppraiser.GetItemPrice(mag, _log));
+                        continue;
+                    }
+
+                    var value = _itemAppraiser.GetItemPrice(childItem, _log);
                     if (value < minimumValue)
                     {
                         itemsToThrow.Add(childItem, value);
@@ -1430,8 +1432,8 @@ public class LootingInventoryController
 
         // All usable mags and money should be considered eligible to loot. Otherwise, all other items fall subject to the mod settings for restricting pickup and loot value thresholds
         return lootItem is Money
-            || IsUsableMag(lootItem as Magazine)
-            || IsUsableAmmo(lootItem as Ammo)
+            || lootItem is Magazine mag && IsUsableMag(mag)
+            || lootItem is Ammo ammo && IsUsableAmmo(ammo)
             || (
                 pickupNotRestricted
                 && (
