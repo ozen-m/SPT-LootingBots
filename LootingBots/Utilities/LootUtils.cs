@@ -14,14 +14,14 @@ public static class LootUtils
     public static readonly int LootMask = LayerMask.GetMask("Interactive", "Loot", "Deadbody");
     public static readonly AccessTools.FieldRef<Player, Corpse> PlayerCorpseField = AccessTools.FieldRefAccess<Player, Corpse>("Corpse");
 
-    private static readonly EquipmentSlot[] _weaponSlots =
+    public static readonly EquipmentSlot[] WeaponSlots =
     [
         EquipmentSlot.Holster,
         EquipmentSlot.FirstPrimaryWeapon,
         EquipmentSlot.SecondPrimaryWeapon,
     ];
 
-    private static readonly EquipmentSlot[] _storageSlots =
+    public static readonly EquipmentSlot[] StorageSlots =
     [
         EquipmentSlot.Backpack,
         EquipmentSlot.TacticalVest,
@@ -29,7 +29,7 @@ public static class LootUtils
         EquipmentSlot.Pockets,
     ];
 
-    private static readonly EquipmentSlot[] _otherSlots =
+    public static readonly EquipmentSlot[] OtherSlots =
     [
         EquipmentSlot.ArmBand,
         EquipmentSlot.Headwear,
@@ -208,16 +208,16 @@ public static class LootUtils
             || botEquipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem != null
         )
         {
-            GetItemInSlotsToLootNonAlloc(corpseEquipment, preallocatedList, _weaponSlots);
-            GetItemInSlotsToLootNonAlloc(corpseEquipment, preallocatedList, _storageSlots);
+            GetItemInSlotsToLootNonAlloc(corpseEquipment, preallocatedList, WeaponSlots);
+            GetItemInSlotsToLootNonAlloc(corpseEquipment, preallocatedList, StorageSlots);
         }
         else
         {
-            GetItemInSlotsToLootNonAlloc(corpseEquipment, preallocatedList, _storageSlots);
-            GetItemInSlotsToLootNonAlloc(corpseEquipment, preallocatedList, _weaponSlots);
+            GetItemInSlotsToLootNonAlloc(corpseEquipment, preallocatedList, StorageSlots);
+            GetItemInSlotsToLootNonAlloc(corpseEquipment, preallocatedList, WeaponSlots);
         }
 
-        GetItemInSlotsToLootNonAlloc(corpseEquipment, preallocatedList, _otherSlots);
+        GetItemInSlotsToLootNonAlloc(corpseEquipment, preallocatedList, OtherSlots);
     }
 
     private static void GetItemInSlotsToLootNonAlloc(InventoryEquipment equipment, List<Item> preallocatedList, EquipmentSlot[] slots)
@@ -362,6 +362,6 @@ public static class LootUtils
     )
         where TItem : Item
     {
-        inventoryController.GetAcceptableItemsNonAlloc(_storageSlots, preAllocatedList, predicate);
+        inventoryController.GetAcceptableItemsNonAlloc(StorageSlots, preAllocatedList, predicate);
     }
 }

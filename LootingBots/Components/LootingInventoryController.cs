@@ -671,26 +671,13 @@ public class LootingInventoryController
         return lootingActions.Count > 0;
     }
 
+    /// <summary>
+    /// Check if this magazine can be used by any equipped weapon
+    /// </summary>
     public bool IsUsableMag(Magazine mag)
     {
-        return HasAcceptableMagazineSlot(_botInventoryController.Inventory.Equipment, mag);
-    }
-
-    public bool IsUsableAmmo(Ammo ammo)
-    {
-        return HasAcceptableAmmoSlot(_botInventoryController.Inventory.Equipment, ammo);
-    }
-
-    private static readonly EquipmentSlot[] _weaponSlots =
-    [
-        EquipmentSlot.FirstPrimaryWeapon,
-        EquipmentSlot.SecondPrimaryWeapon,
-        EquipmentSlot.Holster,
-    ];
-
-    private static bool HasAcceptableMagazineSlot(InventoryEquipment equipment, Magazine mag)
-    {
-        foreach (var weaponSlot in _weaponSlots)
+        var equipment = _botInventoryController.Inventory.Equipment;
+        foreach (var weaponSlot in LootUtils.WeaponSlots)
         {
             if (equipment.GetSlot(weaponSlot).ContainedItem is not Weapon weapon)
             {
@@ -707,9 +694,13 @@ public class LootingInventoryController
         return false;
     }
 
-    private static bool HasAcceptableAmmoSlot(InventoryEquipment equipment, Ammo ammo)
+    /// <summary>
+    /// Check if this ammo can be used by any equipped weapon
+    /// </summary>
+    public bool IsUsableAmmo(Ammo ammo)
     {
-        foreach (var weaponSlot in _weaponSlots)
+        var equipment = _botInventoryController.Inventory.Equipment;
+        foreach (var weaponSlot in LootUtils.WeaponSlots)
         {
             if (equipment.GetSlot(weaponSlot).ContainedItem is not Weapon weapon)
             {
@@ -1081,8 +1072,6 @@ public class LootingInventoryController
     /// <summary>
     /// Gets the max armor class of an item
     /// </summary>
-    /// <param name="item"></param>
-    /// <returns></returns>
     public static int GetArmorClass(Item item)
     {
         // Get item's armor class then get armor class of plates inside armor slots
@@ -1146,9 +1135,6 @@ public class LootingInventoryController
     /// <summary>
     /// Gets the difference in penetration power tier.
     /// </summary>
-    /// <param name="potentialWeapon"></param>
-    /// <param name="equippedWeapon"></param>
-    /// <returns></returns>
     public int GetCaliberDifference(Weapon potentialWeapon, Weapon equippedWeapon)
     {
         return GetWeaponPenetrationPower(potentialWeapon) / 10 - GetWeaponPenetrationPower(equippedWeapon) / 10;
@@ -1476,6 +1462,9 @@ public class LootingInventoryController
         _transactionController.SetRootItemOwner(owner);
     }
 
+    /// <summary>
+    /// Calculates the sum value of its children (recursive). Excludes slots.
+    /// </summary>
     private float GetAllContainedItemsValue(Item item)
     {
         var price = 0f;
