@@ -1118,10 +1118,9 @@ public class LootingInventoryController
     }
 
     /// <summary>
-    /// A weapon (potentialWeapon) is defined as better when:
-    ///   1. Its ammo is in the same tier or is better than the equippedWeapon
-    ///   2. It's more valuable than the equippedWeapon
-    /// TODO: Solely base on ammo penetration power?
+    /// A weapon (<paramref name="potentialWeapon"/>) is defined as better when:
+    ///   1. Its ammo penetration power is better than <paramref name="equippedWeapon"/>
+    ///   2. Its ammo penetration power is the same AND is more valuable than <paramref name="equippedWeapon"/>
     /// </summary>
     public bool IsWeaponBetter(Weapon potentialWeapon, Weapon equippedWeapon, bool moreValuable)
     {
@@ -1131,12 +1130,12 @@ public class LootingInventoryController
         }
 
         var powerDifference = GetCaliberDifference(potentialWeapon, equippedWeapon);
-        if (powerDifference >= 0 && moreValuable)
+        if (powerDifference > 0 || powerDifference == 0 && moreValuable)
         {
             if (_log.DebugEnabled)
             {
                 _log.LogDebug(
-                    $"Weapon {potentialWeapon.Name.Localized()} is better versus {equippedWeapon?.Name.Localized()}. Difference: {powerDifference}, IsMoreValuable: {true}"
+                    $"Weapon {potentialWeapon.Name.Localized()} is better versus {equippedWeapon.Name.Localized()}. Difference: {powerDifference}, IsMoreValuable: {true}"
                 );
             }
             return true;
