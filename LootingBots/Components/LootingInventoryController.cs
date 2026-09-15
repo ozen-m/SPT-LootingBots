@@ -1169,9 +1169,14 @@ public class LootingInventoryController
         var magazine = weapon.GetCurrentMagazine();
         if (magazine != null)
         {
-            foreach (var ammo in magazine.Cartridges._items)
+            foreach (var item in magazine.Cartridges._items)
             {
-                var power = ((AmmoTemplate)ammo.Template).PenetrationPower;
+                if (item is not Ammo ammo)
+                {
+                    continue;
+                }
+
+                var power = ammo.PenetrationPower;
                 if (power > currentPower)
                 {
                     currentPower = power;
@@ -1179,14 +1184,14 @@ public class LootingInventoryController
             }
         }
 
-        foreach (var shell in weapon.ShellsInChambers)
+        foreach (var slot in weapon.Chambers)
         {
-            if (shell is null)
+            if (slot.ContainedItem is not Ammo ammo)
             {
                 continue;
             }
 
-            var power = shell.PenetrationPower;
+            var power = ammo.PenetrationPower;
             if (power > currentPower)
             {
                 currentPower = power;
