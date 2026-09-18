@@ -374,8 +374,8 @@ public class LootingTransactionController
 
         await SimulatePlayerDelayAsync(token: token);
 
-        var promise = new TaskCompletionSource<IResult>();
-        _inventoryController.ThrowItem(toThrow, false, promise.SetResult);
+        var promise = CallbackTaskCompletionSource.Start(token);
+        _inventoryController.ThrowItem(toThrow, false, promise.ResultCallback);
 
         var throwResult = await promise.Task;
         if (throwResult.Failed)
@@ -453,10 +453,10 @@ public class LootingTransactionController
     private async Task<IResult> RunNetworkTransactionWithTimeoutAsync(OperationResult operationResult)
     {
         var timeoutToken = _networkTimeout.Timeout(NetworkTransactionTimeout);
-        using var callbackSource = new CallbackTaskCompletionSource<IResult>(timeoutToken);
+        var callbackSource = CallbackTaskCompletionSource.Start(timeoutToken);
 
         var operation = _inventoryController.ConvertOperationResultToOperation(operationResult.Value);
-        _inventoryController.Execute(operation, callbackSource.TrySetResult);
+        _inventoryController.Execute(operation, callbackSource.ResultCallback);
 
         try
         {

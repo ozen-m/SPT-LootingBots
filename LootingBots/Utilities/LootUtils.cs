@@ -75,24 +75,27 @@ public static class LootUtils
     /// <summary>
     /// Triggers a container to open/close.
     /// </summary>
-    public static Task InteractAsync(
+    public static ValueTask<bool> InteractAsync(
         this BotOwner botOwner,
         WorldInteractiveObject worldInteractiveObject,
         EInteractionType action,
         CancellationToken token = default
     )
     {
+        var source = ActionTaskCompletionSource.Start(token);
+
         if (worldInteractiveObject == null)
         {
-            return Task.FromException(
+            source.SetException(
                 new ArgumentNullException($"[{botOwner.Name()}] Interacting [{action.ToString()}] with WorldInteractiveObject but is NULL")
             );
         }
-
-        // NOTE: This method MUST be used for Fika compatibility
-        var interactionResult = new InteractionResult(action);
-        var source = new CallbackTaskCompletionSource(token);
-        botOwner.GetPlayer.StartInteraction(worldInteractiveObject, interactionResult, source.CompleteWithDispose);
+        else
+        {
+            // NOTE: This method MUST be used for Fika compatibility
+            var interactionResult = new InteractionResult(action);
+            botOwner.GetPlayer.StartInteraction(worldInteractiveObject, interactionResult, source.CompleteAction);
+        }
 
         return source.Task;
     }
