@@ -468,7 +468,7 @@ public class LootingTransactionController
         {
             if (operation.Status is EOperationStatus.Succeeded)
             {
-                return new SuccessfulResult();
+                return SuccessfulResult.New;
             }
             operation.Dispose();
             return new FailedResult($"Timed out on network transaction, operation status: {operation.Status.ToString()}");
