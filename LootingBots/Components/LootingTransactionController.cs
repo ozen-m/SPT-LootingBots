@@ -146,9 +146,9 @@ public class LootingTransactionController
             return Task.FromResult(false);
         }
 
-        if (_log.InfoEnabled)
+        if (_log.DebugEnabled)
         {
-            _log.LogInfo($"Equipping: {item.Name.Localized()} [place: {ableToEquip.Container.ID.Localized()}]");
+            _log.LogDebug($"Equipping: {item.Name.Localized()} [place: {ableToEquip.Container.ID.Localized()}]");
         }
         return MoveItemAsync(item, ableToEquip, token);
     }
@@ -175,9 +175,9 @@ public class LootingTransactionController
             && !string.Equals(gridAddress.GetRootItem()?.Parent?.Container?.ID, "securedcontainer", StringComparison.OrdinalIgnoreCase)
         )
         {
-            if (_log.InfoEnabled)
+            if (_log.DebugEnabled)
             {
-                _log.LogInfo($"Picking up: {item.Name.Localized()} [place: {gridAddress.GetRootItem()?.Name.Localized()}]");
+                _log.LogDebug($"Picking up: {item.Name.Localized()} [place: {gridAddress.GetRootItem()?.Name.Localized()}]");
             }
             return MoveItemAsync(item, gridAddress, token);
         }

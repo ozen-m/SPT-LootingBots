@@ -153,9 +153,9 @@ internal class LootingLogic : CustomLogic
         // Check if bot is stuck and can't reach
         if (_stuckCount > 1)
         {
-            if (_log.WarningEnabled)
+            if (_log.InfoEnabled)
             {
-                _log.LogWarning(
+                _log.LogInfo(
                     $"Has been stuck trying to reach: {_lootingBrain.ActiveLoot.GetLootName()}. Remaining distance: {Mathf.Sqrt(_lootingBrain.DistanceToLoot)}. Ignoring"
                 );
             }
