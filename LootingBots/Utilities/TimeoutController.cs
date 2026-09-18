@@ -41,7 +41,7 @@ public sealed class TimeoutController : MonoBehaviour
     /// <param name="secondsTimeout">The timeout duration, in seconds</param>
     /// <returns>A <see cref="CancellationToken"/> that is canceled when the timeout expires.</returns>
     /// <exception cref="InvalidOperationException">Thrown if a timeout is already running.</exception>
-    public CancellationToken Timeout(float secondsTimeout)
+    public CancellationToken Timeout(int secondsTimeout)
     {
         if (_isRunning)
         {

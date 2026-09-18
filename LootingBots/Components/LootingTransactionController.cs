@@ -10,7 +10,7 @@ namespace LootingBots.Components;
 
 public class LootingTransactionController
 {
-    private const float NetworkTransactionTimeout = 5f;
+    private const int NetworkTransactionTimeout = 5;
     private readonly TimeoutController _networkTimeout;
 
     private readonly InventoryController _inventoryController;
