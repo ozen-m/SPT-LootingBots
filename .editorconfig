@@ -150,9 +150,10 @@ resharper_possible_multiple_enumeration_highlighting = none
 resharper_collection_never_updated_global_highlighting = none
 resharper_unused_auto_property_accessor_global_highlighting = none
 
-# Ignored warnings
+# Severity overrides
 dotnet_diagnostic.CS1591.severity = none
 dotnet_diagnostic.CA1822.severity = none
+dotnet_diagnostic.UNT0029.severity = error
 
 # Xml project files
 [*.{csproj,vbproj,vcxproj,vcxproj.filters,proj,nativeproj,locproj}]

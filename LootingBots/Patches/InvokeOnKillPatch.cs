@@ -1,5 +1,6 @@
 ﻿using System.Reflection;
 using EFT;
+using EFT.Ballistics;
 using SPT.Reflection.Patching;
 
 namespace LootingBots.Patches;
@@ -15,13 +16,7 @@ public class InvokeOnKillPatch : ModulePatch
     }
 
     [PatchPostfix]
-    protected static void Postfix(
-        LocalPlayer __instance,
-        IPlayer aggressor,
-        DamageInfoStruct damageInfo,
-        EBodyPart bodyPart,
-        EDamageType lethalDamageType
-    )
+    protected static void Postfix(LocalPlayer __instance, IPlayer aggressor, DamageInfo damageInfo)
     {
         // Skip if the aggressor is a human player
         var aggressorBotOwner = aggressor.AIData?.BotOwner;

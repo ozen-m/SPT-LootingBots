@@ -1,6 +1,7 @@
 using System.Buffers;
 using Comfort.Common;
 using EFT;
+using EFT.Ballistics;
 using EFT.Interactive;
 using EFT.InventoryLogic;
 using LootingBots.Patches;
@@ -20,12 +21,7 @@ public class LootFinder : MonoBehaviour
 
     private float _scanTimer;
     private bool _lockUntilNextScan;
-
-    private const int MaxEmptyAttempts = 3;
-    private const float EmptyAttemptsCooldown = 180f;
     private int _emptyAttempts;
-
-    // TODO: Add empty attempts config?
 
     // Bot specific config
     private bool _containerLootingEnabled;
@@ -38,6 +34,11 @@ public class LootFinder : MonoBehaviour
     public bool IsScheduledScan
     {
         get { return _scanTimer < Time.time; }
+    }
+
+    public bool IsScanRunning
+    {
+        get { return _lootTask is not null && !_lootTask.IsCompleted; }
     }
 
     private static float DetectCorpseDistance
@@ -55,19 +56,12 @@ public class LootFinder : MonoBehaviour
         get { return LootingBots.DetectItemDistance.Value; }
     }
 
-    public enum LootType : byte
-    {
-        None = 0,
-        Corpse = 1,
-        Container = 2,
-        Item = 3,
-    }
-
-    public bool IsScanRunning { get; private set; }
-    private CancellationTokenSource _lootFinderCts;
-
     private readonly Queue<LootableContainer> _priorityLootableContainers = [];
     private readonly Queue<Player> _priorityCorpses = [];
+
+    private Task _lootTask;
+    private CancellationTokenSource _lootFinderCts;
+    private GameObject[] _debugSpheres;
 
     public void Init(BotOwner botOwner)
     {
@@ -75,23 +69,22 @@ public class LootFinder : MonoBehaviour
         _botOwner = botOwner;
         _lootingBrain = _botOwner.GetPlayer.gameObject.GetComponent<LootingBrain>();
         _log = new BotLog(LootingBots.LootLog, _botOwner);
+        _lootFinderCts = new CancellationTokenSource();
 
+        UpdateFinderSettings();
+
+        OnAirdropLandedPatch.OnAirdropLanded += OnAirdropLanded;
+        _botOwner.BotPersonalStats.OnKillTarget += OnKilledEnemyPlayer;
+    }
+
+    public void UpdateFinderSettings()
+    {
+        _corpseLootingEnabled = LootingBots.CorpseLootingEnabled.Value.IsBotEnabled(_lootingBrain);
+        _needsCorpseSight = LootingBots.DetectCorpseNeedsSight.Value.IsBotEnabled(_lootingBrain);
         _containerLootingEnabled = LootingBots.ContainerLootingEnabled.Value.IsBotEnabled(_lootingBrain);
         _needsContainerSight = LootingBots.DetectContainerNeedsSight.Value.IsBotEnabled(_lootingBrain);
         _itemLootingEnabled = LootingBots.LooseItemLootingEnabled.Value.IsBotEnabled(_lootingBrain);
         _needsItemSight = LootingBots.DetectItemNeedsSight.Value.IsBotEnabled(_lootingBrain);
-        _corpseLootingEnabled = LootingBots.CorpseLootingEnabled.Value.IsBotEnabled(_lootingBrain);
-        _needsCorpseSight = LootingBots.DetectCorpseNeedsSight.Value.IsBotEnabled(_lootingBrain);
-
-        if (_containerLootingEnabled)
-        {
-            OnAirdropLandedPatch.OnAirdropLanded += OnAirdropLanded;
-        }
-
-        if (_corpseLootingEnabled)
-        {
-            botOwner.BotPersonalStats.OnKillTarget += OnKilledEnemyPlayer;
-        }
     }
 
     public void ResetScanTimer()
@@ -105,13 +98,16 @@ public class LootFinder : MonoBehaviour
 
     public void BeginSearch(int ticket)
     {
-        IsScanRunning = true;
-
         StopFindingLoot();
-        _lootFinderCts = new CancellationTokenSource();
+        if (_lootFinderCts.IsCancellationRequested)
+        {
+            _lootFinderCts.Dispose();
+            _lootFinderCts = new CancellationTokenSource();
+        }
+
         if (!FindPrioritizedLoot(ticket))
         {
-            _ = FindLootAsync(ticket, _lootFinderCts.Token).ContinueWith(ExceptionHandler, TaskScheduler.Current);
+            _lootTask = FindLootAsync(ticket, _lootFinderCts.Token);
         }
 
         SetLockUntilNextScan(false);
@@ -119,7 +115,7 @@ public class LootFinder : MonoBehaviour
 
     public void ForceScan()
     {
-        _scanTimer = Time.time - 1f;
+        _scanTimer = -1f;
         SetLockUntilNextScan(true);
         _lootingBrain.ForceBrainEnabled = true;
     }
@@ -137,35 +133,54 @@ public class LootFinder : MonoBehaviour
 
     public void StopFindingLoot()
     {
-        if (_lootFinderCts is null)
+        if (!IsScanRunning)
         {
             return;
         }
 
         _lootFinderCts.Cancel();
-        _lootFinderCts.Dispose();
-        _lootFinderCts = null;
+    }
+
+    public void EnqueuePriorityCorpse(string corpseProfileId)
+    {
+        var playerOwner = Singleton<GameWorld>.Instance.GetEverExistedBridgeByProfileID(corpseProfileId);
+        if (playerOwner?.iPlayer is Player deadPlayer)
+        {
+            if (_log.DebugEnabled)
+            {
+                _log.LogDebug($"Adding [{deadPlayer.name}] to priority queue");
+            }
+
+            _priorityCorpses.Enqueue(deadPlayer);
+        }
+        else
+        {
+            if (_log.ErrorEnabled)
+            {
+                _log.LogError($"Cannot prioritize corpse, player not found! ProfileId: {corpseProfileId}");
+            }
+        }
     }
 
     public void OnDestroy()
     {
         StopFindingLoot();
+        _lootFinderCts.Dispose();
 
-        if (_containerLootingEnabled)
-        {
-            OnAirdropLandedPatch.OnAirdropLanded -= OnAirdropLanded;
-        }
+        OnAirdropLandedPatch.OnAirdropLanded -= OnAirdropLanded;
+        _botOwner.BotPersonalStats.OnKillTarget -= OnKilledEnemyPlayer;
 
-        if (_corpseLootingEnabled)
+        if (_debugSpheres != null)
         {
-            _botOwner.BotPersonalStats.OnKillTarget -= OnKilledEnemyPlayer;
+            foreach (var sphere in _debugSpheres)
+            {
+                Destroy(sphere);
+            }
         }
     }
 
     private async Task FindLootAsync(int queue, CancellationToken token)
     {
-        IsScanRunning = true;
-
         var colliders = _colliderPool.Rent(3000);
 
         try
@@ -205,7 +220,8 @@ public class LootFinder : MonoBehaviour
             }
 
             // Sort colliders by distance
-            Array.Sort(colliders, 0, hits, new ColliderDistanceComparer(botPosition));
+            ColliderDistanceComparer.Instance.SetReferencePosition(botPosition);
+            Array.Sort(colliders, 0, hits, ColliderDistanceComparer.Instance);
 
             if (_log.DebugEnabled)
             {
@@ -260,11 +276,8 @@ public class LootFinder : MonoBehaviour
                         rootItem is not null
                         && !rootItem.QuestItem // Item is not a quest item
                         && (
-                            rootItem is SearchableItemItemClass // If the item is something that can be searched, consider it lootable
-                            || (
-                                rootItem is ArmoredEquipmentItemClass armor
-                                && _lootingBrain.InventoryController.IsBetterArmorThanEquipped(armor)
-                            )
+                            rootItem is SearchableItem // If the item is something that can be searched, consider it lootable
+                            || (_lootingBrain.InventoryController.IsBetterArmorThanEquipped(rootItem))
                             || (_lootingBrain.IsValuableEnough(rootItem) && availableGridSpaces > rootItem.GetItemSize())
                         )
                     )
@@ -272,8 +285,6 @@ public class LootFinder : MonoBehaviour
                         lootType = LootType.Item;
                     }
                 }
-
-                await Task.Yield();
 
                 if (lootType is LootType.None || rootItem is null)
                 {
@@ -284,7 +295,7 @@ public class LootFinder : MonoBehaviour
 
                 // If object has been ignored, skip to the next object detected
                 var rootItemId = rootItem.Id;
-                if (_lootingBrain.IsLootIgnored(rootItemId) || ActiveLootCache.IsLootInUse(rootItemId))
+                if (_lootingBrain.IsLootIgnored(rootItemId) || ActiveLootCache.IsLootInUse(rootItemId, _botOwner))
                 {
                     await Task.Yield();
 
@@ -292,29 +303,28 @@ public class LootFinder : MonoBehaviour
                 }
 
                 var bounds = collider.bounds;
-                var center = new Vector3(bounds.center.x, bounds.center.y - bounds.extents.y - 0.4f, bounds.center.z);
+                var center = bounds.center;
+                center.y -= bounds.extents.y + 0.4f;
                 var destination = GetDestination(center);
 
-                await Task.Yield();
-
                 // Check if we can perform distance and LOS checks
-                if (_botOwner.Mover == null)
+                if (_botOwner.Mover is null)
                 {
                     if (_log.WarningEnabled)
                     {
                         _log.LogWarning("botOwner.BotMover is null! Cannot perform path distance calculations");
                     }
 
-                    break;
+                    return;
                 }
-                if (_botOwner.LookSensor == null)
+                if (_botOwner.LookSensor is null)
                 {
                     if (_log.WarningEnabled)
                     {
                         _log.LogWarning("botOwner.LookSensor is null! Cannot perform line of sight check");
                     }
 
-                    break;
+                    return;
                 }
 
                 // Check if loot is in range
@@ -355,143 +365,177 @@ public class LootFinder : MonoBehaviour
                     continue;
                 }
 
-                _lootingBrain.SetLoot(interactableObject, lootType, interactableObject.transform.position, destination, dist);
+                _lootingBrain.SetLoot(interactableObject, lootType, interactableObject.transform.position, destination, rootItemId, dist);
                 _emptyAttempts = 0;
-                break;
+                return;
+            }
+        }
+        catch (Exception e)
+        {
+            if (e is OperationCanceledException)
+            {
+                if (_log.DebugEnabled)
+                {
+                    _log.LogDebug("Loot scan interrupted");
+                }
+                return;
+            }
+
+            if (_log.ErrorEnabled)
+            {
+                _log.LogError("Exception while trying to scan for loot:");
+                _log.LogError(e.ToString());
             }
         }
         finally
         {
-            if (!_lootingBrain.HasActiveLootable && ++_emptyAttempts > MaxEmptyAttempts)
+            if (
+                LootingBots.MaxEmptyAttempts.Value > 0
+                && !_lootingBrain.HasActiveLootable
+                && ++_emptyAttempts >= LootingBots.MaxEmptyAttempts.Value
+            )
             {
-                if (_log.DebugEnabled)
+                // Note: Cancellations count towards emptyAttempts
+                if (_log.InfoEnabled)
                 {
-                    _log.LogDebug($"Max empty attempts reached, preventing looting for {EmptyAttemptsCooldown}s");
+                    _log.LogInfo($"Max empty attempts reached, preventing looting for {LootingBots.EmptyAttemptsCooldown.Value}s");
                 }
-                OverrideNextScanTime(EmptyAttemptsCooldown);
+                OverrideNextScanTime(LootingBots.EmptyAttemptsCooldown.Value);
                 _emptyAttempts = 0;
             }
 
             _colliderPool.Return(colliders, true);
             ScanScheduler.Return(queue);
             _lootingBrain.ForceBrainEnabled = false;
-            IsScanRunning = false;
         }
     }
 
-    public bool FindPrioritizedLoot(int ticket)
+    private bool FindPrioritizedLoot(int ticket)
     {
-        for (var i = 0; i < _priorityLootableContainers.Count; i++)
+        if (_containerLootingEnabled)
         {
-            var lootableContainer = _priorityLootableContainers.Dequeue();
-
-            var position = lootableContainer.TrackableTransform.position;
-            var destination = GetDestination(position);
-
-            if (!IsLootInRange(LootType.Container, destination, out var dist))
+            for (var i = 0; i < _priorityLootableContainers.Count; i++)
             {
+                var lootableContainer = _priorityLootableContainers.Dequeue();
+
+                var position = lootableContainer.TrackableTransform.position;
+                var destination = GetDestination(position);
+
+                if (!IsLootInRange(LootType.Container, destination, out var dist))
+                {
+                    if (dist != -1f)
+                    {
+                        if (_log.DebugEnabled)
+                        {
+                            _log.LogDebug($"Re-queuing container [{lootableContainer.GetLootName()}], not in range. Dist: {dist}");
+                        }
+                        _priorityLootableContainers.Enqueue(lootableContainer);
+                    }
+                    continue;
+                }
+
+                // Cache the loot and set active target
+                var rootItemId = lootableContainer.GetRootItemId();
+                if (!ActiveLootCache.CacheActiveLootId(rootItemId, _botOwner))
+                {
+                    if (_log.ErrorEnabled)
+                    {
+                        _log.LogError("Failed to cache and set active loot, bot owner is null or id already in the cache?");
+                    }
+                    continue;
+                }
+
+                _lootingBrain.SetLoot(lootableContainer, LootType.Container, position, destination, rootItemId, dist);
+
                 if (_log.DebugEnabled)
                 {
-                    _log.LogDebug($"Re-queuing container [{lootableContainer.GetLootName()}], not in range. Dist: {dist}");
+                    _log.LogDebug($"Setting container [{lootableContainer.GetLootName()}] as active loot. Dist: {dist}");
                 }
-                _priorityLootableContainers.Enqueue(lootableContainer);
-                continue;
+
+                ScanScheduler.Return(ticket);
+                _lootingBrain.ForceBrainEnabled = false;
+                return true;
             }
-
-            // Cache the loot and set active target
-            if (!ActiveLootCache.CacheActiveLootId(lootableContainer.GetRootItemId(), _botOwner))
-            {
-                if (_log.ErrorEnabled)
-                {
-                    _log.LogError("Failed to cache and set active loot, bot owner is null or id already in the cache?");
-                }
-                continue;
-            }
-
-            _lootingBrain.SetLoot(lootableContainer, LootType.Container, position, destination, dist);
-
-            if (_log.DebugEnabled)
-            {
-                _log.LogDebug($"Setting container [{lootableContainer.GetLootName()}] as active loot. Dist: {dist}");
-            }
-
-            ScanScheduler.Return(ticket);
-            _lootingBrain.ForceBrainEnabled = false;
-            IsScanRunning = false;
-            return true;
         }
 
-        for (var i = 0; i < _priorityCorpses.Count; i++)
+        if (_corpseLootingEnabled)
         {
-            var player = _priorityCorpses.Dequeue();
-            if (_log.DebugEnabled)
+            for (var i = 0; i < _priorityCorpses.Count; i++)
             {
-                _log.LogDebug($"Trying to find prioritized corpse: {player.AIData?.BotOwner.Name()}");
-            }
-
-            var corpse = LootUtils._playerCorpseField(player);
-            if (corpse == null)
-            {
+                var player = _priorityCorpses.Dequeue();
                 if (_log.DebugEnabled)
                 {
-                    _log.LogDebug($"Removing prioritized player, corpse not found for killed player [{player.AIData?.BotOwner.Name()}]");
+                    _log.LogDebug($"Trying to find prioritized corpse: {player.AIData?.BotOwner.Name()}");
                 }
 
-                continue;
-            }
+                var corpse = LootUtils.PlayerCorpseField(player);
+                if (corpse == null)
+                {
+                    if (_log.DebugEnabled)
+                    {
+                        _log.LogDebug(
+                            $"Removing prioritized player, corpse not found for killed player [{player.AIData?.BotOwner.Name()}]"
+                        );
+                    }
 
-            // If corpse has been ignored, continue to the next prioritized corpse
-            var rootItemId = corpse.GetRootItemId();
-            if (_lootingBrain.IsLootIgnored(rootItemId))
-            {
-                continue;
-            }
-            if (ActiveLootCache.IsLootInUse(rootItemId))
-            {
+                    continue;
+                }
+
+                // If corpse has been ignored, continue to the next prioritized corpse
+                var rootItemId = corpse.GetRootItemId();
+                if (_lootingBrain.IsLootIgnored(rootItemId))
+                {
+                    continue;
+                }
+                if (ActiveLootCache.IsLootInUse(rootItemId, _botOwner))
+                {
+                    if (_log.DebugEnabled)
+                    {
+                        _log.LogDebug($"Re-queuing corpse [{corpse.GetLootName()}], is currently being looted by someone else");
+                    }
+                    _priorityCorpses.Enqueue(player);
+                    continue;
+                }
+
+                var position = corpse.TrackableTransform.position;
+                var destination = GetDestination(position);
+
+                // Check if loot is in range
+                // No need to check LOS since technically it's their kill
+                if (!IsLootInRange(LootType.Corpse, destination, out var dist))
+                {
+                    if (dist != -1f)
+                    {
+                        if (_log.DebugEnabled)
+                        {
+                            _log.LogDebug($"Re-queuing corpse [{corpse.GetLootName()}], not in range. Dist: {dist}");
+                        }
+                        _priorityCorpses.Enqueue(player);
+                    }
+                    continue;
+                }
+
+                // Cache the loot and set active target
+                if (!ActiveLootCache.CacheActiveLootId(rootItemId, _botOwner))
+                {
+                    if (_log.ErrorEnabled)
+                    {
+                        _log.LogError("Failed to cache and set active loot, bot owner is null or id already in the cache?");
+                    }
+                    continue;
+                }
+
+                _lootingBrain.SetLoot(corpse, LootType.Corpse, position, destination, rootItemId, dist);
+
                 if (_log.DebugEnabled)
                 {
-                    _log.LogDebug($"Re-queuing corpse [{corpse.GetLootName()}], is currently being looted by someone else");
+                    _log.LogDebug($"Setting Corpse [{corpse.GetLootName()}] as active loot. Dist: {dist}");
                 }
-                _priorityCorpses.Enqueue(player);
-                continue;
+
+                ScanScheduler.Return(ticket);
+                _lootingBrain.ForceBrainEnabled = false;
+                return true;
             }
-
-            var position = corpse.TrackableTransform.position;
-            var destination = GetDestination(position);
-
-            // Check if loot is in range
-            // No need to check LOS since technically it's their kill
-            if (!IsLootInRange(LootType.Corpse, destination, out var dist))
-            {
-                if (_log.DebugEnabled)
-                {
-                    _log.LogDebug($"Re-queuing corpse [{corpse.GetLootName()}], not in range. Dist: {dist}");
-                }
-                _priorityCorpses.Enqueue(player);
-                continue;
-            }
-
-            // Cache the loot and set active target
-            if (!ActiveLootCache.CacheActiveLootId(rootItemId, _botOwner))
-            {
-                if (_log.ErrorEnabled)
-                {
-                    _log.LogError("Failed to cache and set active loot, bot owner is null or id already in the cache?");
-                }
-                continue;
-            }
-
-            _lootingBrain.SetLoot(corpse, LootType.Corpse, position, destination, dist);
-
-            if (_log.DebugEnabled)
-            {
-                _log.LogDebug($"Setting Corpse [{corpse.GetLootName()}] as active loot. Dist: {dist}");
-            }
-
-            ScanScheduler.Return(ticket);
-            _lootingBrain.ForceBrainEnabled = false;
-            IsScanRunning = false;
-            return true;
         }
 
         return false;
@@ -544,12 +588,12 @@ public class LootFinder : MonoBehaviour
         var start = _botOwner.LookSensor.HeadPoint;
         var directionOfLoot = destination - start;
 
-        var sightBlocked = Physics.Raycast(start, directionOfLoot, directionOfLoot.magnitude, LayerMaskClass.HighPolyWithTerrainMask);
+        var sightBlocked = Physics.Raycast(start, directionOfLoot, directionOfLoot.magnitude, LayersMaskController.HighPolyWithTerrainMask);
 
         return !sightBlocked;
     }
 
-    private static Vector3 GetDestination(Vector3 center)
+    private Vector3 GetDestination(Vector3 center)
     {
         // Try to snap the desired destination point to the nearest NavMesh to ensure the bot can draw a navigable path to the point
         var pointNearbyContainer = NavMesh.SamplePosition(center, out var navMeshAlignedPoint, 1f, NavMesh.AllAreas)
@@ -569,9 +613,14 @@ public class LootFinder : MonoBehaviour
 
         if (LootingBots.DebugLootNavigation.Value)
         {
-            GameObjectHelper.DrawSphere(center, 0.5f, Color.red);
-            GameObjectHelper.DrawSphere(pointNearbyContainer, 0.5f, Color.green);
-            GameObjectHelper.DrawSphere(destination, 0.5f, Color.blue);
+            if (_debugSpheres is null)
+            {
+                InitializeDebugSpheres();
+            }
+
+            _debugSpheres[0].transform.position = center;
+            _debugSpheres[1].transform.position = pointNearbyContainer;
+            _debugSpheres[2].transform.position = destination;
         }
 
         return destination;
@@ -579,7 +628,7 @@ public class LootFinder : MonoBehaviour
 
     private void OnAirdropLanded(LootableContainer airdrop)
     {
-        if(_log.DebugEnabled)
+        if (_log.DebugEnabled)
         {
             _log.LogDebug($"Adding [{airdrop.GetLootName()}] to priority queue");
         }
@@ -587,52 +636,36 @@ public class LootFinder : MonoBehaviour
         _priorityLootableContainers.Enqueue(airdrop);
     }
 
-    private void OnKilledEnemyPlayer(string victimProfileId, DamageInfoStruct damageInfo)
+    private void OnKilledEnemyPlayer(string victimProfileId, DamageInfo damageInfo)
     {
-        var playerOwner = Singleton<GameWorld>.Instance.GetEverExistedBridgeByProfileID(victimProfileId);
-        if (playerOwner?.iPlayer is Player victimPlayer)
-        {
-            _priorityCorpses.Enqueue(victimPlayer);
-        }
-        else
-        {
-            if (_log.ErrorEnabled)
-            {
-                _log.LogError($"Killed player not found! Victim ProfileId: {victimProfileId}");
-            }
-        }
+        EnqueuePriorityCorpse(victimProfileId);
     }
 
-    private void ExceptionHandler(Task task)
+    private void InitializeDebugSpheres()
     {
-        if (task.IsCanceled)
-        {
-            if (_log.DebugEnabled)
-            {
-                _log.LogDebug("Loot scan interrupted");
-            }
-            return;
-        }
+        _debugSpheres = new GameObject[3];
+        _debugSpheres[0] = GameObjectHelper.DrawSphere(Vector3.zero, 0.5f, Color.red);
+        _debugSpheres[1] = GameObjectHelper.DrawSphere(Vector3.zero, 0.5f, Color.green);
+        _debugSpheres[2] = GameObjectHelper.DrawSphere(Vector3.zero, 0.5f, Color.blue);
+    }
 
-        if (task.IsFaulted)
-        {
-            if (_log.ErrorEnabled)
-            {
-                _log.LogError("Exception while trying to scan for loot:");
-                _log.LogError(task.Exception!.ToString());
-            }
-        }
+    public enum LootType : byte
+    {
+        None = 0,
+        Corpse = 1,
+        Container = 2,
+        Item = 3,
     }
 }
 
 public static class PathExtensions
 {
     /// <summary>
-    /// Based on <see cref="GClass371.CalculatePathLength(Vector3[] corners)"/>
+    /// Based on <see cref="NavMeshPathExtension.CalculatePathLength(Vector3[] corners)"/>
     /// </summary>
     public static bool CalculatePathLengthWithMaxRange(this Vector3[] corners, float range, out float length)
     {
-        if (corners == null || corners.Length < 2)
+        if (corners is null || corners.Length < 2)
         {
             length = -1f;
             return false;
@@ -643,8 +676,7 @@ public static class PathExtensions
         for (var i = 1; i < corners.Length; i++)
         {
             var currentCorner = corners[i];
-            var vector3 = prevCorner - currentCorner;
-            length += Mathf.Sqrt(vector3.x * vector3.x + vector3.y * vector3.y + vector3.z * vector3.z);
+            length += Vector3.Distance(prevCorner, currentCorner);
 
             // Reached max range
             if (length > range)

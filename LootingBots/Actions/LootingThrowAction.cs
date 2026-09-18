@@ -1,7 +1,6 @@
 ﻿using EFT.InventoryLogic;
 using LootingBots.Components;
 using LootingBots.Utilities;
-using UnityEngine.Pool;
 
 namespace LootingBots.Actions;
 
@@ -10,7 +9,7 @@ namespace LootingBots.Actions;
 /// </summary>
 public class LootingThrowAction : LootingAction
 {
-    private static readonly ObjectPool<LootingThrowAction> _pool = new(
+    private static readonly UnityEngine.Pool.ObjectPool<LootingThrowAction> _pool = new(
         Create,
         null,
         a => a.Reset(),

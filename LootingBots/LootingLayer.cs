@@ -13,6 +13,10 @@ internal class LootingLayer : CustomLayer
     private readonly LootingBrain _lootingBrain;
     private readonly LootFinder _lootFinder;
 
+    private readonly Action _lootingLogic;
+    private readonly Action _findLootLogic;
+    private readonly Action _peacefulLogic;
+
     public LootingLayer(BotOwner botOwner, int priority)
         : base(botOwner, priority)
     {
@@ -23,6 +27,10 @@ internal class LootingLayer : CustomLayer
 
         _lootingBrain = lootingBrain;
         _lootFinder = lootFinder;
+
+        _lootingLogic = new Action(typeof(LootingLogic), "Looting");
+        _findLootLogic = new Action(typeof(FindLootLogic), "Loot Scan");
+        _peacefulLogic = new Action(typeof(PeacefulLogic), "Peaceful");
     }
 
     public override string GetName()
@@ -39,16 +47,12 @@ internal class LootingLayer : CustomLayer
 
     public override void Start()
     {
-        _lootingBrain.UpdateGridStats();
         BotOwner.PatrollingData.Pause();
         base.Start();
     }
 
     public override void Stop()
     {
-        _lootFinder.StopFindingLoot();
-        _lootingBrain.StopLooting();
-        _lootingBrain.UpdateGridStats();
         BotOwner.PatrollingData.Unpause();
         base.Stop();
     }
@@ -57,15 +61,15 @@ internal class LootingLayer : CustomLayer
     {
         if (_lootingBrain.IsBotLooting)
         {
-            return new Action(typeof(LootingLogic), "Looting");
+            return _lootingLogic;
         }
 
         if (_lootFinder.IsScheduledScan)
         {
-            return new Action(typeof(FindLootLogic), "Loot Scan");
+            return _findLootLogic;
         }
 
-        return new Action(typeof(PeacefulLogic), "Peaceful");
+        return _peacefulLogic;
     }
 
     public override bool IsCurrentActionEnding()
@@ -107,16 +111,11 @@ internal class LootingLayer : CustomLayer
 
         debugPanel.AppendLabeledValue(
             "Distance to Loot",
-            $" {(_lootingBrain.ActiveLootType is LootFinder.LootType.None || _lootingBrain.DistanceToLoot != float.MaxValue ? "Calculating path..." : $"{Mathf.Sqrt(_lootingBrain.DistanceToLoot):0.##}m")}",
+            $" {(_lootingBrain.ActiveLootType is LootFinder.LootType.None || _lootingBrain.DistanceToLoot == float.MaxValue ? "Calculating path..." : $"{Mathf.Sqrt(_lootingBrain.DistanceToLoot):0.##}m")}",
             Color.grey,
             Color.grey
         );
 
         _lootingBrain.Stats.StatsDebugPanel(debugPanel);
-    }
-
-    public bool EndLooting()
-    {
-        return _lootingBrain.ActiveLoot == null;
     }
 }

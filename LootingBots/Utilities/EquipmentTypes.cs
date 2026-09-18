@@ -121,7 +121,7 @@ public static class EquipmentTypeUtils
     }
 
     /// <summary>
-    /// GClasses based off GClass3373.FindSlotToPickUp
+    /// GClasses based off InventoryExtension.FindSlotToPickUp
     /// </summary>
     public static bool IsItemEligible(this EquipmentType allowedGear, Item item, bool toPickup = false)
     {
@@ -175,9 +175,9 @@ public static class EquipmentTypeUtils
             return allowedGear.HasDogtag();
         }
 
-        if (item is KnifeItemClass) { }
+        if (item is Knife) { }
 
-        if (item is ThrowWeapItemClass)
+        if (item is ThrowWeap)
         {
             return allowedGear.HasGrenade();
         }
@@ -197,17 +197,17 @@ public static class EquipmentTypeUtils
 
     public static bool IsTacticalRig(Item item)
     {
-        return item is VestItemClass;
+        return item is Vest;
     }
 
     public static bool IsArmoredRig(Item item)
     {
-        if (item is VestItemClass vest)
+        if (item is Vest vest)
         {
             foreach (var slot in vest.Slots)
             {
                 // If any slot is an armor slot
-                if (slot is GClass3125)
+                if (slot is ArmorSlot)
                 {
                     return true;
                 }
@@ -219,46 +219,46 @@ public static class EquipmentTypeUtils
 
     public static bool IsBackpack(Item item)
     {
-        return item is BackpackItemClass;
+        return item is Backpack;
     }
 
     public static bool IsHelmet(Item item)
     {
-        return item is HeadwearItemClass;
+        return item is Headwear;
     }
 
     public static bool IsChestArmor(Item item)
     {
-        return item is ArmorItemClass;
+        return item is Armor;
     }
 
     public static bool IsFaceCover(Item item)
     {
-        return item is FaceCoverItemClass;
+        return item is FaceCover;
     }
 
     public static bool IsEyewear(Item item)
     {
-        return item is VisorsItemClass;
+        return item is Visors;
     }
 
     public static bool IsArmorPlate(Item item)
     {
-        return item is ArmorPlateItemClass;
+        return item is ArmorPlate;
     }
 
     public static bool IsDogtag(Item item)
     {
-        return item is OtherItemClass;
+        return item is BarterOther;
     }
 
     public static bool IsEarpiece(Item item)
     {
-        return item is HeadphonesItemClass;
+        return item is Headphones;
     }
 
     public static bool IsArmband(Item item)
     {
-        return item is ArmBandItemClass;
+        return item is ArmBand;
     }
 }

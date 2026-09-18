@@ -1,101 +1,131 @@
 using Comfort.Common;
+using Diz.LanguageExtensions;
 using EFT;
 using EFT.InventoryLogic;
 using LootingBots.Utilities;
-using InventoryControllerResultStruct = GStruct153;
+using UnityEngine;
+using Object = UnityEngine.Object;
 
 namespace LootingBots.Components;
 
-public class LootingTransactionController(InventoryController inventoryController, BotLog log)
+public class LootingTransactionController
 {
-    private const int NetworkTransactionTimeout = 5000;
+    private const int NetworkTransactionTimeout = 5;
+    private readonly TimeoutController _networkTimeout;
+
+    private readonly InventoryController _inventoryController;
+    private readonly Player _player;
+    private readonly BotLog _log;
+
+    private readonly List<Ammo> _extraAmmoScratch = [];
+
+    private IItemOwner _rootItemOwner;
+
+    public LootingTransactionController(BotOwner owner, InventoryController inventoryController, BotLog log)
+    {
+        _inventoryController = inventoryController;
+        _player = owner.GetPlayer;
+        _log = log;
+        _networkTimeout = _player.gameObject.AddComponent<TimeoutController>();
+        _player.OnIPlayerDeadOrUnspawn += DestroyNetworkTimeoutController;
+    }
 
     /// <summary>
     /// Tries to add extra spare ammo for the weapon being looted into the bot's secure container,
     /// so that the bots are able to refill their mags properly in their reload logic.
-    ///
-    /// Incompatible with Fika.
     /// </summary>
-    public bool AddExtraAmmo(Weapon weapon)
+    public void AddExtraAmmo(Weapon weapon)
     {
-        try
+        if (FikaHandler.IsPresent && !FikaHandler.CanUseInterop)
         {
-            var secureContainer = (SearchableItemItemClass)
-                inventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.SecuredContainer).ContainedItem;
-
-            var container = secureContainer.Grids.FirstOrDefault();
-
-            // Try to get the current ammo used by the weapon by checking the contents of the magazine.
-            // If it's empty, try to create an instance of the ammo using the Weapon's CurrentAmmoTemplate
-            var ammoToAdd =
-                weapon.GetCurrentMagazine()?.FirstRealAmmo()
-                ?? Singleton<ItemFactoryClass>.Instance.CreateItem(MongoID.Generate(), weapon.CurrentAmmoTemplate._id, null);
-
-            // Check to see if there already is ammo that meets the weapon's caliber in the secure container
-            var alreadyHasAmmo = false;
-
-            foreach (var item in secureContainer.GetAllItems())
-            {
-                if (item is AmmoItemClass bullet && bullet.Caliber.Equals(((AmmoItemClass)ammoToAdd).Caliber))
-                {
-                    alreadyHasAmmo = true;
-                    break; // Early exit as soon as a match is found
-                }
-            }
-
-            // If we don't have any ammo,
-            // attempt to add 10 max ammo stacks into the bot's secure container for use in the bot's internal reloading code
-            if (!alreadyHasAmmo)
-            {
-                if (log.DebugEnabled)
-                {
-                    log.LogDebug($"Trying to add ammo");
-                }
-
-                var ammoAdded = 0;
-
-                for (var i = 0; i < 10; i++)
-                {
-                    var ammo = ammoToAdd.CloneItem();
-                    ammo.StackObjectsCount = ammo.StackMaxSize;
-
-                    var location = container.FindFreeSpace(ammo);
-
-                    if (location != null)
-                    {
-                        var result = container.AddItemWithoutRestrictions(ammo, location);
-                        if (result.Succeeded)
-                        {
-                            ammoAdded += ammo.StackObjectsCount;
-                        }
-                        else if (log.ErrorEnabled)
-                        {
-                            log.LogError($"Failed to add {ammo.Name.Localized()} to secure container");
-                        }
-                    }
-                    else if (log.ErrorEnabled)
-                    {
-                        log.LogError($"Cannot find location in secure container for {ammo.Name.Localized()}");
-                    }
-                }
-
-                if (ammoAdded > 0 && log.DebugEnabled)
-                {
-                    log.LogDebug($"Successfully added {ammoAdded} round of {ammoToAdd.Name.Localized()}");
-                }
-            }
-            else if (log.DebugEnabled)
-            {
-                log.LogDebug($"Already has ammo for {weapon.Name.Localized()}");
-            }
-        }
-        catch (Exception e)
-        {
-            log.LogError(e);
-            return false;
+            return;
         }
 
-        return true;
+        var securedContainer = (SearchableItem)
+            _inventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.SecuredContainer).ContainedItem;
+        if (securedContainer is null)
+        {
+            if (_log.WarningEnabled)
+            {
+                _log.LogWarning($"Could not find secured container to check extra ammo for {weapon.Name.Localized()}");
+            }
+            return;
+        }
+
+        // Get the weapons chamber to check
+        var weaponChamber = weapon.HasChambers ? weapon.Chambers[0] : null;
+        if (weaponChamber is null)
+        {
+            return;
+        }
+
+        // Get all ammo items in the secured container
+        // then check to see if there already is ammo that meets the weapon's caliber in the secure container
+        _extraAmmoScratch.Clear();
+        securedContainer.GetAllItemsNonAlloc(_extraAmmoScratch);
+        foreach (var bullet in _extraAmmoScratch)
+        {
+            if (weaponChamber.CanAccept(bullet))
+            {
+                if (_log.DebugEnabled)
+                {
+                    _log.LogDebug($"Already has ammo for {weapon.Name.Localized()}");
+                }
+                return; // Early exit as soon as a match is found
+            }
+        }
+
+        // If we don't have any ammo,
+        // attempt to add 10 max ammo stacks into the bot's secure container for use in the bot's internal reloading code
+        if (_log.DebugEnabled)
+        {
+            _log.LogDebug($"Trying to add extra ammo for new weapon {weapon.Name.Localized()}");
+        }
+
+        // Try to get the current ammo used by the weapon by checking the weapon's chamber.
+        // If it's empty, check the contents of the magazine.
+        // If it's still empty, try to create an instance of the ammo using the Weapon's CurrentAmmoTemplate.
+        var ammoToAdd =
+            weaponChamber.ContainedItem
+            ?? weapon.GetCurrentMagazine()?.FirstRealAmmo()
+            ?? Singleton<ItemFactory>.Instance.CreateItem(MongoID.Generate(), weapon.CurrentAmmoTemplate._id, null);
+
+        var ammoAdded = 0;
+        var container = securedContainer.Grids[0];
+
+        for (var i = 0; i < 10; i++)
+        {
+            var ammo = ammoToAdd.CloneItem();
+
+            // Limit the stack to 60, some mods modify the max stack size to huge amounts
+            ammo.StackObjectsCount = Mathf.Min(60, ammo.StackMaxSize);
+
+            var location = container.FindFreeSpace(ammo);
+            if (location != null)
+            {
+                var result = container.AddItemWithoutRestrictions(ammo, location);
+                if (result.Succeeded)
+                {
+                    ammoAdded += ammo.StackObjectsCount;
+                    FikaHandler.TrySendAmmoAddedPacket(_player, ammo);
+                }
+                else if (_log.ErrorEnabled)
+                {
+                    _log.LogError($"Failed to add {ammo.Name.Localized()} to secure container: {result.Error}");
+                }
+            }
+            else if (_log.DebugEnabled)
+            {
+                _log.LogDebug($"Cannot find location in secure container for {ammo.Name.Localized()}");
+            }
+        }
+
+        if (ammoAdded > 0 && _log.DebugEnabled)
+        {
+            _log.LogDebug(
+                $"Successfully added {ammoAdded} rounds of {ammoToAdd.Name.Localized()} for new weapon {weapon.Name.Localized()}"
+            );
+        }
     }
 
     /// <summary>
@@ -106,21 +136,20 @@ public class LootingTransactionController(InventoryController inventoryControlle
         token.ThrowIfCancellationRequested();
 
         // Check to see if we can equip the item
-        var ableToEquip = inventoryController.FindSlotToPickUp(item);
-        if (ableToEquip == null)
+        var ableToEquip = _inventoryController.FindSlotToPickUp(item);
+        if (ableToEquip is null)
         {
-            if (log.DebugEnabled)
+            if (_log.DebugEnabled)
             {
-                log.LogDebug($"Could not find a place to equip: {item.Name.Localized()}");
+                _log.LogDebug($"Could not find a place to equip: {item.Name.Localized()}");
             }
             return Task.FromResult(false);
         }
 
-        if (log.InfoEnabled)
+        if (_log.DebugEnabled)
         {
-            log.LogInfo($"Equipping: {item.Name.Localized()} [place: {ableToEquip.Container.ID.Localized()}]");
+            _log.LogDebug($"Equipping: {item.Name.Localized()} [place: {ableToEquip.Container.ID.Localized()}]");
         }
-
         return MoveItemAsync(item, ableToEquip, token);
     }
 
@@ -133,39 +162,30 @@ public class LootingTransactionController(InventoryController inventoryControlle
         token.ThrowIfCancellationRequested();
 
         // Check to see if this is an item that we can merge with another item in the inventory
-        var mergeableItem = inventoryController.FindItemToMerge(item);
-
+        var mergeableItem = _inventoryController.FindItemToMerge(item);
         if (mergeableItem != null)
         {
-            if (log.DebugEnabled)
-            {
-                log.LogDebug($"Merging: {item.Name.Localized()} [with: {mergeableItem.Name.Localized()}]");
-            }
-
             return MergeItemAsync(item, mergeableItem, token);
         }
 
         // Otherwise, find an empty grid slot to put the item in
-        var gridAddress = inventoryController.FindGridToPickUp(item);
-
+        var gridAddress = _inventoryController.FindGridToPickUp(item);
         if (
             gridAddress != null
             && !string.Equals(gridAddress.GetRootItem()?.Parent?.Container?.ID, "securedcontainer", StringComparison.OrdinalIgnoreCase)
         )
         {
-            if (log.InfoEnabled)
+            if (_log.DebugEnabled)
             {
-                log.LogInfo($"Picking up: {item.Name.Localized()} [place: {gridAddress.GetRootItem()?.Name.Localized()}]");
+                _log.LogDebug($"Picking up: {item.Name.Localized()} [place: {gridAddress.GetRootItem()?.Name.Localized()}]");
             }
-
             return MoveItemAsync(item, gridAddress, token);
         }
 
-        if (log.DebugEnabled)
+        if (_log.DebugEnabled)
         {
-            log.LogDebug($"Could not find a place to pickup: {item.Name.Localized()}");
+            _log.LogDebug($"Could not find a place to pickup: {item.Name.Localized()}");
         }
-
         return Task.FromResult(false);
     }
 
@@ -178,51 +198,55 @@ public class LootingTransactionController(InventoryController inventoryControlle
         token.ThrowIfCancellationRequested();
 
         // No address was given, try equipping or picking up
-        if (location == null)
+        if (location is null)
         {
             return await TryEquipItemAsync(item, token) || await TryPickupItemAsync(item, token);
         }
 
-        if (log.DebugEnabled)
+        if (_log.DebugEnabled)
         {
-            log.LogDebug(
+            _log.LogDebug(
                 $"Moving {item.Name.Localized()} to: {location.Container.ID.Localized()} [{location.GetRootItem()?.Name.Localized()}]..."
             );
         }
 
         await SimulatePlayerDelayAsync(token: token);
 
-        var moveResult = InteractionsHandlerClass.Move(item, location, inventoryController, true);
+        if (!IsItemReachable(item))
+        {
+            return false;
+        }
+
+        var moveResult = ItemManipulator.Move(item, location, _inventoryController, true);
         if (moveResult.Failed)
         {
-            if (log.ErrorEnabled)
+            if (_log.WarningEnabled)
             {
-                log.LogWarning(
+                _log.LogWarning(
                     $"Failed to move {item.Name.Localized()} to {location.Container.ID.Localized()} [{location.GetRootItem()?.Name.Localized()}]. Error: {moveResult.Error}"
                 );
             }
             return false;
         }
 
-        var moveNetworkResult = await TryRunNetworkTransactionWithTimeoutAsync(moveResult, null, token);
+        var moveNetworkResult = await TryRunNetworkTransactionWithTimeoutAsync(moveResult);
         if (moveNetworkResult.Failed)
         {
-            if (log.ErrorEnabled)
+            if (_log.ErrorEnabled)
             {
-                log.LogError(
+                _log.LogError(
                     $"Failed to move {item.Name.Localized()} to {location.Container.ID.Localized()} [{location.GetRootItem()?.Name.Localized()}]. Network Error: {moveNetworkResult.Error}"
                 );
             }
             return false;
         }
 
-        if (log.InfoEnabled)
+        if (_log.InfoEnabled)
         {
-            log.LogInfo(
+            _log.LogInfo(
                 $"Moving {item.Name.Localized()} to: {location.Container.ID.Localized()} [{location.GetRootItem()?.Name.Localized()}]...done"
             );
         }
-
         return true;
     }
 
@@ -235,40 +259,44 @@ public class LootingTransactionController(InventoryController inventoryControlle
     {
         token.ThrowIfCancellationRequested();
 
-        if (log.DebugEnabled)
+        if (_log.DebugEnabled)
         {
-            log.LogDebug($"Swapping {item.Name.Localized()} with {toSwap.Name.Localized()}...");
+            _log.LogDebug($"Swapping {item.Name.Localized()} with {toSwap.Name.Localized()}...");
         }
 
         await SimulatePlayerDelayAsync(token: token);
 
-        var swapResult = InteractionsHandlerClass.Swap(item, toSwap.CurrentAddress, toSwap, item.CurrentAddress, inventoryController, true);
+        if (!IsItemReachable(item))
+        {
+            return false;
+        }
+
+        var swapResult = ItemManipulator.Swap(item, toSwap.CurrentAddress, toSwap, item.CurrentAddress, _inventoryController, true);
         if (swapResult.Failed)
         {
-            if (log.WarningEnabled)
+            if (_log.WarningEnabled && swapResult.Error is not Slot.ConflictingItemError)
             {
-                log.LogWarning($"Failed to swap {item.Name.Localized()} with {toSwap.Name.Localized()}. Error: {swapResult.Error}");
+                _log.LogWarning($"Failed to swap {item.Name.Localized()} with {toSwap.Name.Localized()}. Error: {swapResult.Error}");
             }
             return false;
         }
 
-        var swapNetworkResult = await TryRunNetworkTransactionWithTimeoutAsync(swapResult, null, token);
+        var swapNetworkResult = await TryRunNetworkTransactionWithTimeoutAsync(swapResult);
         if (swapNetworkResult.Failed)
         {
-            if (log.ErrorEnabled)
+            if (_log.ErrorEnabled)
             {
-                log.LogError(
+                _log.LogError(
                     $"Failed to swap {item.Name.Localized()} with {toSwap.Name.Localized()}. Network Error: {swapNetworkResult.Error}"
                 );
             }
             return false;
         }
 
-        if (log.InfoEnabled)
+        if (_log.InfoEnabled)
         {
-            log.LogInfo($"Swapping {item.Name.Localized()} with {toSwap.Name.Localized()}...done");
+            _log.LogInfo($"Swapping {item.Name.Localized()} with {toSwap.Name.Localized()}...done");
         }
-
         return true;
     }
 
@@ -279,25 +307,33 @@ public class LootingTransactionController(InventoryController inventoryControlle
     {
         token.ThrowIfCancellationRequested();
 
-        if (toItem == null)
+        if (toItem is null)
         {
-            log.LogWarning($"Cannot merge item {toMove} to NULL target item!");
+            if (_log.WarningEnabled)
+            {
+                _log.LogWarning($"Cannot merge item {toMove} to NULL target item!");
+            }
             return false;
         }
 
-        if (log.DebugEnabled)
+        if (_log.DebugEnabled)
         {
-            log.LogDebug(
-                $"Merging {toMove.Name?.Localized()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount})..."
+            _log.LogDebug(
+                $"Merging {toMove.Name.Localized()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount})..."
             );
         }
 
-        var mergeResult = InteractionsHandlerClass.Merge(toMove, toItem, inventoryController, true);
+        if (!IsItemReachable(toMove))
+        {
+            return false;
+        }
+
+        var mergeResult = ItemManipulator.Merge(toMove, toItem, _inventoryController, true);
         if (mergeResult.Failed)
         {
-            if (log.ErrorEnabled)
+            if (_log.ErrorEnabled)
             {
-                log.LogError(
+                _log.LogError(
                     $"Failed to merge {toMove.Name.Localized()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount}). Error: {mergeResult.Error}"
                 );
             }
@@ -305,25 +341,22 @@ public class LootingTransactionController(InventoryController inventoryControlle
         }
 
         await SimulatePlayerDelayAsync(token: token);
-        var mergeNetworkResult = await TryRunNetworkTransactionWithTimeoutAsync(mergeResult, null, token);
+        var mergeNetworkResult = await TryRunNetworkTransactionWithTimeoutAsync(mergeResult);
         if (mergeNetworkResult.Failed)
         {
-            if (log.ErrorEnabled)
+            if (_log.ErrorEnabled)
             {
-                log.LogError(
+                _log.LogError(
                     $"Failed to merge {toMove.Name.Localized()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount}). Network Error: {mergeNetworkResult.Error}"
                 );
             }
             return false;
         }
 
-        if (log.InfoEnabled)
+        if (_log.InfoEnabled)
         {
-            log.LogInfo(
-                $"Merging {toMove.Name?.Localized()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount})...done"
-            );
+            _log.LogInfo($"Merged with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount})...done");
         }
-
         return true;
     }
 
@@ -334,68 +367,117 @@ public class LootingTransactionController(InventoryController inventoryControlle
     {
         token.ThrowIfCancellationRequested();
 
-        if (log.DebugEnabled)
+        if (_log.DebugEnabled)
         {
-            log.LogDebug($"Throwing item: {toThrow.Name.Localized()}...");
+            _log.LogDebug($"Throwing item: {toThrow.Name.Localized()}...");
         }
 
         await SimulatePlayerDelayAsync(token: token);
 
-        var promise = new TaskCompletionSource<IResult>();
-        inventoryController.ThrowItem(toThrow, false, promise.SetResult);
+        var promise = CallbackTaskCompletionSource.Start(token);
+        _inventoryController.ThrowItem(toThrow, false, promise.ResultCallback);
 
         var throwResult = await promise.Task;
         if (throwResult.Failed)
         {
-            if (log.WarningEnabled)
+            if (_log.WarningEnabled)
             {
-                log.LogWarning($"Failed to throw item: {toThrow.Name.Localized()}. Error: {throwResult.Error}");
+                _log.LogWarning($"Failed to throw item: {toThrow.Name.Localized()}. Error: {throwResult.Error}");
             }
             return false;
         }
 
-        if (log.InfoEnabled)
+        if (_log.InfoEnabled)
         {
-            log.LogInfo($"Throwing item: {toThrow.Name.Localized()}...done");
+            _log.LogInfo($"Throwing item: {toThrow.Name.Localized()}...done");
         }
-
         return true;
     }
 
     /// <summary>
-    /// Try to run network transaction with timeout.
-    /// For some odd reason I can't figure out, especially when moving the bot's active weapon around, the method runs indefinitely.
-    /// So try to circumvent it by fast forwarding the current state.
-    ///
-    /// It's GClass2053 Operation (RemoveWeaponOperation) running indefinitely.
+    /// Try to transfer an item to a corpse's inventory or throw
     /// </summary>
-    public async Task<IResult> TryRunNetworkTransactionWithTimeoutAsync(
-        InventoryControllerResultStruct operationResult,
-        Callback callback = null,
-        CancellationToken token = default
-    )
+    public Task<bool> TransferOrThrowItemAsync(Item toThrow, InventoryEquipment equipment, CancellationToken token = default)
     {
-        using var timeoutSource = new CancellationTokenSource(TimeSpan.FromMilliseconds(NetworkTransactionTimeout));
-
-        var networkTask = inventoryController.TryRunNetworkTransaction(operationResult, callback);
-
-        await Task.WhenAny(networkTask, Task.Delay(Timeout.Infinite, timeoutSource.Token), Task.Delay(Timeout.Infinite, token));
-
-        if (timeoutSource.Token.IsCancellationRequested)
+        if (equipment is null)
         {
-            var playerInvCont = (Player.PlayerInventoryController)inventoryController;
-            if (log.WarningEnabled)
+            return ThrowItemAsync(toThrow, token);
+        }
+
+        if (_log.DebugEnabled)
+        {
+            _log.LogDebug($"Transferring or throwing item: {toThrow.Name.Localized()}...");
+        }
+
+        foreach (var grid in equipment.GetPrioritizedGridsForLoot(toThrow))
+        {
+            var location = grid.FindLocationForItem(toThrow);
+            if (location == null)
             {
-                log.LogWarning("Timed out on network transaction, trying to fast forward...");
+                continue;
             }
-            playerInvCont.Player_0.FastForwardCurrentOperations();
-        }
-        else
-        {
-            token.ThrowIfCancellationRequested();
+            if (!ItemManipulator.DestinationCheck(toThrow.Parent, location, (CorpseItemController)equipment.Owner).Value)
+            {
+                continue;
+            }
+
+            return MoveItemAsync(toThrow, location, token);
         }
 
-        return await networkTask;
+        return ThrowItemAsync(toThrow, token);
+    }
+
+    /// <summary>
+    /// Try to run network transaction with timeout.
+    ///
+    /// For some reason <see cref="InventoryController.TryRunNetworkTransaction"/>
+    /// runs indefinitely when moving the bot's active weapon around.
+    /// Circumvent it by checking if the operation was successful after a timeout.
+    /// </summary>
+    public Task<IResult> TryRunNetworkTransactionWithTimeoutAsync(OperationResult operationResult)
+    {
+        if (operationResult.Failed)
+        {
+            return Task.FromResult<IResult>(new FailedResult(operationResult.Error!.ToString()));
+        }
+        if (operationResult.Value.CanExecute(_inventoryController))
+        {
+            return RunNetworkTransactionWithTimeoutAsync(operationResult);
+        }
+        return Task.FromResult<IResult>(new FailedResult("InventoryController cannot execute this operation"));
+    }
+
+    /// <summary>
+    /// A modified <see cref="InventoryController.RunNetworkTransaction"/> that includes a timeout
+    /// </summary>
+    private async Task<IResult> RunNetworkTransactionWithTimeoutAsync(OperationResult operationResult)
+    {
+        var timeoutToken = _networkTimeout.Timeout(NetworkTransactionTimeout);
+        var callbackSource = CallbackTaskCompletionSource.Start(timeoutToken);
+
+        var operation = _inventoryController.ConvertOperationResultToOperation(operationResult.Value);
+        _inventoryController.Execute(operation, callbackSource.ResultCallback);
+
+        try
+        {
+            var result = await callbackSource.Task;
+            _networkTimeout.ResetTimer();
+            return result;
+        }
+        catch (OperationCanceledException) when (_networkTimeout.IsTimeout)
+        {
+            if (operation.Status is EOperationStatus.Succeeded)
+            {
+                return SuccessfulResult.New;
+            }
+            operation.Dispose();
+            return new FailedResult($"Timed out on network transaction, operation status: {operation.Status.ToString()}");
+        }
+        catch (Exception)
+        {
+            _networkTimeout.ResetTimer();
+            throw;
+        }
     }
 
     /// <summary>
@@ -408,6 +490,48 @@ public class LootingTransactionController(InventoryController inventoryControlle
             delay = LootingBots.TransactionDelay.Value;
         }
 
-        return Task.Delay(TimeSpan.FromMilliseconds(delay), cancellationToken: token);
+        return Task.Delay(TimeSpan.FromMilliseconds(delay), token);
+    }
+
+    /// <summary>
+    /// Sets owner which <see cref="IsItemReachable"/> checks for.
+    /// </summary>
+    public void SetRootItemOwner(IItemOwner rootItemOwner)
+    {
+        _rootItemOwner = rootItemOwner;
+    }
+
+    /// <summary>
+    /// Check if a bot can reach this item:
+    ///   1. The item is owned by the owner of the root item the bot is looting
+    ///   2. The bot owns the item (e.g. for secondary to main weapon swaps)
+    ///   3. The item is a <see cref="EFT.Interactive.LootItem"/> in the world, which everyone can access
+    /// </summary>
+    private bool IsItemReachable(Item item)
+    {
+        if (item.Owner == _rootItemOwner)
+        {
+            return true;
+        }
+        if (item.Owner == _inventoryController)
+        {
+            return true;
+        }
+        if (Singleton<GameWorld>.Instance.LootItems.ContainsKey(item.Id.GetHashCode())) // Key is LootItem.GetNetId()
+        {
+            return true;
+        }
+
+        if (_log.DebugEnabled)
+        {
+            _log.LogDebug($"Cannot reach {item.Name.Localized()} [with owner: {item.Owner}, location: {item.Parent}]");
+        }
+        return false;
+    }
+
+    private void DestroyNetworkTimeoutController(IPlayer player)
+    {
+        player.OnIPlayerDeadOrUnspawn -= DestroyNetworkTimeoutController;
+        Object.Destroy(_networkTimeout);
     }
 }

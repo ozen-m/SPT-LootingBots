@@ -3,6 +3,7 @@ using EFT.Interactive;
 using EFT.InventoryLogic;
 using HarmonyLib;
 using UnityEngine;
+using Grid = EFT.InventoryLogic.Grid;
 
 namespace LootingBots.Utilities;
 
@@ -11,24 +12,24 @@ public static class LootUtils
     public const int RESERVED_SLOT_COUNT = 2;
     public static readonly int LowPolyMask = LayerMask.GetMask("LowPolyCollider");
     public static readonly int LootMask = LayerMask.GetMask("Interactive", "Loot", "Deadbody");
-    public static readonly AccessTools.FieldRef<Player, Corpse> _playerCorpseField = AccessTools.FieldRefAccess<Player, Corpse>("Corpse");
+    public static readonly AccessTools.FieldRef<Player, Corpse> PlayerCorpseField = AccessTools.FieldRefAccess<Player, Corpse>("Corpse");
 
-    private static readonly EquipmentSlot[] WeaponSlots =
+    public static readonly EquipmentSlot[] WeaponSlots =
     [
         EquipmentSlot.Holster,
         EquipmentSlot.FirstPrimaryWeapon,
         EquipmentSlot.SecondPrimaryWeapon,
     ];
 
-    private static readonly EquipmentSlot[] StorageSlots =
+    public static readonly EquipmentSlot[] StorageSlots =
     [
         EquipmentSlot.Backpack,
-        EquipmentSlot.ArmorVest,
         EquipmentSlot.TacticalVest,
+        EquipmentSlot.ArmorVest,
         EquipmentSlot.Pockets,
     ];
 
-    private static readonly EquipmentSlot[] OtherSlots =
+    public static readonly EquipmentSlot[] OtherSlots =
     [
         EquipmentSlot.ArmBand,
         EquipmentSlot.Headwear,
@@ -42,8 +43,13 @@ public static class LootUtils
     /// <summary>
     /// Calculate the size of a container
     /// </summary>
-    public static int GetContainerSize(this SearchableItemItemClass container)
+    public static int GetContainerSize(this Item item)
     {
+        if (item is not SearchableItem container)
+        {
+            return 0;
+        }
+
         var grids = container.Grids;
         var gridSize = 0;
 
@@ -67,59 +73,55 @@ public static class LootUtils
     }
 
     /// <summary>
-    /// Triggers a container to open/close. Borrowed from Questing Bots, needed for Fika
+    /// Triggers a container to open/close.
     /// </summary>
-    /// <seealso href="https://github.com/dwesterwick/SPTQuestingBots/blob/0.10.3/bepinex_dev/SPTQuestingBots/Helpers/InteractiveObjectHelpers.cs#L111"/>
-    public static void InteractContainer(
+    public static ValueTask<bool> InteractAsync(
+        this BotOwner botOwner,
         WorldInteractiveObject worldInteractiveObject,
-        BotOwner botOwner,
         EInteractionType action,
-        BotLog log
+        CancellationToken token = default
     )
     {
-        // TODO: Null check is probably no longer needed!
+        var source = ActionTaskCompletionSource.Start(token);
+
         if (worldInteractiveObject == null)
         {
-            if (log.DebugEnabled)
-            {
-                log.LogWarning($"Interacting [{action.ToString()}] with WorldInteractiveObject but is NULL");
-            }
-            return;
+            source.SetException(
+                new ArgumentNullException($"[{botOwner.Name()}] Interacting [{action.ToString()}] with WorldInteractiveObject but is NULL")
+            );
         }
-
-        var interactionResult = new InteractionResult(action);
-        if (worldInteractiveObject is Door)
+        else
         {
             // NOTE: This method MUST be used for Fika compatibility
-            botOwner.GetPlayer.vmethod_0(worldInteractiveObject, interactionResult, null);
+            var interactionResult = new InteractionResult(action);
+            botOwner.GetPlayer.StartInteraction(worldInteractiveObject, interactionResult, source.CompleteAction);
         }
 
-        // NOTE: This method MUST be used for Fika compatibility
-        botOwner.GetPlayer.vmethod_1(worldInteractiveObject, interactionResult);
+        return source.Task;
     }
 
     /// <summary>
-    /// Calculates the amount of empty grid slots in the container
+    /// Calculates the amount of total and available grid slots in a container
     /// </summary>
-    public static int GetAvailableGridSlots(StashGridClass[] grids)
+    /// <returns>(Total Size Grid Slots, Available Grid Slots)</returns>
+    public static (int total, int available) GetTotalAndAvailableGridSlots(Grid[] grids)
     {
         if (grids is null)
         {
-            return 0;
+            return (0, 0);
         }
 
-        // Initialize freeSpaces to 0
-        var freeSpaces = 0;
+        var gridSize = 0;
+        var containedSize = 0;
 
-        // Loop through each grid and calculate the free spaces
+        // Loop through each grid and calculate the total and contained spaces
         foreach (var grid in grids)
         {
-            var gridSize = grid.GridHeight * grid.GridWidth;
-            var containedItemSize = grid.GetSizeOfContainedItems();
-            freeSpaces += gridSize - containedItemSize;
+            gridSize += grid.GridHeight * grid.GridWidth;
+            containedSize += grid.GetSizeOfContainedItems();
         }
 
-        return freeSpaces;
+        return (gridSize, gridSize - containedSize);
     }
 
     /// <summary>
@@ -127,12 +129,12 @@ public static class LootUtils
     /// </summary>
     /// <param name="grid">The grid to calculate the amount of space taken up for</param>
     /// <returns>Returns the item size as an integer</returns>
-    public static int GetSizeOfContainedItems(this StashGridClass grid)
+    public static int GetSizeOfContainedItems(this Grid grid)
     {
         var containedItemSize = 0;
 
-        // Loop through each item in grid.Items and accumulate the item size
-        foreach (var item in grid.Items)
+        // Loop through each item in grid.Items (same as grid.ItemCollection.ItemsList) and accumulate the item size
+        foreach (var item in grid.ItemCollection.ItemsList)
         {
             containedItemSize += item.GetItemSize();
         }
@@ -165,7 +167,7 @@ public static class LootUtils
         // Use the item's template id to search for the same item in the inventory
         foreach (var foundItem in controller.Inventory.GetAllItemByTemplate(item.TemplateId))
         {
-            if (foundItem == null)
+            if (foundItem is null)
             {
                 continue;
             }
@@ -203,38 +205,31 @@ public static class LootUtils
         List<Item> preallocatedList
     )
     {
-        var hasBackpack = botEquipment.GetSlot(EquipmentSlot.Backpack).ContainedItem != null;
-        var hasTacVest = botEquipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem != null;
-
         // Add slots in priority order
-        if (hasBackpack || hasTacVest)
+        if (
+            botEquipment.GetSlot(EquipmentSlot.Backpack).ContainedItem != null
+            || botEquipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem != null
+        )
         {
-            GetItemInSlotsNonAlloc(corpseEquipment, botEquipment, preallocatedList, WeaponSlots);
-            GetItemInSlotsNonAlloc(corpseEquipment, botEquipment, preallocatedList, StorageSlots);
+            GetItemInSlotsToLootNonAlloc(corpseEquipment, preallocatedList, WeaponSlots);
+            GetItemInSlotsToLootNonAlloc(corpseEquipment, preallocatedList, StorageSlots);
         }
         else
         {
-            GetItemInSlotsNonAlloc(corpseEquipment, botEquipment, preallocatedList, StorageSlots);
-            GetItemInSlotsNonAlloc(corpseEquipment, botEquipment, preallocatedList, WeaponSlots);
+            GetItemInSlotsToLootNonAlloc(corpseEquipment, preallocatedList, StorageSlots);
+            GetItemInSlotsToLootNonAlloc(corpseEquipment, preallocatedList, WeaponSlots);
         }
 
-        GetItemInSlotsNonAlloc(corpseEquipment, botEquipment, preallocatedList, OtherSlots);
+        GetItemInSlotsToLootNonAlloc(corpseEquipment, preallocatedList, OtherSlots);
     }
 
-    private static void GetItemInSlotsNonAlloc(
-        InventoryEquipment equipment,
-        InventoryEquipment botEquipment,
-        List<Item> preallocatedList,
-        EquipmentSlot[] slots
-    )
+    private static void GetItemInSlotsToLootNonAlloc(InventoryEquipment equipment, List<Item> preallocatedList, EquipmentSlot[] slots)
     {
-        var equipmentOwner = equipment.Parent.GetOwner();
-        var botOwner = botEquipment.Parent.GetOwner();
         foreach (var slotName in slots)
         {
             var slot = equipment.GetSlot(slotName);
             var item = slot.ContainedItem;
-            if (item == null)
+            if (item is null)
             {
                 continue;
             }
@@ -243,9 +238,8 @@ public static class LootUtils
             var unlootableComponent = item.GetItemComponent<UnlootableComponent>();
             if (
                 unlootableComponent != null
-                && equipmentOwner != botOwner
                 && unlootableComponent.IsUnlootableFrom(item.Parent.Container)
-                && item is not PocketsItemClass // Include pockets to loot list
+                && item is not Pockets // Include pockets to loot list
             )
             {
                 continue;
@@ -273,12 +267,7 @@ public static class LootUtils
     /// </summary>
     public static string GetRootItemId(this InteractableObject interactableObject)
     {
-        return interactableObject switch
-        {
-            LootableContainer container => container.ItemOwner?.RootItem.Id,
-            LootItem lootItem => lootItem.ItemOwner?.RootItem.Id,
-            _ => null,
-        };
+        return interactableObject.GetRootItem()?.Id;
     }
 
     /// <summary>
@@ -298,7 +287,7 @@ public static class LootUtils
     /// <summary>
     /// Check if moving an item to a slot is blocked.
     /// Except chest/rig armor.
-    /// Based on <see cref="Slot.method_3"/>
+    /// Based on <see cref="Slot.GetConflictingSlot"/>
     /// </summary>
     public static bool HasBlockingItem(this Slot slot, Item incomingItem, out Item conflictingItem)
     {
@@ -315,14 +304,13 @@ public static class LootUtils
             return false;
         }
 
-        var slotNames = slotBlocker.ConflictingSlotNames;
-        for (var i = 0; i < slotNames.Length; i++)
+        foreach (var conflictingSlotName in slotBlocker.ConflictingSlotNames)
         {
             if (
-                conflictingSlots.TryGetValue(slotNames[i], out var conflictingSlot)
+                conflictingSlots.TryGetValue(conflictingSlotName, out var conflictingSlot)
                 && conflictingSlot != slot // Exclude checking the same slot
                 && conflictingSlot.ContainedItem is { } conflictItem
-                && conflictItem is not ArmorItemClass and not VestItemClass // Exclude chest/rig armor
+                && conflictItem is not Armor and not Vest // Exclude chest/rig armor
             )
             {
                 conflictingItem = conflictItem;
@@ -331,5 +319,52 @@ public static class LootUtils
         }
 
         return false;
+    }
+
+    public static Item GetFirstItem(this IEnumerable<Item> items)
+    {
+        switch (items)
+        {
+            case null:
+                return null;
+            case List<Item> list:
+                return list.Count > 0 ? list[0] : null;
+            default:
+            {
+                using var enumerator = items.GetEnumerator();
+                return enumerator.MoveNext() ? enumerator.Current : null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets all contained items (grid) of an item and its children
+    /// </summary>
+    /// <remarks>Does not get items in its Slots</remarks>
+    public static void GetAllContainedItems(this Item item, List<Item> preAllocatedList)
+    {
+        if (item is not CompoundItem compoundItem)
+        {
+            return;
+        }
+
+        foreach (var grid in compoundItem.Grids)
+        {
+            foreach (var containedItem in grid.ItemCollection.ItemsList)
+            {
+                preAllocatedList.Add(containedItem);
+                containedItem.GetAllContainedItems(preAllocatedList);
+            }
+        }
+    }
+
+    public static void GetAcceptableItemsInStorageSlotsNonAlloc<TItem>(
+        this InventoryController inventoryController,
+        IList<TItem> preAllocatedList,
+        Predicate<TItem> predicate = null
+    )
+        where TItem : Item
+    {
+        inventoryController.GetAcceptableItemsNonAlloc(StorageSlots, preAllocatedList, predicate);
     }
 }

@@ -5,18 +5,20 @@
     <Nullable>disable</Nullable>
     <LangVersion>preview</LangVersion>
     <RootNamespace>LootingBots</RootNamespace>
-    <AssemblyName>skwizzy.LootingBots</AssemblyName>
-    <Version>1.7.0</Version>
-    <ReleaseOutputDir>..\Build\BepInEx\plugins\</ReleaseOutputDir>
+    <AssemblyName>Skwizzy.LootingBots</AssemblyName>
+    <Version>1.8.0</Version>
+    <ReleaseOutputDir>..\Build\BepInEx\plugins\Skwizzy.LootingBots\</ReleaseOutputDir>
+    <DebugType>portable</DebugType>
+    <PathMap Condition="'$(Configuration)' == 'Release'">$(MSBuildProjectDirectory)=/src/</PathMap>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="BepInEx.Core" Version="5.*" />
     <PackageReference Include="UnityEngine.Modules" Version="2022.3.43" IncludeAssets="compile" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.Unity.Analyzers" Version="1.25.*-*" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Unity.Analyzers" Version="1.27.*-*" PrivateAssets="all" />
     <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="10.0.*-*" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" Version="17.14.*-*" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" Version="18.7.*-*" PrivateAssets="all" />
     <PackageReference Include="RoR2.BepInEx.Analyzers" Version="1.0.*-*" PrivateAssets="all" />
   </ItemGroup>
   <ItemGroup>
@@ -25,6 +27,9 @@
     </Reference>
     <Reference Include="DrakiaXYZ-BigBrain">
       <HintPath>..\References\DrakiaXYZ-BigBrain.dll</HintPath>
+    </Reference>
+    <Reference Include="Fika.Core">
+      <HintPath>..\References\Fika.Core.dll</HintPath>
     </Reference>
     <Reference Include="Sirenix.Serialization">
       <HintPath>..\References\Sirenix.Serialization.dll</HintPath>
@@ -67,6 +72,7 @@
     <MakeDir Directories="$(ReleaseOutputDir)" />
     <ItemGroup>
       <RemainingFiles Include="$(OutputPath)**\*" />
+      <RemainingFiles Include="..\LICENSE" />
     </ItemGroup>
     <Copy
       SourceFiles="@(RemainingFiles)"

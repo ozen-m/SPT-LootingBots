@@ -7,107 +7,124 @@ using UnityEngine.AI;
 
 namespace LootingBots.Logic;
 
-internal class LootingLogic(BotOwner botOwner) : CustomLogic(botOwner)
+internal class LootingLogic : CustomLogic
 {
-    private readonly LootingBrain _lootingBrain = botOwner.GetPlayer.gameObject.GetComponent<LootingBrain>();
-    private readonly BotLog _log = new(LootingBots.LootLog, botOwner);
-    private float _closeEnoughTimer;
-    private float _moveTimer;
+    private readonly LootingBrain _lootingBrain;
+    private readonly BotLog _log;
+    private Vector3 _destination = Vector3.zero;
+    private float _updateTimer;
+    private float _stuckTimer;
     private int _stuckCount;
     private int _navigationAttempts;
-    private Vector3 _destination = Vector3.zero;
 
-    // Run looting logic only when the bot is not looting and when the bot has an active item to loot
-    private bool _shouldUpdate
+    // Run looting logic only when the bot is not looting
+    private bool ShouldUpdate
     {
-        get { return !_lootingBrain.LootTaskRunning && _lootingBrain.HasActiveLootable && BotOwner.BotState == EBotState.Active; }
+        get { return !_lootingBrain.LootTaskRunning && BotOwner.BotState == EBotState.Active; }
+    }
+
+    public LootingLogic(BotOwner botOwner)
+        : base(botOwner)
+    {
+        _lootingBrain = botOwner.GetPlayer.gameObject.GetComponent<LootingBrain>();
+        _log = new BotLog(LootingBots.LootLog, botOwner);
+
+        if (botOwner.Profile.Nickname != _lootingBrain.BotOwner.Profile.Nickname)
+        {
+            _log.LogError(botOwner.Profile.Nickname + " is using the LootingBrain for " + _lootingBrain.BotOwner.Profile.Nickname);
+        }
     }
 
     public override void Update(CustomLayer.ActionData data)
     {
-        // Kick off looting logic
-        if (_shouldUpdate)
+        if (!ShouldUpdate)
         {
-            TryLoot();
+            return;
         }
+
+        // Open any nearby door
+        BotOwner.DoorOpener.UpdateDoorInteractionStatus();
+
+        if (_updateTimer > Time.time)
+        {
+            return;
+        }
+        _updateTimer = Time.time + 0.2f;
+
+        // If a player picks up an item that was marked as active by a bot, its ItemOwner?.RootItem will be null.
+        // In this case cleanup the active item
+        if (_lootingBrain.ActiveLootType == LootFinder.LootType.Item && _lootingBrain.ActiveLoot.GetRootItem() is null)
+        {
+            _lootingBrain.CleanupLoot(false);
+            return;
+        }
+
+        // If the bot is interacting with a door, let it complete first
+        if (BotOwner.DoorOpener.Interacting || BotOwner.Mover.CurrentState == EBotMoverState.NearDoor)
+        {
+            return;
+        }
+
+        // Kick off looting logic
+        TryLoot();
+    }
+
+    public override void Start()
+    {
+        _destination = _lootingBrain.Destination;
+        _stuckTimer = Time.time + 2f;
     }
 
     public override void Stop()
     {
         _destination = Vector3.zero;
-        _lootingBrain.DistanceToLoot = float.MaxValue;
         _stuckCount = 0;
         _navigationAttempts = 0;
+        _lootingBrain.DistanceToLoot = float.MaxValue;
         _lootingBrain.StopLooting();
         base.Stop();
     }
 
     private void TryLoot()
     {
-        try
+        // Check if the bot is close enough to the destination to commence looting
+        if (IsCloseEnough())
         {
-            // Check if the bot is close enough to the destination to commence looting
-            if (_closeEnoughTimer < Time.time)
+            // Crouch and look to item
+            BotOwner.SetPose(0f);
+            BotOwner.Steering.LookToPoint(_lootingBrain.LootObjectPosition, 180f);
+            if (BotOwner.GetPlayer.MovementContext._isInPatrol)
             {
-                _closeEnoughTimer = Time.time + 2f;
-
-                var isCloseEnough = IsCloseEnough();
-
-                // If the bot is closer than 4m from the loot, they should slow down and not sprint to prevent powersliding
-                var slowDown = _lootingBrain.DistanceToLoot < 6f;
-
-                // If the bot has not just looted something, loot the current item since we are now close enough
-                if (!_lootingBrain.LootTaskRunning && isCloseEnough && _lootingBrain.HasActiveLootable)
-                {
-                    // Crouch and look to item
-                    BotOwner.SetPose(0f);
-                    BotOwner.Steering.LookToPoint(_lootingBrain.LootObjectPosition);
-                    _lootingBrain.StartLooting();
-                    return;
-                }
-
-                if (!_lootingBrain.LootTaskRunning)
-                {
-                    // Stand and move to lootable
-                    BotOwner.SetTargetMoveSpeed(1f);
-                    BotOwner.SetPose(1f);
-                    BotOwner.Steering.LookToMovingDirection();
-                }
-
-                // Stop the bot from sprinting when approaching lootable
-                if (slowDown)
-                {
-                    BotOwner.Mover.Sprint(false);
-                }
+                // SAIN sets bot in a patrol state if it has no enemy, or is not sprinting
+                BotOwner.GetPlayer.MovementContext.SetPatrol(false);
             }
-
-            // Try to move the bot to the destination
-            if (_moveTimer < Time.time && !_lootingBrain.LootTaskRunning)
-            {
-                _moveTimer = Time.time + 4f;
-
-                // Initiate move to loot. Will return false if the bot is not able to navigate using a NavMesh
-                var canMove = TryMoveToLoot();
-
-                // If there is not a valid path to the loot, ignore the loot forever
-                if (!canMove)
-                {
-                    _lootingBrain.HandleNonNavigableLoot();
-                    _stuckCount = 0;
-                }
-            }
+            _lootingBrain.StartLooting();
+            return;
         }
-        catch (Exception e)
+
+        // Try moving to loot. Will return false if the bot is not able to navigate
+        if (!TryMoveToLoot())
         {
-            _log.LogError(e);
+            // There is no valid path to the loot, ignore the loot forever
+            _lootingBrain.CleanupLoot();
+            _stuckCount = 0;
+            return;
         }
+
+        // Stand and move to lootable
+        BotOwner.SetTargetMoveSpeed(1f);
+        BotOwner.SetPose(1f);
+        BotOwner.Steering.LookToMovingDirection();
+
+        // If the bot is closer than 5m (sqr 25f) from the loot, they should slow down to prevent power-sliding, otherwise sprint
+        var canSprint = _lootingBrain.DistanceToLoot > 25f;
+        BotOwner.Sprint(canSprint);
     }
 
     /// <summary>
     /// Check to see if the destination point and the loot object do not have a wall between them by casting a Ray between the two points.
     /// Walls should be on the LowPolyCollider LayerMask, so we can assume if we see one of these then we cannot properly loot.
     /// </summary>
-    /// <returns></returns>
     public bool HasLOS()
     {
         var rayDirection = _lootingBrain.LootObjectPosition - _destination;
@@ -126,80 +143,58 @@ internal class LootingLogic(BotOwner botOwner) : CustomLogic(botOwner)
 
     /// <summary>
     /// Makes the bot look towards the target destination and begin moving towards it.
-    /// Navigation will be canceled if:
-    /// - The bot has not moved in more than 2 navigation calls
-    /// - If the destination cannot be snapped to a mesh,
+    /// Navigation will be canceled and loot is ignored if:
+    /// - The bot has not moved in more than 2 stuck checks (first stuck is almost always stopping at a door)
+    /// - If the destination cannot be snapped to a mesh
     /// - If the NavPathStatus is Invalid
     /// </summary>
     public bool TryMoveToLoot()
     {
-        var canMove = true;
-        try
+        // Check if bot is stuck and can't reach
+        if (_stuckCount > 1)
+        {
+            if (_log.InfoEnabled)
+            {
+                _log.LogInfo(
+                    $"Has been stuck trying to reach: {_lootingBrain.ActiveLoot.GetLootName()}. Remaining distance: {Mathf.Sqrt(_lootingBrain.DistanceToLoot)}. Ignoring"
+                );
+            }
+
+            return false;
+        }
+
+        // Instruct the bot to move to the destination: on first attempt, or if the bot has no path
+        if (_navigationAttempts == 0 || !BotOwner.Mover.HasPathAndNoComplete)
         {
             // Increment navigation attempt counter
             _navigationAttempts++;
 
-            var lootableName = _lootingBrain.ActiveLoot.GetLootName();
-
-            // If the bot has not been stuck for more than 2 navigation checks, attempt to navigate to the lootable otherwise ignore the container forever
-            var isBotStuck = _stuckCount > 1;
-            var isNavigationLimit = _navigationAttempts > 30;
-
             // Log every 5 movement attempts to reduce noise
-            if (_navigationAttempts % 5 == 1 && _log.DebugEnabled)
+            if (_log.DebugEnabled && _navigationAttempts % 5 == 1)
             {
-                _log.LogDebug($"[Attempt: {_navigationAttempts}] Navigating to {lootableName}");
+                _log.LogDebug($"[Attempt: {_navigationAttempts}] Navigating to {_lootingBrain.ActiveLoot.GetLootName()}");
             }
 
-            if (!isBotStuck && !isNavigationLimit && _lootingBrain.Destination != Vector3.zero)
+            var pathStatus = BotOwner.GoToPoint(_destination, true, -1f, false, false);
+            if (pathStatus == NavMeshPathStatus.PathInvalid)
             {
-                _destination = _lootingBrain.Destination;
-
-                if (_navigationAttempts == 1)
+                if (_log.WarningEnabled)
                 {
-                    var pathStatus = BotOwner.GoToPoint(_destination, true, -1f, false, false);
-
-                    if (pathStatus == NavMeshPathStatus.PathInvalid)
-                    {
-                        if (_log.WarningEnabled)
-                        {
-                            _log.LogWarning($"No valid path to: {lootableName}. Ignoring");
-                        }
-
-                        canMove = false;
-                    }
-
-                    if (pathStatus == NavMeshPathStatus.PathPartial)
-                    {
-                        if (_log.WarningEnabled)
-                        {
-                            _log.LogWarning($"Partial path to: {lootableName}.");
-                        }
-                    }
+                    _log.LogWarning($"No valid path to: {_lootingBrain.ActiveLoot.GetLootName()}. Ignoring");
                 }
+
+                return false;
             }
-            else
+            if (pathStatus == NavMeshPathStatus.PathPartial)
             {
-                if (isBotStuck)
+                if (_log.WarningEnabled)
                 {
-                    if (_log.WarningEnabled)
-                    {
-                        _log.LogWarning($"Has been stuck trying to reach: {lootableName}. Ignoring");
-                    }
+                    _log.LogWarning($"Partial path to: {_lootingBrain.ActiveLoot.GetLootName()}.");
                 }
-                else if (_log.WarningEnabled)
-                {
-                    _log.LogWarning($"Has exceeded the navigation limit (30) trying to reach: {lootableName}. Ignoring");
-                }
-                canMove = false;
             }
         }
-        catch (Exception e)
-        {
-            _log.LogError(e);
-        }
 
-        return canMove;
+        return true;
     }
 
     /// <summary>
@@ -207,55 +202,53 @@ internal class LootingLogic(BotOwner botOwner) : CustomLogic(botOwner)
     /// </summary>
     private bool IsCloseEnough()
     {
-        if (_destination == Vector3.zero)
-        {
-            return false;
-        }
-
         // Calculate distance from bot to destination
         var vector = BotOwner.Position - _destination;
         var y = vector.y;
         vector.y = 0f;
-        var distance = vector.sqrMagnitude;
+        var sqrDistance = vector.sqrMagnitude;
 
         // Within a radius of 0.92 (sqr 0.85), and ±0.5 vertically
-        var isCloseEnough = distance < 0.85f && Math.Abs(y) < 0.5f;
+        var isCloseEnough = sqrDistance < 0.85f && Math.Abs(y) < 0.5f;
 
-        // Check to see if the bot is stuck
-        if (!IsBotStuck(distance))
+        // Check to see if the bot is stuck every 2 seconds.
+        if (_stuckTimer < Time.time && !IsBotStuck(sqrDistance))
         {
             // Bot has moved, reset stuckCount and update cached distance to container
             _stuckCount = 0;
-            _lootingBrain.DistanceToLoot = distance;
+            _lootingBrain.DistanceToLoot = sqrDistance;
         }
 
         if (isCloseEnough && _log.DebugEnabled)
         {
-            _log.LogDebug($"Bot is close enough to loot. {distance}. height diff: {y}");
+            _log.LogDebug($"Bot is close enough to loot. {Mathf.Sqrt(sqrDistance)}. height diff: {y}");
         }
 
         return isCloseEnough;
     }
 
     /// <summary>
-    /// Checks if the bot is stuck moving and increments the stuck counter.
+    /// Checks, every 2 seconds, if the bot is stuck moving and increments the stuck counter.
     /// </summary>
-    /// <param name="dist">Current distance</param>
-    private bool IsBotStuck(float dist)
+    /// <param name="sqrDist">Current squared distance</param>
+    private bool IsBotStuck(float sqrDist)
     {
-        // Calculate change in distance and assume any change less than .25f means the bot hasn't moved.
-        var changeInDist = Math.Abs(_lootingBrain.DistanceToLoot - dist);
-        var isStuck = changeInDist < 0.3f;
+        _stuckTimer = Time.time + 2f;
 
+        // Calculate change in sqr distance and assume any change less than 0.5f means the bot hasn't moved.
+        var changeInDistSqr = Mathf.Abs(_lootingBrain.DistanceToLoot - sqrDist);
+        var isStuck = changeInDistSqr < 0.5f;
         if (isStuck)
         {
-            if (_log.DebugEnabled)
-            {
-                _log.LogDebug($"[Stuck: {_stuckCount}] Distance moved since check: {changeInDist}. Dist from loot: {dist}");
-            }
-
             // Bot is stuck, update stuck count
             _stuckCount++;
+
+            if (_log.DebugEnabled)
+            {
+                _log.LogDebug(
+                    $"[Stuck: {_stuckCount}] Distance moved since check: {changeInDistSqr}. Dist from loot: {Mathf.Sqrt(sqrDist)}"
+                );
+            }
         }
 
         return isStuck;

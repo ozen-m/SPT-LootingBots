@@ -1,0 +1,4 @@
+<Solution>
+    <Project Path="LootingBots.Server/LootingBots.Server.csproj" />
+    <Project Path="LootingBots/LootingBots.csproj" />
+</Solution>

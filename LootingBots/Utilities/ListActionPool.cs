@@ -1,11 +1,18 @@
 ﻿using LootingBots.Actions;
-using UnityEngine.Pool;
 
 namespace LootingBots.Utilities;
 
 public static class ListActionPool
 {
-    private static readonly ObjectPool<List<LootingAction>> _pool = new(Create, null, OnRelease, LogOnDestroyInstance, true, 2, 32);
+    private static readonly UnityEngine.Pool.ObjectPool<List<LootingAction>> _pool = new(
+        Create,
+        null,
+        OnRelease,
+        LogOnDestroyInstance,
+        true,
+        2,
+        32
+    );
 
     public static List<LootingAction> Create()
     {

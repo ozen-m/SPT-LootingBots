@@ -19,11 +19,20 @@ public static class External
         {
             var log = GetOrCreateInteropLog(bot);
 
+            if (!lootingBrain.LootingEnabled)
+            {
+                if (log.WarningEnabled)
+                {
+                    log.LogWarning("Cannot force a loot scan, bot is not allowed to loot corpses, or containers, or loose items");
+                }
+                return true;
+            }
+
             if (!lootingBrain.HasFreeSpace)
             {
                 if (log.WarningEnabled)
                 {
-                    log.LogWarning("Forcing a scan but bot does not have enough free space");
+                    log.LogWarning("Forcing a loot scan despite the bot not having enough free space");
                 }
             }
             else if (log.DebugEnabled)
@@ -38,7 +47,7 @@ public static class External
     }
 
     /// <summary>
-    /// Stops a bot from looting if it is currently looting something and prevent loot scans.
+    /// Stops a bot from looting if it is currently looting and prevent loot scans.
     /// </summary>
     /// <param name="duration">The duration, in seconds, to prevent a bot from looting</param>
     public static bool PreventBotFromLooting(BotOwner bot, float duration)
@@ -55,7 +64,6 @@ public static class External
             if (lootingBrain.IsBrainEnabled)
             {
                 lootFinder.OverrideNextScanTime(duration);
-
                 lootingBrain.StopLooting();
             }
 
@@ -120,25 +128,22 @@ public static class External
 
     private static bool GetLootingBrain(BotOwner bot, out LootingBrain lootingBrain)
     {
-        lootingBrain = bot.GetPlayer.gameObject.GetComponent<LootingBrain>();
-        return lootingBrain != null;
+        return bot.GetPlayer.TryGetComponent(out lootingBrain);
     }
 
     private static bool GetLootFinder(BotOwner bot, out LootFinder lootFinder)
     {
-        lootFinder = bot.GetPlayer.gameObject.GetComponent<LootFinder>();
-        return lootFinder != null;
+        return bot.GetPlayer.TryGetComponent(out lootFinder);
     }
 
     private static BotLog GetOrCreateInteropLog(BotOwner bot)
     {
-        if (_interopLogs.TryGetValue(bot, out var log))
+        if (!_interopLogs.TryGetValue(bot, out var log))
         {
-            return log;
+            log = new BotLog(LootingBots.InteropLog, bot);
+            _interopLogs.Add(bot, log);
         }
 
-        log = new BotLog(LootingBots.InteropLog, bot);
-        _interopLogs.Add(bot, log);
         return log;
     }
 }
