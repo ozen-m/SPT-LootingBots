@@ -1282,10 +1282,14 @@ public class LootingInventoryController
                         continue;
                     }
 
-                    // If it's a magazine we cannot use, throw it
-                    if (childItem is Magazine mag && !IsUsableMag(mag))
+                    if (childItem is Magazine mag)
                     {
-                        itemsToThrow.Add(mag, _itemAppraiser.GetItemPrice(mag, _log));
+                        // If it's a magazine we cannot use, throw it
+                        if (!IsUsableMag(mag))
+                        {
+                            itemsToThrow.Add(mag, _itemAppraiser.GetItemPrice(mag, _log));
+                        }
+
                         continue;
                     }
 
