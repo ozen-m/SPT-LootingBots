@@ -281,6 +281,7 @@ public class LootingBrain : MonoBehaviour
     public void OnDestroy()
     {
         Destroy(_lootingSource);
+        InventoryController.Unsubscribe();
     }
 
     private readonly Stopwatch _lootTimer = new();
@@ -450,7 +451,6 @@ public class LootingBrain : MonoBehaviour
         CleanupLoot(lootingSuccessful);
 
         InventoryController.UpdateActiveWeapon();
-        InventoryController.UpdateGridStats();
         InventoryController.SetRootItemOwner(null);
         BotOwner.AIData.CalcPower();
         LootTaskRunning = false;
@@ -462,11 +462,6 @@ public class LootingBrain : MonoBehaviour
             LootingBots.ContainerLootingEnabled.Value.IsBotEnabled(this)
             || LootingBots.LooseItemLootingEnabled.Value.IsBotEnabled(this)
             || LootingBots.CorpseLootingEnabled.Value.IsBotEnabled(this);
-    }
-
-    public void UpdateGridStats()
-    {
-        InventoryController.UpdateGridStats();
     }
 
     /// <summary>

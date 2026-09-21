@@ -104,7 +104,7 @@ public static class LootUtils
     /// Calculates the amount of total and available grid slots in a container
     /// </summary>
     /// <returns>(Total Size Grid Slots, Available Grid Slots)</returns>
-    public static (int total, int available) GetTotalAndAvailableGridSlots(Grid[] grids)
+    public static (int total, int available) GetTotalAndAvailableGridSlots(this Grid[] grids)
     {
         if (grids is null)
         {

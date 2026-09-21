@@ -105,6 +105,7 @@ public class LootingInventoryController
     private readonly Action _updateActiveWeaponAction;
     private readonly Callback<IHandsController> _onWeaponTakenCallback;
     private readonly List<Item> _itemsScratch = [];
+    private readonly List<Action> _unsubActions = [];
 
     // Represents the value in roubles of the current item
     public float CurrentItemPrice;
@@ -156,6 +157,7 @@ public class LootingInventoryController
 
         CalculateGearValue();
         CalculateInitialNetWorth();
+        SubscribeToGearSlots();
         UpdateGridStats();
     }
 
@@ -257,6 +259,20 @@ public class LootingInventoryController
     }
 
     /// <summary>
+    /// Subscribe to gear slots so when its ContainedItem is changed, grid stats is updated.
+    /// </summary>
+    public void SubscribeToGearSlots()
+    {
+        Action<Item> updateGridStatsAction = UpdateGridStats;
+
+        var tacVestSlot = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.TacticalVest);
+        _unsubActions.Add(tacVestSlot.ReactiveContainedItem.Subscribe(updateGridStatsAction));
+
+        var backpackSlot = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Backpack);
+        _unsubActions.Add(backpackSlot.ReactiveContainedItem.Subscribe(updateGridStatsAction));
+    }
+
+    /// <summary>
     /// Updates stats for AvailableGridSpaces and TotalGridSpaces based off the bots current gear.
     /// </summary>
     public void UpdateGridStats()
@@ -265,12 +281,17 @@ public class LootingInventoryController
         var pockets = (SearchableItem)_botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Pockets).ContainedItem;
         var backpack = (SearchableItem)_botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Backpack).ContainedItem;
 
-        var tacVestGrids = LootUtils.GetTotalAndAvailableGridSlots(tacVest?.Grids);
-        var pocketsGrids = LootUtils.GetTotalAndAvailableGridSlots(pockets?.Grids);
-        var backpackGrids = LootUtils.GetTotalAndAvailableGridSlots(backpack?.Grids);
+        var tacVestGrids = (tacVest?.Grids).GetTotalAndAvailableGridSlots();
+        var pocketsGrids = (pockets?.Grids).GetTotalAndAvailableGridSlots();
+        var backpackGrids = (backpack?.Grids).GetTotalAndAvailableGridSlots();
 
         Stats.AvailableGridSpaces = tacVestGrids.available + pocketsGrids.available + backpackGrids.available;
         Stats.TotalGridSpaces = tacVestGrids.total + pocketsGrids.total + backpackGrids.total;
+    }
+
+    private void UpdateGridStats(Item _)
+    {
+        UpdateGridStats();
     }
 
     /// <summary>
@@ -435,10 +456,6 @@ public class LootingInventoryController
                         _transactionController.AddExtraAmmo(weapon);
                         CalculateGearValue();
                     }
-                    if (item is SearchableItem)
-                    {
-                        UpdateGridStats();
-                    }
 
                     if (_log.DebugEnabled)
                     {
@@ -455,7 +472,6 @@ public class LootingInventoryController
                     if (item is SearchableItem)
                     {
                         Stats.AddNetValue(GetAllContainedItemsValue(item));
-                        UpdateGridStats();
                     }
                     continue;
                 }
@@ -1464,6 +1480,14 @@ public class LootingInventoryController
     public void SetRootItemOwner(IItemOwner owner)
     {
         _transactionController.SetRootItemOwner(owner);
+    }
+
+    public void Unsubscribe()
+    {
+        foreach (var action in _unsubActions)
+        {
+            action();
+        }
     }
 
     /// <summary>
