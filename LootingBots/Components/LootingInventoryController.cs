@@ -184,9 +184,14 @@ public class LootingInventoryController
 
         var tacVestSlot = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.TacticalVest);
         _unsubActions.Add(tacVestSlot.ReactiveContainedItem.Subscribe(updateGridStatsAction));
+        _unsubActions.Add(tacVestSlot.ReactiveContainedItem.Bind(Stats.WeaponValues.Vest.OnChangeContainer));
 
         var backpackSlot = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Backpack);
         _unsubActions.Add(backpackSlot.ReactiveContainedItem.Subscribe(updateGridStatsAction));
+        _unsubActions.Add(backpackSlot.ReactiveContainedItem.Bind(Stats.WeaponValues.Backpack.OnChangeContainer));
+
+        var pockets = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Pockets).ContainedItem;
+        Stats.WeaponValues.Pockets.OnChangeContainer(pockets);
     }
 
     /// <summary>
@@ -402,7 +407,6 @@ public class LootingInventoryController
             if (item is SearchableItem searchableItem)
             {
                 var success = await LootNestedItemsAsync(searchableItem, token);
-
                 if (!success)
                 {
                     return false;
@@ -410,17 +414,50 @@ public class LootingInventoryController
             }
 
             // Check to see if we can pick up the item
-            if (AllowedToPickup(item, itemSize) && await _transactionController.TryPickupItemAsync(item, token))
+            if (AllowedToPickup(item, itemSize))
             {
-                Stats.AddNetValue(CurrentItemPrice + GetAllContainedItemsValue(item));
-                Stats.AvailableGridSpaces -= itemSize;
+                // If we're allowed to pick up the item, but we don't have space, try to find an item to replace it with
+                if (!_lootingBrain.HasFreeSpace)
+                {
+                    if (
+                        HasReplacement(item, itemSize, out var source, out var index, out var loot)
+                        && await _transactionController.ReplaceItemAsync(
+                            item,
+                            source[index].Item,
+                            _lootingBrain.ActiveLoot.GetRootItem(),
+                            token
+                        )
+                    )
+                    {
+                        var replaced = source[index];
+                        Stats.AddNetValue(CurrentItemPrice - replaced.Value);
+                        Stats.AvailableGridSpaces -= itemSize - replaced.Size;
+                        source.Replace(index, loot);
+
+                        if (_log.DebugEnabled)
+                        {
+                            _log.LogDebug(
+                                $"Replaced {replaced.Item.LocalizedName()} with {item.LocalizedName()} (Net: {CurrentItemPrice - replaced.Value:N0}₽)"
+                            );
+                        }
+                        continue;
+                    }
+                }
+                else if (await _transactionController.TryPickupItemAsync(item, token))
+                {
+                    Stats.AddNetValue(CurrentItemPrice + GetAllContainedItemsValue(item));
+                    Stats.AvailableGridSpaces -= itemSize;
+                    Stats.WeaponValues.TryAddContainedItem(item, itemSize, CurrentItemPrice);
+                    continue;
+                }
             }
-            else if (item is Weapon weapon && LootingBots.CanStripAttachments.Value)
+
+            // Strip the weapon of its mods if we cannot pick up the weapon
+            if (item is Weapon weaponToStrip && LootingBots.CanStripAttachments.Value)
             {
-                // Strip the weapon of its mods if we cannot pick up the weapon
                 using (UnityEngine.Pool.ListPool<Item>.Get(out var modsToLoot))
                 {
-                    var successful = await StripWeaponAsync(weapon, modsToLoot, token);
+                    var successful = await StripWeaponAsync(weaponToStrip, modsToLoot, token);
                     if (!successful)
                     {
                         return false;
@@ -1320,11 +1357,6 @@ public class LootingInventoryController
     /// </summary>
     public bool AllowedToPickup(Item lootItem, int itemSize = 1)
     {
-        if (!_lootingBrain.HasFreeSpace)
-        {
-            return false;
-        }
-
         var pickupNotRestricted = _isPMC
             ? LootingBots.PMCGearToPickup.Value.IsItemEligible(lootItem, true)
             : LootingBots.ScavGearToPickup.Value.IsItemEligible(lootItem, true);
@@ -1339,6 +1371,36 @@ public class LootingInventoryController
                     lootItem is BarterOther || IsValuableEnough(CurrentItemPrice / itemSize) // Divide by slots to get price per slot
                 )
             );
+    }
+
+    /// <summary>
+    /// Try to find an item to be replaced for the potential item.
+    /// </summary>
+    /// <param name="source">The item's "parent". From the backpack, vest, or pockets.</param>
+    /// <param name="index">Index of the item to be replaced from <paramref name="source"/>.</param>
+    /// <returns>True if found an item to be replaced.</returns>
+    public bool HasReplacement(Item lootItem, int itemSize, out ContainedItems source, out int index, out ContainedLootItem loot)
+    {
+        loot = new ContainedLootItem(lootItem, itemSize, CurrentItemPrice);
+        if (Stats.WeaponValues.Backpack.TryFindReplacement(loot, out index))
+        {
+            source = Stats.WeaponValues.Backpack;
+            return true;
+        }
+        if (Stats.WeaponValues.Vest.TryFindReplacement(loot, out index))
+        {
+            source = Stats.WeaponValues.Vest;
+            return true;
+        }
+        if (Stats.WeaponValues.Pockets.TryFindReplacement(loot, out index))
+        {
+            source = Stats.WeaponValues.Pockets;
+            return true;
+        }
+
+        source = null;
+        index = -1;
+        return false;
     }
 
     /// <summary>

@@ -258,6 +258,11 @@ public class LootingTransactionController
     {
         token.ThrowIfCancellationRequested();
 
+        if (item.Parent is OwnerItself)
+        {
+            return false;
+        }
+
         if (_log.DebugEnabled)
         {
             _log.LogDebug($"Swapping {item.Name.Localized()} with {toSwap.Name.Localized()}...");
@@ -273,7 +278,7 @@ public class LootingTransactionController
         var swapResult = ItemManipulator.Swap(item, toSwap.CurrentAddress, toSwap, item.CurrentAddress, _inventoryController, true);
         if (swapResult.Failed)
         {
-            if (_log.WarningEnabled && swapResult.Error is not Slot.ConflictingItemError)
+            if (_log.WarningEnabled && swapResult.Error is not (Slot.ConflictingItemError or Slot.ItemFiltersWontAllowError))
             {
                 _log.LogWarning($"Failed to swap {item.Name.Localized()} with {toSwap.Name.Localized()}. Error: {swapResult.Error}");
             }
@@ -398,8 +403,13 @@ public class LootingTransactionController
     /// Try to transfer an item to another item's grid or throw
     /// </summary>
     /// <param name="transferTo">The brain's ActiveLoot Root Item</param>
-    public Task<bool> TransferOrThrowItemAsync(Item toThrow, Item transferTo, CancellationToken token = default)
+    public Task<bool> TransferOrThrowItemAsync(Item toThrow, Item transferTo = null, CancellationToken token = default)
     {
+        if (transferTo is null)
+        {
+            return ThrowItemAsync(toThrow, token);
+        }
+
         if (_log.DebugEnabled)
         {
             _log.LogDebug($"Transferring or throwing item: {toThrow.Name.Localized()}...");
@@ -423,6 +433,30 @@ public class LootingTransactionController
         }
 
         return ThrowItemAsync(toThrow, token);
+    }
+
+    /// <summary>
+    /// Replace items by trying to swap the two items, or transfer to another item's grid, or throw
+    /// </summary>
+    public async Task<bool> ReplaceItemAsync(Item toKeep, Item toThrow, Item rootItem = null, CancellationToken token = default)
+    {
+        if (_log.DebugEnabled)
+        {
+            _log.LogDebug($"Trying to replace {toThrow.Name.Localized()} with {toKeep.LocalizedName()}...");
+        }
+
+        if (await SwapItemsAsync(toKeep, toThrow, token))
+        {
+            return true;
+        }
+
+        var grid = toThrow.Parent.Container;
+        if (!await TransferOrThrowItemAsync(toThrow, rootItem, token))
+        {
+            return false;
+        }
+
+        return grid.TryFindLocationForItem(toKeep, out var address) && await MoveItemAsync(toKeep, address, token);
     }
 
     /// <summary>
