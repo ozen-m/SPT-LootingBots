@@ -1236,7 +1236,12 @@ public class LootingInventoryController
                 }
 
                 // Check the conditions to filter out items to keep
-                if (childItem.QuestItem || childItem is Meds or BarterOther or Money || (childItem is Ammo ammo && IsUsableAmmo(ammo)))
+                if (
+                    childItem.QuestItem
+                    || childItem.IsDogtag()
+                    || childItem is Meds or Money
+                    || (childItem is Ammo ammo && IsUsableAmmo(ammo))
+                )
                 {
                     continue;
                 }
@@ -1248,7 +1253,6 @@ public class LootingInventoryController
                     {
                         itemsToThrow.Add(mag, _itemAppraiser.GetItemPrice(mag, _log));
                     }
-
                     continue;
                 }
 
@@ -1368,7 +1372,7 @@ public class LootingInventoryController
             || (
                 pickupNotRestricted
                 && (
-                    lootItem is BarterOther || IsValuableEnough(CurrentItemPrice / itemSize) // Divide by slots to get price per slot
+                    lootItem.IsDogtag() || IsValuableEnough(CurrentItemPrice / itemSize) // Divide by slots to get price per slot
                 )
             );
     }

@@ -1,6 +1,7 @@
 ﻿using System.Text;
 using EFT;
 using EFT.InventoryLogic;
+using LootingBots.Utilities;
 using UnityEngine;
 
 namespace LootingBots.Components;
@@ -222,7 +223,7 @@ public class ContainedItems
 
     public static bool IsNotReplaceable(Item item)
     {
-        return item.QuestItem || item is Magazine or Ammo or Meds or Money or BarterOther;
+        return item.QuestItem || item.IsDogtag() || item is Magazine or Ammo or Meds or Money;
     }
 }
 

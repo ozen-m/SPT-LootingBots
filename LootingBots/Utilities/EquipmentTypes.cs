@@ -150,10 +150,10 @@ public static class EquipmentTypeUtils
             Vest vest when IsArmoredRig(vest) => allowedGear.HasArmoredRig(),
             Vest => allowedGear.HasTacticalRig(),
             ArmorPlate => allowedGear.HasArmorPlate(),
-            BarterOther => allowedGear.HasDogtag(),
             ThrowWeap => allowedGear.HasGrenade(),
             Weapon => allowedGear.HasWeapon(),
             ArmBand => allowedGear.HasArmband(),
+            BarterOther barter when barter.IsDogtag() => allowedGear.HasDogtag(),
             _ => toPickup,
         };
     }
@@ -170,5 +170,15 @@ public static class EquipmentTypeUtils
         }
 
         return false;
+    }
+
+    public static bool IsDogtag(this Item item)
+    {
+        return item is BarterOther barter && barter.Dogtag is not null;
+    }
+
+    public static bool IsDogtag(this BarterOther barter)
+    {
+        return barter.Dogtag is not null;
     }
 }
