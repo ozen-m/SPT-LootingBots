@@ -8,7 +8,7 @@ namespace LootingBots.Components;
 
 public class BotStats
 {
-    public readonly GearValue WeaponValues = new();
+    public readonly GearValue Gear = new();
 
     public float NetWorth;
     public float InitialNetWorth;
@@ -22,17 +22,17 @@ public class BotStats
 
     public float PrimaryValue
     {
-        get { return WeaponValues.Primary.Value; }
+        get { return Gear.Primary.Value; }
     }
 
     public float SecondaryValue
     {
-        get { return WeaponValues.Secondary.Value; }
+        get { return Gear.Secondary.Value; }
     }
 
     public float HolsterValue
     {
-        get { return WeaponValues.Holster.Value; }
+        get { return Gear.Holster.Value; }
     }
 
     public void AddNetValue(float itemPrice)
@@ -55,9 +55,9 @@ public class BotStats
         debugPanel.AppendLabeledValue("Total Looted Value", $" {Looted:n0}₽", Color.white, Color.white);
         debugPanel.AppendLabeledValue("Total Net Worth", $" {NetWorth:n0}₽", Color.white, Color.white);
         debugPanel.AppendLabeledValue("Available Space", $" {AvailableGridSpaces} slots", Color.white, freeSpaceColor);
-        debugPanel.AppendLabeledValue("Primary Value", $" {WeaponValues.Primary.Value:n0}₽", Color.white, Color.white);
-        debugPanel.AppendLabeledValue("Secondary Value", $" {WeaponValues.Secondary.Value:n0}₽", Color.white, Color.white);
-        debugPanel.AppendLabeledValue("Holster Value", $" {WeaponValues.Holster.Value:n0}₽", Color.white, Color.white);
+        debugPanel.AppendLabeledValue("Primary Value", $" {Gear.Primary.Value:n0}₽", Color.white, Color.white);
+        debugPanel.AppendLabeledValue("Secondary Value", $" {Gear.Secondary.Value:n0}₽", Color.white, Color.white);
+        debugPanel.AppendLabeledValue("Holster Value", $" {Gear.Holster.Value:n0}₽", Color.white, Color.white);
     }
 }
 

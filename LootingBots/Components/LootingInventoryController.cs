@@ -94,49 +94,49 @@ public class LootingInventoryController
 
         if (primary != null)
         {
-            if (Stats.WeaponValues.Primary.Id != primary.Id)
+            if (Stats.Gear.Primary.Id != primary.Id)
             {
                 var value = _itemAppraiser.GetItemPrice(primary, _log);
-                Stats.WeaponValues.Primary.UpdatePair(primary.Id, value);
+                Stats.Gear.Primary.UpdatePair(primary.Id, value);
             }
         }
         else
         {
-            if (!string.IsNullOrEmpty(Stats.WeaponValues.Primary.Id))
+            if (!string.IsNullOrEmpty(Stats.Gear.Primary.Id))
             {
-                Stats.WeaponValues.Primary.UpdatePair(string.Empty, 0f);
+                Stats.Gear.Primary.UpdatePair(string.Empty, 0f);
             }
         }
 
         if (secondary != null)
         {
-            if (Stats.WeaponValues.Secondary.Id != secondary.Id)
+            if (Stats.Gear.Secondary.Id != secondary.Id)
             {
                 var value = _itemAppraiser.GetItemPrice(secondary, _log);
-                Stats.WeaponValues.Secondary.UpdatePair(secondary.Id, value);
+                Stats.Gear.Secondary.UpdatePair(secondary.Id, value);
             }
         }
         else
         {
-            if (!string.IsNullOrEmpty(Stats.WeaponValues.Secondary.Id))
+            if (!string.IsNullOrEmpty(Stats.Gear.Secondary.Id))
             {
-                Stats.WeaponValues.Secondary.UpdatePair(string.Empty, 0f);
+                Stats.Gear.Secondary.UpdatePair(string.Empty, 0f);
             }
         }
 
         if (holster != null)
         {
-            if (Stats.WeaponValues.Holster.Id != holster.Id)
+            if (Stats.Gear.Holster.Id != holster.Id)
             {
                 var value = _itemAppraiser.GetItemPrice(holster, _log);
-                Stats.WeaponValues.Holster.UpdatePair(holster.Id, value);
+                Stats.Gear.Holster.UpdatePair(holster.Id, value);
             }
         }
         else
         {
-            if (!string.IsNullOrEmpty(Stats.WeaponValues.Holster.Id))
+            if (!string.IsNullOrEmpty(Stats.Gear.Holster.Id))
             {
-                Stats.WeaponValues.Holster.UpdatePair(string.Empty, 0f);
+                Stats.Gear.Holster.UpdatePair(string.Empty, 0f);
             }
         }
     }
@@ -184,14 +184,14 @@ public class LootingInventoryController
 
         var tacVestSlot = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.TacticalVest);
         _unsubActions.Add(tacVestSlot.ReactiveContainedItem.Subscribe(updateGridStatsAction));
-        _unsubActions.Add(tacVestSlot.ReactiveContainedItem.Bind(Stats.WeaponValues.Vest.OnChangeContainer));
+        _unsubActions.Add(tacVestSlot.ReactiveContainedItem.Bind(Stats.Gear.Vest.OnChangeContainer));
 
         var backpackSlot = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Backpack);
         _unsubActions.Add(backpackSlot.ReactiveContainedItem.Subscribe(updateGridStatsAction));
-        _unsubActions.Add(backpackSlot.ReactiveContainedItem.Bind(Stats.WeaponValues.Backpack.OnChangeContainer));
+        _unsubActions.Add(backpackSlot.ReactiveContainedItem.Bind(Stats.Gear.Backpack.OnChangeContainer));
 
         var pockets = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Pockets).ContainedItem;
-        Stats.WeaponValues.Pockets.OnChangeContainer(pockets);
+        Stats.Gear.Pockets.OnChangeContainer(pockets);
     }
 
     /// <summary>
@@ -447,7 +447,7 @@ public class LootingInventoryController
                 {
                     Stats.AddNetValue(CurrentItemPrice + GetAllContainedItemsValue(item));
                     Stats.AvailableGridSpaces -= itemSize;
-                    Stats.WeaponValues.TryAddContainedItem(item, itemSize, CurrentItemPrice);
+                    Stats.Gear.TryAddContainedItem(item, itemSize, CurrentItemPrice);
                     continue;
                 }
             }
@@ -876,7 +876,7 @@ public class LootingInventoryController
 
             // Update the variables since we swapped the two
             (primary, secondary) = (secondary, primary);
-            ValuePair.SwapPair(Stats.WeaponValues.Primary, Stats.WeaponValues.Secondary);
+            ValuePair.SwapPair(Stats.Gear.Primary, Stats.Gear.Secondary);
         }
 
         // If the weapon is better than the secondary
@@ -1386,19 +1386,19 @@ public class LootingInventoryController
     public bool HasReplacement(Item lootItem, int itemSize, out ContainedItems source, out int index, out ContainedLootItem loot)
     {
         loot = new ContainedLootItem(lootItem, itemSize, CurrentItemPrice);
-        if (Stats.WeaponValues.Backpack.TryFindReplacement(loot, out index))
+        if (Stats.Gear.Backpack.TryFindReplacement(loot, out index))
         {
-            source = Stats.WeaponValues.Backpack;
+            source = Stats.Gear.Backpack;
             return true;
         }
-        if (Stats.WeaponValues.Vest.TryFindReplacement(loot, out index))
+        if (Stats.Gear.Vest.TryFindReplacement(loot, out index))
         {
-            source = Stats.WeaponValues.Vest;
+            source = Stats.Gear.Vest;
             return true;
         }
-        if (Stats.WeaponValues.Pockets.TryFindReplacement(loot, out index))
+        if (Stats.Gear.Pockets.TryFindReplacement(loot, out index))
         {
-            source = Stats.WeaponValues.Pockets;
+            source = Stats.Gear.Pockets;
             return true;
         }
 
