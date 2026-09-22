@@ -250,182 +250,184 @@ public class LootingInventoryController
     /// </summary>
     public async Task<bool> TryAddItemsToBotAsync(List<Item> items, CancellationToken token = default)
     {
-        var lootingActions = ListActionPool.Rent();
-        try
+        using var pooledList = ListActionPool.Get(out var lootingActions);
+
+        foreach (var item in items)
         {
-            foreach (var item in items)
+            token.ThrowIfCancellationRequested();
+
+            if (string.IsNullOrEmpty(item.Name))
             {
-                token.ThrowIfCancellationRequested();
-
-                if (string.IsNullOrEmpty(item.Name))
+                if (_log.DebugEnabled)
                 {
-                    if (_log.DebugEnabled)
+                    _log.LogDebug("Item is NULL");
+                }
+                continue;
+            }
+
+            if (LootingBots.UseExamineTime.Value)
+            {
+                await SimulateExamineTimeAsync(item, token);
+            }
+
+            // Item info, such as: name, size, price
+            var itemName = item.Name.Localized();
+            var itemSize = item.GetItemSize();
+            CurrentItemPrice = _itemAppraiser.GetItemPrice(item, _log);
+
+            if (_log.DebugEnabled)
+            {
+                var itemValue = itemSize > 1 ? $"{CurrentItemPrice:N0}₽ {CurrentItemPrice / itemSize:N0}₽/slot" : $"{CurrentItemPrice:N0}₽";
+                _log.LogDebug($"Loot found: {itemName} ({itemValue})");
+            }
+
+            // Ignore magazines that a bot cannot actively use
+            if (item is Magazine mag && !IsUsableMag(mag))
+            {
+                if (_log.DebugEnabled)
+                {
+                    _log.LogDebug($"Cannot use mag: {itemName}. Skipping");
+                }
+
+                continue;
+            }
+
+            // Check to see if we need to swap gear
+            lootingActions.Reset();
+            var canEquipGear = GetEquipAction(item, lootingActions);
+            if (canEquipGear)
+            {
+                if (_log.DebugEnabled)
+                {
+                    _log.LogDebug($"Found equip action for: {itemName}");
+                }
+
+                foreach (var action in lootingActions)
+                {
+                    var actionResult = await action.ExecuteAsync(_transactionController, token);
+                    if (actionResult)
                     {
-                        _log.LogDebug("Item is NULL");
+                        Stats.AddNetValue(action.NetWorthDelta);
                     }
-                    continue;
+                    else
+                    {
+                        // Break the chain if the action fails
+                        break;
+                    }
+
+                    // Do post actions
+                    if (action is LootingSwapAction swapAction)
+                    {
+                        if (swapAction.TransferItems)
+                        {
+                            if (swapAction.ToSwap is Weapon thrownWeapon)
+                            {
+                                // If we swapped away our previous weapon, throw away its mags and strip the attachments
+                                await ThrowUselessMagsAsync(thrownWeapon, token);
+                                if (LootingBots.CanStripAttachments.Value)
+                                {
+                                    using (UnityEngine.Pool.ListPool<Item>.Get(out var modsToLoot))
+                                    {
+                                        await StripWeaponAsync(thrownWeapon, modsToLoot, token);
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                // To make space we throw undervalued items in our newly equipped item
+                                // Then loot the thrown item
+                                await ThrowUndervaluedItemsAsync(swapAction.Item, token);
+                                await LootNestedItemsAsync(swapAction.ToSwap, token);
+                            }
+                        }
+                    }
+                    else if (action is LootingThrowAction throwAction)
+                    {
+                        if (throwAction.TransferItems)
+                        {
+                            var thrownItem = throwAction.Item;
+
+                            // Ignore thrown loot
+                            _lootingBrain.IgnoreLoot(thrownItem.Id);
+
+                            if (thrownItem is Weapon thrownWeapon)
+                            {
+                                // Throw mags of thrown weapon and strip attachments
+                                await ThrowUselessMagsAsync(thrownWeapon, token);
+                                if (LootingBots.CanStripAttachments.Value)
+                                {
+                                    using (UnityEngine.Pool.ListPool<Item>.Get(out var modsToLoot))
+                                    {
+                                        await StripWeaponAsync(thrownWeapon, modsToLoot, token);
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                // Loot thrown item's children
+                                await LootNestedItemsAsync(thrownItem, token);
+                            }
+                        }
+                    }
                 }
 
-                if (LootingBots.UseExamineTime.Value)
+                // Do post-equip actions
+                // We looted a weapon, calculate gear value
+                if (item is Weapon weapon)
                 {
-                    await SimulateExamineTimeAsync(item, token);
+                    _transactionController.AddExtraAmmo(weapon);
+                    CalculateGearValue();
                 }
-
-                // Item info, such as: name, size, price
-                var itemName = item.Name.Localized();
-                var itemSize = item.GetItemSize();
-                CurrentItemPrice = _itemAppraiser.GetItemPrice(item, _log);
 
                 if (_log.DebugEnabled)
                 {
-                    var itemValue =
-                        itemSize > 1 ? $"{CurrentItemPrice:N0}₽ {CurrentItemPrice / itemSize:N0}₽/slot" : $"{CurrentItemPrice:N0}₽";
-                    _log.LogDebug($"Loot found: {itemName} ({itemValue})");
+                    _log.LogDebug($"Finished equip action for: {itemName}");
                 }
 
-                // Ignore magazines that a bot cannot actively use
-                if (item is Magazine mag && !IsUsableMag(mag))
-                {
-                    if (_log.DebugEnabled)
-                    {
-                        _log.LogDebug($"Cannot use mag: {itemName}. Skipping");
-                    }
+                continue;
+            }
 
-                    continue;
+            // Check to see if we can equip the item
+            if (AllowedToEquip(item) && await _transactionController.TryEquipItemAsync(item, token))
+            {
+                Stats.AddNetValue(CurrentItemPrice);
+                if (item is SearchableItem)
+                {
+                    Stats.AddNetValue(GetAllContainedItemsValue(item));
                 }
+                continue;
+            }
 
-                // Check to see if we need to swap gear
-                ListActionPool.Reset(lootingActions);
-                var canEquipGear = GetEquipAction(item, lootingActions);
-                if (canEquipGear)
+            // Try to pick up any nested items before trying to pick up the item.
+            // This helps when looting rigs to transfer ammo to the bots active rig
+            if (item is SearchableItem searchableItem)
+            {
+                var success = await LootNestedItemsAsync(searchableItem, token);
+
+                if (!success)
                 {
-                    if (_log.DebugEnabled)
-                    {
-                        _log.LogDebug($"Found equip action for: {itemName}");
-                    }
-
-                    foreach (var action in lootingActions)
-                    {
-                        var actionResult = await action.ExecuteAsync(_transactionController, token);
-                        if (actionResult)
-                        {
-                            Stats.AddNetValue(action.NetWorthDelta);
-                        }
-                        else
-                        {
-                            // Break the chain if the action fails
-                            break;
-                        }
-
-                        // Do post actions
-                        if (action is LootingSwapAction swapAction)
-                        {
-                            if (swapAction.TransferItems)
-                            {
-                                if (swapAction.ToSwap is Weapon thrownWeapon)
-                                {
-                                    // If we swapped away our previous weapon, throw away its mags and strip the attachments
-                                    await ThrowUselessMagsAsync(thrownWeapon, token);
-                                    if (LootingBots.CanStripAttachments.Value)
-                                    {
-                                        await StripWeaponAsync(thrownWeapon, token);
-                                    }
-                                }
-                                else
-                                {
-                                    // To make space we throw undervalued items in our newly equipped item
-                                    // Then loot the thrown item
-                                    await ThrowUndervaluedItemsAsync(swapAction.Item, token);
-                                    await LootNestedItemsAsync(swapAction.ToSwap, token);
-                                }
-                            }
-                        }
-                        else if (action is LootingThrowAction throwAction)
-                        {
-                            if (throwAction.TransferItems)
-                            {
-                                var thrownItem = throwAction.Item;
-
-                                // Ignore thrown loot
-                                _lootingBrain.IgnoreLoot(thrownItem.Id);
-
-                                if (thrownItem is Weapon thrownWeapon)
-                                {
-                                    // Throw mags of thrown weapon and strip attachments
-                                    await ThrowUselessMagsAsync(thrownWeapon, token);
-                                    if (LootingBots.CanStripAttachments.Value)
-                                    {
-                                        await StripWeaponAsync(thrownWeapon, token);
-                                    }
-                                }
-                                else
-                                {
-                                    // Loot thrown item's children
-                                    await LootNestedItemsAsync(thrownItem, token);
-                                }
-                            }
-                        }
-                    }
-
-                    // Do post-equip actions
-                    // We looted a weapon, calculate gear value
-                    if (item is Weapon weapon)
-                    {
-                        _transactionController.AddExtraAmmo(weapon);
-                        CalculateGearValue();
-                    }
-
-                    if (_log.DebugEnabled)
-                    {
-                        _log.LogDebug($"Finished equip action for: {itemName}");
-                    }
-
-                    continue;
+                    return false;
                 }
+            }
 
-                // Check to see if we can equip the item
-                if (AllowedToEquip(item) && await _transactionController.TryEquipItemAsync(item, token))
+            // Check to see if we can pick up the item
+            if (AllowedToPickup(item, itemSize) && await _transactionController.TryPickupItemAsync(item, token))
+            {
+                Stats.AddNetValue(CurrentItemPrice + GetAllContainedItemsValue(item));
+                Stats.AvailableGridSpaces -= itemSize;
+            }
+            else if (item is Weapon weapon && LootingBots.CanStripAttachments.Value)
+            {
+                // Strip the weapon of its mods if we cannot pick up the weapon
+                using (UnityEngine.Pool.ListPool<Item>.Get(out var modsToLoot))
                 {
-                    Stats.AddNetValue(CurrentItemPrice);
-                    if (item is SearchableItem)
-                    {
-                        Stats.AddNetValue(GetAllContainedItemsValue(item));
-                    }
-                    continue;
-                }
-
-                // Try to pick up any nested items before trying to pick up the item.
-                // This helps when looting rigs to transfer ammo to the bots active rig
-                if (item is SearchableItem searchableItem)
-                {
-                    var success = await LootNestedItemsAsync(searchableItem, token);
-
-                    if (!success)
-                    {
-                        return false;
-                    }
-                }
-
-                // Check to see if we can pick up the item
-                if (AllowedToPickup(item, itemSize) && await _transactionController.TryPickupItemAsync(item, token))
-                {
-                    Stats.AddNetValue(CurrentItemPrice + GetAllContainedItemsValue(item));
-                    Stats.AvailableGridSpaces -= itemSize;
-                }
-                else if (item is Weapon weapon && LootingBots.CanStripAttachments.Value)
-                {
-                    // Strip the weapon of its mods if we cannot pick up the weapon
-                    var successful = await StripWeaponAsync(weapon, token);
+                    var successful = await StripWeaponAsync(weapon, modsToLoot, token);
                     if (!successful)
                     {
                         return false;
                     }
                 }
             }
-        }
-        finally
-        {
-            ListActionPool.Return(lootingActions);
         }
 
         return true;
@@ -1131,50 +1133,44 @@ public class LootingInventoryController
             return true;
         }
 
-        var items = UnityEngine.Pool.ListPool<Item>.Get();
-        try
+        using var pooledList = UnityEngine.Pool.ListPool<Item>.Get(out var items);
+
+        // Slot must not be locked and is not a quest item
+        foreach (var grid in parentItem.Grids)
         {
-            // Slot must not be locked and is not a quest item
-            foreach (var grid in parentItem.Grids)
+            foreach (var containedItem in grid.ItemCollection.ItemsList)
             {
-                foreach (var containedItem in grid.ItemCollection.ItemsList)
+                if (!containedItem.QuestItem)
                 {
-                    if (!containedItem.QuestItem)
-                    {
-                        items.Add(containedItem);
-                    }
+                    items.Add(containedItem);
                 }
             }
-            foreach (var slot in parentItem.Slots)
+        }
+        foreach (var slot in parentItem.Slots)
+        {
+            if (!slot.Locked && slot.ContainedItem is not null && !slot.ContainedItem.QuestItem)
             {
-                if (!slot.Locked && slot.ContainedItem is not null && !slot.ContainedItem.QuestItem)
-                {
-                    items.Add(slot.ContainedItem);
-                }
+                items.Add(slot.ContainedItem);
             }
+        }
 
-            if (items.Count > 0)
-            {
-                if (_log.DebugEnabled)
-                {
-                    _log.LogDebug($"Looting {items.Count} items from {parentItem.Name.Localized()}");
-                }
-
-                await LootingTransactionController.SimulatePlayerDelayAsync(LootingBrain.LootingStartDelay, token);
-                return await TryAddItemsToBotAsync(items, token);
-            }
-
+        if (items.Count > 0)
+        {
             if (_log.DebugEnabled)
             {
-                _log.LogDebug($"No nested items found to loot in {parentItem.Name.Localized()}");
+                _log.LogDebug($"Looting {items.Count} items from {parentItem.Name.Localized()}");
             }
 
-            return true;
+            await LootingTransactionController.SimulatePlayerDelayAsync(LootingBrain.LootingStartDelay, token);
+            return await TryAddItemsToBotAsync(items, token);
         }
-        finally
+
+        if (_log.DebugEnabled)
         {
-            UnityEngine.Pool.ListPool<Item>.Release(items);
+            _log.LogDebug($"No nested items found to loot in {parentItem.Name.Localized()}");
         }
+
+        return true;
     }
 
     /// <summary>
@@ -1192,127 +1188,108 @@ public class LootingInventoryController
             return;
         }
 
-        var itemsToThrow = DictionaryPool<Item, float>.Get();
-        try
+        var minimumValue = _isPMC ? LootingBots.PMCMinLootThreshold.Value : LootingBots.ScavMinLootThreshold.Value;
+
+        using var pooledDictionary = DictionaryPool<Item, float>.Get(out var itemsToThrow);
+        foreach (var grid in parentItem.Grids)
         {
-            var minimumValue = _isPMC ? LootingBots.PMCMinLootThreshold.Value : LootingBots.ScavMinLootThreshold.Value;
-
-            foreach (var grid in parentItem.Grids)
+            foreach (var childItem in grid.ItemCollection.ItemsList)
             {
-                foreach (var childItem in grid.ItemCollection.ItemsList)
+                // Iterate and throw useless items for child container
+                if (childItem is SearchableItem)
                 {
-                    // Iterate and throw useless items for child container
-                    if (childItem is SearchableItem)
-                    {
-                        await ThrowUndervaluedItemsAsync(childItem, token);
-                        continue;
-                    }
-
-                    // Check the conditions to filter out items to keep
-                    if (childItem.QuestItem || childItem is Meds or BarterOther or Money || (childItem is Ammo ammo && IsUsableAmmo(ammo)))
-                    {
-                        continue;
-                    }
-
-                    if (childItem is Magazine mag)
-                    {
-                        // If it's a magazine we cannot use, throw it
-                        if (!IsUsableMag(mag))
-                        {
-                            itemsToThrow.Add(mag, _itemAppraiser.GetItemPrice(mag, _log));
-                        }
-
-                        continue;
-                    }
-
-                    var value = _itemAppraiser.GetItemPrice(childItem, _log);
-                    if (value < minimumValue)
-                    {
-                        itemsToThrow.Add(childItem, value);
-                    }
-                }
-            }
-
-            if (itemsToThrow.Count > 0)
-            {
-                if (_log.InfoEnabled)
-                {
-                    _log.LogInfo($"Throwing {itemsToThrow.Count} undervalued items from {parentItem.Name.Localized()}");
-                }
-                var rootItem = _lootingBrain.ActiveLoot.GetRootItem();
-
-                foreach (var (toThrow, value) in itemsToThrow)
-                {
-                    if (!await _transactionController.TransferOrThrowItemAsync(toThrow, rootItem, token))
-                    {
-                        continue;
-                    }
-
-                    if (_log.DebugEnabled)
-                    {
-                        _log.LogDebug($"Thrown {toThrow.Name.Localized()} (-{value:N0}₽)");
-                    }
-                    Stats.SubtractNetValue(value);
-                    Stats.AvailableGridSpaces += toThrow.GetItemSize();
-                    _lootingBrain.IgnoreLoot(toThrow.Id);
+                    await ThrowUndervaluedItemsAsync(childItem, token);
+                    continue;
                 }
 
-                return;
-            }
+                // Check the conditions to filter out items to keep
+                if (childItem.QuestItem || childItem is Meds or BarterOther or Money || (childItem is Ammo ammo && IsUsableAmmo(ammo)))
+                {
+                    continue;
+                }
 
-            if (_log.DebugEnabled)
-            {
-                _log.LogDebug($"No undervalued items found to throw in {parentItem.Name.Localized()}");
+                if (childItem is Magazine mag)
+                {
+                    // If it's a magazine we cannot use, throw it
+                    if (!IsUsableMag(mag))
+                    {
+                        itemsToThrow.Add(mag, _itemAppraiser.GetItemPrice(mag, _log));
+                    }
+
+                    continue;
+                }
+
+                var value = _itemAppraiser.GetItemPrice(childItem, _log);
+                if (value < minimumValue)
+                {
+                    itemsToThrow.Add(childItem, value);
+                }
             }
         }
-        finally
+
+        if (itemsToThrow.Count > 0)
         {
-            DictionaryPool<Item, float>.Release(itemsToThrow);
+            if (_log.InfoEnabled)
+            {
+                _log.LogInfo($"Throwing {itemsToThrow.Count} undervalued items from {parentItem.Name.Localized()}");
+            }
+            var rootItem = _lootingBrain.ActiveLoot.GetRootItem();
+
+            foreach (var (toThrow, value) in itemsToThrow)
+            {
+                if (!await _transactionController.TransferOrThrowItemAsync(toThrow, rootItem, token))
+                {
+                    continue;
+                }
+
+                if (_log.DebugEnabled)
+                {
+                    _log.LogDebug($"Thrown {toThrow.Name.Localized()} (-{value:N0}₽)");
+                }
+                Stats.SubtractNetValue(value);
+                Stats.AvailableGridSpaces += toThrow.GetItemSize();
+                _lootingBrain.IgnoreLoot(toThrow.Id);
+            }
+
+            return;
+        }
+
+        if (_log.DebugEnabled)
+        {
+            _log.LogDebug($"No undervalued items found to throw in {parentItem.Name.Localized()}");
         }
     }
 
     /// <summary>
     /// Strip and loot a weapon's attachments.
     /// </summary>
-    public async Task<bool> StripWeaponAsync(Weapon weapon, CancellationToken token = default)
+    public Task<bool> StripWeaponAsync(Weapon weapon, List<Item> itemsToAdd, CancellationToken token = default)
     {
-        var itemsToAdd = UnityEngine.Pool.ListPool<Item>.Get();
-        try
+        foreach (var mod in weapon.Mods)
         {
-            foreach (var mod in weapon.Mods)
+            // Check if the mod's slot is not required, can be modded in raid, and is not a magazine
+            if (mod.Parent.Container is Slot { Required: false } && mod is { RaidModdable: true } and not Magazine)
             {
-                // Check if the mod's slot is not required, can be modded in raid, and is not a magazine
-                if (mod.Parent.Container is Slot { Required: false } && mod is { RaidModdable: true } and not Magazine)
-                {
-                    itemsToAdd.Add(mod);
-                }
+                itemsToAdd.Add(mod);
             }
-
-            if (itemsToAdd.Count > 0)
-            {
-                if (_log.InfoEnabled)
-                {
-                    _log.LogInfo($"Trying to strip attachments of weapon: {weapon.Name.Localized()}");
-                }
-
-                // Call TryAddItemsToBot with the filtered items
-                var success = await TryAddItemsToBotAsync(itemsToAdd, token);
-                if (!success)
-                {
-                    return false;
-                }
-            }
-            else if (_log.DebugEnabled)
-            {
-                _log.LogDebug($"No attachments to strip for weapon: {weapon.Name.Localized()}");
-            }
-
-            return true;
         }
-        finally
+
+        if (itemsToAdd.Count > 0)
         {
-            UnityEngine.Pool.ListPool<Item>.Release(itemsToAdd);
+            if (_log.InfoEnabled)
+            {
+                _log.LogInfo($"Trying to strip attachments of weapon: {weapon.Name.Localized()}");
+            }
+
+            // Call TryAddItemsToBot with the filtered items
+            return TryAddItemsToBotAsync(itemsToAdd, token);
         }
+
+        if (_log.DebugEnabled)
+        {
+            _log.LogDebug($"No attachments to strip for weapon: {weapon.Name.Localized()}");
+        }
+        return Task.FromResult(true);
     }
 
     /// <summary>
