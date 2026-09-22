@@ -367,4 +367,25 @@ public static class LootUtils
     {
         inventoryController.GetAcceptableItemsNonAlloc(StorageSlots, preAllocatedList, predicate);
     }
+
+    public static void GetPrioritizedGridsNonAlloc(this Item item, List<Grid> preAllocatedList)
+    {
+        switch (item)
+        {
+            case InventoryEquipment equipment:
+                var pocketsContainers = (equipment.GetSlot(EquipmentSlot.Pockets).ContainedItem as CompoundItem)?.Grids ?? [];
+                var vestContainers = (equipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem as CompoundItem)?.Grids ?? [];
+                var backpackContainers = (equipment.GetSlot(EquipmentSlot.Backpack).ContainedItem as CompoundItem)?.Grids ?? [];
+                preAllocatedList.AddRange(backpackContainers);
+                preAllocatedList.AddRange(vestContainers);
+                preAllocatedList.AddRange(pocketsContainers);
+                return;
+            case LootContainer container:
+                preAllocatedList.AddRange(container.Grids);
+                return;
+            default:
+                // Loose loot
+                return;
+        }
+    }
 }

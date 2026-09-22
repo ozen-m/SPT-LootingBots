@@ -663,7 +663,7 @@ public class LootingInventoryController
     {
         token.ThrowIfCancellationRequested();
 
-        var corpseEquipment = _lootingBrain.ActiveLoot.GetRootItem() as InventoryEquipment;
+        var rootItem = _lootingBrain.ActiveLoot.GetRootItem();
         var primary = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.FirstPrimaryWeapon).ContainedItem as Weapon;
         var secondary = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.SecondPrimaryWeapon).ContainedItem as Weapon;
         var holster = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Holster).ContainedItem as Weapon;
@@ -706,7 +706,7 @@ public class LootingInventoryController
                     _log.LogDebug($"Removing useless mag {mag.Name.Localized()}");
                 }
 
-                if (!await _transactionController.TransferOrThrowItemAsync(mag, corpseEquipment, token))
+                if (!await _transactionController.TransferOrThrowItemAsync(mag, rootItem, token))
                 {
                     continue;
                 }
@@ -1239,11 +1239,11 @@ public class LootingInventoryController
                 {
                     _log.LogInfo($"Throwing {itemsToThrow.Count} undervalued items from {parentItem.Name.Localized()}");
                 }
-                var corpseEquipment = _lootingBrain.ActiveLoot.GetRootItem() as InventoryEquipment;
+                var rootItem = _lootingBrain.ActiveLoot.GetRootItem();
 
                 foreach (var (toThrow, value) in itemsToThrow)
                 {
-                    if (!await _transactionController.TransferOrThrowItemAsync(toThrow, corpseEquipment, token))
+                    if (!await _transactionController.TransferOrThrowItemAsync(toThrow, rootItem, token))
                     {
                         continue;
                     }

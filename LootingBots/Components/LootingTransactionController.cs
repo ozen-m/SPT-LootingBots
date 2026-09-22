@@ -4,6 +4,7 @@ using EFT;
 using EFT.InventoryLogic;
 using LootingBots.Utilities;
 using UnityEngine;
+using Grid = EFT.InventoryLogic.Grid;
 using Object = UnityEngine.Object;
 
 namespace LootingBots.Components;
@@ -396,28 +397,26 @@ public class LootingTransactionController
     }
 
     /// <summary>
-    /// Try to transfer an item to a corpse's inventory or throw
+    /// Try to transfer an item to another item's grid or throw
     /// </summary>
-    public Task<bool> TransferOrThrowItemAsync(Item toThrow, InventoryEquipment equipment, CancellationToken token = default)
+    /// <param name="transferTo">The brain's ActiveLoot Root Item</param>
+    public Task<bool> TransferOrThrowItemAsync(Item toThrow, Item transferTo, CancellationToken token = default)
     {
-        if (equipment is null)
-        {
-            return ThrowItemAsync(toThrow, token);
-        }
-
         if (_log.DebugEnabled)
         {
             _log.LogDebug($"Transferring or throwing item: {toThrow.Name.Localized()}...");
         }
 
-        foreach (var grid in equipment.GetPrioritizedGridsForLoot(toThrow))
+        using var pooled = UnityEngine.Pool.ListPool<Grid>.Get(out var grids);
+        transferTo.GetPrioritizedGridsNonAlloc(grids);
+        foreach (var grid in grids)
         {
             var location = grid.FindLocationForItem(toThrow);
             if (location == null)
             {
                 continue;
             }
-            if (!ItemManipulator.DestinationCheck(toThrow.Parent, location, (ItemController)equipment.Owner).Value)
+            if (!ItemManipulator.DestinationCheck(toThrow.Parent, location, (ItemController)transferTo.Owner).Value)
             {
                 continue;
             }
