@@ -285,7 +285,7 @@ public class LootingBrain : MonoBehaviour
     }
 
     private readonly Stopwatch _lootTimer = new();
-    private readonly List<Item> _itemsToLoot = new(13);
+    private readonly List<Item> _itemsToLoot = [with(13)];
 
     /// <summary>
     /// Handles looting a corpse found on the map.

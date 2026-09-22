@@ -18,8 +18,6 @@ public class LootingTransactionController
     private readonly Player _player;
     private readonly BotLog _log;
 
-    private readonly List<Ammo> _extraAmmoScratch = [];
-
     private IItemOwner _rootItemOwner;
 
     public LootingTransactionController(BotOwner owner, InventoryController inventoryController, BotLog log)
@@ -62,9 +60,9 @@ public class LootingTransactionController
 
         // Get all ammo items in the secured container
         // then check to see if there already is ammo that meets the weapon's caliber in the secure container
-        _extraAmmoScratch.Clear();
-        securedContainer.GetAllItemsNonAlloc(_extraAmmoScratch);
-        foreach (var bullet in _extraAmmoScratch)
+        using var pooledList = UnityEngine.Pool.ListPool<Ammo>.Get(out var bullets);
+        securedContainer.GetAllItemsNonAlloc(bullets);
+        foreach (var bullet in bullets)
         {
             if (weaponChamber.CanAccept(bullet))
             {

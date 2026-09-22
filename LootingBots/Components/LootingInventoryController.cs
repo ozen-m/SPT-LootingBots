@@ -22,7 +22,6 @@ public class LootingInventoryController
 
     private readonly Action _updateActiveWeaponAction;
     private readonly Callback<IHandsController> _onWeaponTakenCallback;
-    private readonly List<Item> _itemsScratch = [];
     private readonly List<Action> _unsubActions = [];
 
     // Represents the value in roubles of the current item
@@ -655,8 +654,6 @@ public class LootingInventoryController
         return false;
     }
 
-    private readonly List<Magazine> _throwUselessMagsScratch = [];
-
     /// <summary>
     /// Throws all magazines from the rig that are not used by any of the weapons that the bot currently has equipped.
     /// Also records thrown mag value.
@@ -674,8 +671,8 @@ public class LootingInventoryController
         var secondaryMagSlot = secondary?.GetMagazineSlot();
         var holsterMagSlot = holster?.GetMagazineSlot();
 
-        _throwUselessMagsScratch.Clear();
-        _botInventoryController.GetAcceptableItemsInStorageSlotsNonAlloc(_throwUselessMagsScratch);
+        using var pooledList = UnityEngine.Pool.ListPool<Magazine>.Get(out var magazines);
+        _botInventoryController.GetAcceptableItemsInStorageSlotsNonAlloc(magazines);
 
         if (_log.DebugEnabled)
         {
@@ -683,7 +680,7 @@ public class LootingInventoryController
         }
 
         var reservedCount = 0;
-        foreach (var mag in _throwUselessMagsScratch)
+        foreach (var mag in magazines)
         {
             var fitsInThrown = thrownMagSlot?.CanAccept(mag) == true;
             var fitsInPrimary = primaryMagSlot?.CanAccept(mag) == true;
@@ -1388,12 +1385,12 @@ public class LootingInventoryController
     {
         var price = 0f;
 
-        item.GetAllContainedItems(_itemsScratch);
-        foreach (var containedItem in _itemsScratch)
+        using var pooledList = UnityEngine.Pool.ListPool<Item>.Get(out var containedItems);
+        item.GetAllContainedItems(containedItems);
+        foreach (var containedItem in containedItems)
         {
             price += _itemAppraiser.GetItemPrice(containedItem, _log);
         }
-        _itemsScratch.Clear();
 
         return price;
     }
