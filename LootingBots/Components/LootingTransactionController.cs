@@ -210,12 +210,12 @@ public class LootingTransactionController
             );
         }
 
-        await SimulatePlayerDelayAsync(token: token);
-
         if (!IsItemReachable(item))
         {
             return false;
         }
+
+        await SimulatePlayerDelayAsync(token: token);
 
         var moveResult = ItemManipulator.Move(item, location, _inventoryController, true);
         if (moveResult.Failed)
@@ -264,12 +264,12 @@ public class LootingTransactionController
             _log.LogDebug($"Swapping {item.Name.Localized()} with {toSwap.Name.Localized()}...");
         }
 
-        await SimulatePlayerDelayAsync(token: token);
-
         if (!IsItemReachable(item))
         {
             return false;
         }
+
+        await SimulatePlayerDelayAsync(token: token);
 
         var swapResult = ItemManipulator.Swap(item, toSwap.CurrentAddress, toSwap, item.CurrentAddress, _inventoryController, true);
         if (swapResult.Failed)
@@ -328,6 +328,8 @@ public class LootingTransactionController
             return false;
         }
 
+        await SimulatePlayerDelayAsync(token: token);
+
         var mergeResult = ItemManipulator.Merge(toMove, toItem, _inventoryController, true);
         if (mergeResult.Failed)
         {
@@ -340,7 +342,6 @@ public class LootingTransactionController
             return false;
         }
 
-        await SimulatePlayerDelayAsync(token: token);
         var mergeNetworkResult = await TryRunNetworkTransactionWithTimeoutAsync(mergeResult);
         if (mergeNetworkResult.Failed)
         {

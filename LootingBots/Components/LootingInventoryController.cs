@@ -706,8 +706,6 @@ public class LootingInventoryController
                     _log.LogDebug($"Removing useless mag {mag.Name.Localized()}");
                 }
 
-                await LootingTransactionController.SimulatePlayerDelayAsync(token: token);
-
                 if (!await _transactionController.TransferOrThrowItemAsync(mag, corpseEquipment, token))
                 {
                     continue;
@@ -1245,8 +1243,6 @@ public class LootingInventoryController
 
                 foreach (var (toThrow, value) in itemsToThrow)
                 {
-                    await LootingTransactionController.SimulatePlayerDelayAsync(token: token);
-
                     if (!await _transactionController.TransferOrThrowItemAsync(toThrow, corpseEquipment, token))
                     {
                         continue;
