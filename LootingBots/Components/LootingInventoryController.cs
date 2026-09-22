@@ -1209,7 +1209,7 @@ public class LootingInventoryController
                     }
 
                     // Check the conditions to filter out items to keep
-                    if (childItem.QuestItem || childItem is Meds or BarterOther || (childItem is Ammo ammo && IsUsableAmmo(ammo)))
+                    if (childItem.QuestItem || childItem is Meds or BarterOther or Money || (childItem is Ammo ammo && IsUsableAmmo(ammo)))
                     {
                         continue;
                     }

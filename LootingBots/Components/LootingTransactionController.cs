@@ -417,7 +417,7 @@ public class LootingTransactionController
             {
                 continue;
             }
-            if (!ItemManipulator.DestinationCheck(toThrow.Parent, location, (CorpseItemController)equipment.Owner).Value)
+            if (!ItemManipulator.DestinationCheck(toThrow.Parent, location, (ItemController)equipment.Owner).Value)
             {
                 continue;
             }
