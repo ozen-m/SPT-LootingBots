@@ -145,22 +145,7 @@ public static class BotTypeUtils
 
     public static bool IsBoss(WildSpawnType wildSpawnType)
     {
-        var bosses = new List<WildSpawnType>
-        {
-            WildSpawnType.bossBully,
-            WildSpawnType.bossGluhar,
-            WildSpawnType.bossKilla,
-            WildSpawnType.bossKnight,
-            WildSpawnType.bossKojaniy,
-            WildSpawnType.bossSanitar,
-            WildSpawnType.bossTagilla,
-            WildSpawnType.bossTest,
-            WildSpawnType.bossZryachiy,
-            WildSpawnType.bossBoar,
-            WildSpawnType.bossKolontay,
-            WildSpawnType.bossPartisan,
-        };
-        return bosses.Contains(wildSpawnType);
+        return _bossWildTypes.Contains(wildSpawnType);
     }
 
     /// <summary>
@@ -178,4 +163,20 @@ public static class BotTypeUtils
         // Check for player Scavs created by SPT
         return profileInfo.Settings.Role == WildSpawnType.assault && !string.IsNullOrEmpty(profileInfo.MainProfileNickname);
     }
+
+    private static readonly HashSet<WildSpawnType> _bossWildTypes =
+    [
+        WildSpawnType.bossBully,
+        WildSpawnType.bossGluhar,
+        WildSpawnType.bossKilla,
+        WildSpawnType.bossKnight,
+        WildSpawnType.bossKojaniy,
+        WildSpawnType.bossSanitar,
+        WildSpawnType.bossTagilla,
+        WildSpawnType.bossTest,
+        WildSpawnType.bossZryachiy,
+        WildSpawnType.bossBoar,
+        WildSpawnType.bossKolontay,
+        WildSpawnType.bossPartisan,
+    ];
 }
