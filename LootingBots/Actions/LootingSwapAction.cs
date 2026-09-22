@@ -11,19 +11,14 @@ namespace LootingBots.Actions;
 public class LootingSwapAction : LootingAction
 {
     private static readonly UnityEngine.Pool.ObjectPool<LootingSwapAction> _pool = new(
-        Create,
+        () => new LootingSwapAction(),
         null,
         a => a.Reset(),
         ListActionPool.LogOnDestroyInstance,
-        true,
+        false,
         2,
         32
     );
-
-    public static LootingSwapAction Create()
-    {
-        return new LootingSwapAction();
-    }
 
     public static LootingSwapAction Rent(Item item, Item toSwap, float netWorthDelta = 0f, bool transferItems = false)
     {

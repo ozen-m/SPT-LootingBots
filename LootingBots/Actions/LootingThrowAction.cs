@@ -10,18 +10,13 @@ namespace LootingBots.Actions;
 public class LootingThrowAction : LootingAction
 {
     private static readonly UnityEngine.Pool.ObjectPool<LootingThrowAction> _pool = new(
-        Create,
+        () => new LootingThrowAction(),
         null,
         a => a.Reset(),
         ListActionPool.LogOnDestroyInstance,
-        true,
+        false,
         32
     );
-
-    public static LootingThrowAction Create()
-    {
-        return new LootingThrowAction();
-    }
 
     public static LootingThrowAction Rent(Item item, float netWorthDelta = 0f, bool transferItems = true)
     {

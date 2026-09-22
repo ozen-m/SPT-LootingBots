@@ -10,19 +10,14 @@ namespace LootingBots.Actions;
 public class LootingMoveAction : LootingAction
 {
     private static readonly UnityEngine.Pool.ObjectPool<LootingMoveAction> _pool = new(
-        Create,
+        () => new LootingMoveAction(),
         null,
         a => a.Reset(),
         ListActionPool.LogOnDestroyInstance,
-        true,
+        false,
         2,
         32
     );
-
-    public static LootingMoveAction Create()
-    {
-        return new LootingMoveAction();
-    }
 
     public static LootingMoveAction Rent(Item item, ItemAddress place = null, float netWorthDelta = 0f)
     {
