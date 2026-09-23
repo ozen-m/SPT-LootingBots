@@ -422,7 +422,7 @@ public class LootingTransactionController
     {
         if (_log.DebugEnabled)
         {
-            _log.LogDebug($"Trying to replace {toThrow.Name.Localized()} with {toKeep.LocalizedName()}...");
+            _log.LogDebug($"Trying to replace {toThrow.LocalizedName()} with {toKeep.LocalizedName()}...");
         }
 
         if (await SwapItemsAsync(toKeep, toThrow, token))
@@ -430,13 +430,39 @@ public class LootingTransactionController
             return true;
         }
 
-        var grid = toThrow.Parent.Container;
-        if (!await TransferOrThrowItemAsync(toThrow, transferTo, token))
+        // Validate that we can move toKeep to a new address in toThrow's container before transferring/throwing toThrow
+        var container = toThrow.Parent.Container;
+        var removeResult = ItemManipulator.Remove(toThrow, _inventoryController, false);
+
+        if (!container.TryFindLocationForItem(toKeep, out var address))
         {
+            removeResult.Value?.RollBack();
+
+            if (_log.DebugEnabled)
+            {
+                _log.LogDebug(
+                    $"Failed to replace {toThrow.LocalizedName()} with {toKeep.LocalizedName()}. Error: No valid location in {container} for {toKeep.LocalizedName()}"
+                );
+            }
             return false;
         }
 
-        return grid.TryFindLocationForItem(toKeep, out var address) && await MoveItemAsync(toKeep, address, token);
+        // Check if we can move to the new address
+        var moveResult = ItemManipulator.Move(toKeep, address, _inventoryController, true);
+
+        // Rollback removal since we didn't simulate
+        removeResult.Value?.RollBack();
+
+        if (moveResult.Failed)
+        {
+            if (_log.DebugEnabled)
+            {
+                _log.LogDebug($"Failed to replace {toThrow.LocalizedName()} with {toKeep.LocalizedName()}. Error: {moveResult.Error}");
+            }
+            return false;
+        }
+
+        return await TransferOrThrowItemAsync(toThrow, transferTo, token) && await MoveItemAsync(toKeep, address, token);
     }
 
     /// <summary>
