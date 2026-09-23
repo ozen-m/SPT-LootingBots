@@ -151,15 +151,10 @@ public class LootingInventoryController
         Stats.NetWorth = 0f;
         foreach (var slot in _botInventoryController.Inventory.Equipment._cachedSlots)
         {
-            if (string.Equals(slot.Name, "securedcontainer", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
             var containedItem = slot.ContainedItem;
             switch (containedItem)
             {
-                case null:
+                case null or MobContainer:
                     continue;
                 case SearchableItem searchableItem:
                 {
