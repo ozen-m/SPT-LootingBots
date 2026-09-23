@@ -62,6 +62,11 @@ internal class LootingLogic : CustomLogic
         // If the bot is interacting with a door, let it complete first
         if (BotOwner.DoorOpener.Interacting || BotOwner.Mover.CurrentState == EBotMoverState.NearDoor)
         {
+            // Stop sprinting so we don't drain the bot's stamina while opening a door
+            if (BotOwner.Mover.Sprinting)
+            {
+                BotOwner.Sprint(false);
+            }
             return;
         }
 
@@ -117,7 +122,14 @@ internal class LootingLogic : CustomLogic
         BotOwner.Steering.LookToMovingDirection();
 
         // If the bot is closer than 5m (sqr 25f) from the loot, they should slow down to prevent power-sliding, otherwise sprint
-        var canSprint = _lootingBrain.DistanceToLoot > 25f;
+        // Stop sprinting if stamina is below 10%, or start sprinting if stamina has more than 80%
+        var canSprint =
+            _lootingBrain.DistanceToLoot > 25f
+            && BotOwner.GetPlayer.Physical.CanSprint
+            && (
+                (BotOwner.Mover.Sprinting && BotOwner.GetPlayer.Physical.Stamina.NormalValue >= 0.10f)
+                || (!BotOwner.Mover.Sprinting && BotOwner.GetPlayer.Physical.Stamina.NormalValue > 0.80f)
+            );
         BotOwner.Sprint(canSprint);
     }
 
