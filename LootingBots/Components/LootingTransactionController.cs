@@ -274,9 +274,9 @@ public class LootingTransactionController
         var swapResult = ItemManipulator.Swap(item, toSwap.CurrentAddress, toSwap, item.CurrentAddress, _inventoryController, true);
         if (swapResult.Failed)
         {
-            if (_log.WarningEnabled && swapResult.Error is not (Slot.ConflictingItemError or Slot.ItemFiltersWontAllowError))
+            if (_log.DebugEnabled && swapResult.Error is not (Slot.ConflictingItemError or Slot.ItemFiltersWontAllowError))
             {
-                _log.LogWarning($"Failed to swap {item.Name.Localized()} with {toSwap.Name.Localized()}. Error: {swapResult.Error}");
+                _log.LogDebug($"Cannot swap {item.Name.Localized()} with {toSwap.Name.Localized()}. Error: {swapResult.Error}");
             }
             return false;
         }
