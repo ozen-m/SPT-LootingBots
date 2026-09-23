@@ -411,6 +411,12 @@ public class LootingInventoryController
             // Check to see if we can pick up the item
             if (AllowedToPickup(item, itemSize))
             {
+                // Check to see if this is an item that we can merge with another item in the inventory
+                if (await _transactionController.TryMergeItemAsync(item, token))
+                {
+                    continue;
+                }
+
                 // If we're allowed to pick up the item, but we don't have space, try to find an item to replace it with
                 if (!_lootingBrain.HasFreeSpace)
                 {

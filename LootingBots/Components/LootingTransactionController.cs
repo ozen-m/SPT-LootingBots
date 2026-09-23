@@ -151,6 +151,12 @@ public class LootingTransactionController
         return MoveItemAsync(item, ableToEquip, token);
     }
 
+    public ValueTask<bool> TryMergeItemAsync(Item item, CancellationToken token = default)
+    {
+        var mergeableItem = _inventoryController.FindItemToMerge(item);
+        return mergeableItem == null ? new ValueTask<bool>(false) : new ValueTask<bool>(MergeItemAsync(item, mergeableItem, token));
+    }
+
     /// <summary>
     /// Tries to find a valid grid for the item being looted. Checks all containers currently equipped to the bot.
     /// If there is a valid grid to place the item inside, issue a merge/move action to pick up the item.
@@ -159,14 +165,7 @@ public class LootingTransactionController
     {
         token.ThrowIfCancellationRequested();
 
-        // Check to see if this is an item that we can merge with another item in the inventory
-        var mergeableItem = _inventoryController.FindItemToMerge(item);
-        if (mergeableItem != null)
-        {
-            return MergeItemAsync(item, mergeableItem, token);
-        }
-
-        // Otherwise, find an empty grid slot to put the item in
+        // Find an empty grid slot to put the item in
         var gridAddress = _inventoryController.Inventory.Equipment.FindGridToPickUpLootNonAlloc(item);
         if (gridAddress != null)
         {
