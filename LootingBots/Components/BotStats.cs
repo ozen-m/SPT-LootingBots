@@ -80,6 +80,16 @@ public class GearValue
 
         return Backpack.TryAdd(item, size, value) || Vest.TryAdd(item, size, value) || Pockets.TryAdd(item, size, value);
     }
+
+    public bool TryRemoveContainedItem(Item item)
+    {
+        if (ContainedItems.IsNotReplaceable(item))
+        {
+            return false;
+        }
+
+        return Backpack.TryRemove(item) || Vest.TryRemove(item) || Pockets.TryRemove(item);
+    }
 }
 
 public class ValuePair(string id, float value)
@@ -162,6 +172,19 @@ public class ContainedItems
 
         AddInternal(new ContainedLootItem(item, size, value));
         return true;
+    }
+
+    public bool TryRemove(Item item)
+    {
+        for (var i = 0; i < _items.Count; i++)
+        {
+            if (_items[i].Item == item)
+            {
+                _items.RemoveAt(i);
+                return true;
+            }
+        }
+        return false;
     }
 
     public void Replace(int index, ContainedLootItem loot)
@@ -264,6 +287,6 @@ public readonly struct ContainedLootItem : IComparable<ContainedLootItem>
 
     public override string ToString()
     {
-        return $"LootItem: {Item.LocalizedName()}, Size: {Size}, Value: {ValuePerSlot}, ValuePerSlot: {ValuePerSlot}";
+        return $"LootItem: {Item.LocalizedName()}, Size: {Size}, Value: {Value}, ValuePerSlot: {ValuePerSlot}";
     }
 }

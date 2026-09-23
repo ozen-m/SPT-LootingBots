@@ -322,7 +322,10 @@ public class LootingInventoryController
                             if (swapAction.ToSwap is Weapon thrownWeapon)
                             {
                                 // If we swapped away our previous weapon, throw away its mags and strip the attachments
-                                await ThrowUselessMagsAsync(thrownWeapon, token);
+                                using (UnityEngine.Pool.ListPool<Magazine>.Get(out var uselessMagazines))
+                                {
+                                    await ThrowUselessMagsAsync(thrownWeapon, uselessMagazines, token);
+                                }
                                 if (LootingBots.CanStripAttachments.Value)
                                 {
                                     using (UnityEngine.Pool.ListPool<Item>.Get(out var modsToLoot))
@@ -335,7 +338,10 @@ public class LootingInventoryController
                             {
                                 // To make space we throw undervalued items in our newly equipped item
                                 // Then loot the thrown item
-                                await ThrowUndervaluedItemsAsync(swapAction.Item, token);
+                                using (DictionaryPool<Item, float>.Get(out var itemsToThrow))
+                                {
+                                    await ThrowUndervaluedItemsAsync(swapAction.Item, itemsToThrow, token);
+                                }
                                 await LootNestedItemsAsync(swapAction.ToSwap, token);
                             }
                         }
@@ -352,7 +358,10 @@ public class LootingInventoryController
                             if (thrownItem is Weapon thrownWeapon)
                             {
                                 // Throw mags of thrown weapon and strip attachments
-                                await ThrowUselessMagsAsync(thrownWeapon, token);
+                                using (UnityEngine.Pool.ListPool<Magazine>.Get(out var uselessMagazines))
+                                {
+                                    await ThrowUselessMagsAsync(thrownWeapon, uselessMagazines, token);
+                                }
                                 if (LootingBots.CanStripAttachments.Value)
                                 {
                                     using (UnityEngine.Pool.ListPool<Item>.Get(out var modsToLoot))
@@ -695,11 +704,10 @@ public class LootingInventoryController
     /// Throws all magazines from the rig that are not used by any of the weapons that the bot currently has equipped.
     /// Also records thrown mag value.
     /// </summary>
-    public async Task ThrowUselessMagsAsync(Weapon thrownWeapon, CancellationToken token)
+    public ValueTask ThrowUselessMagsAsync(Weapon thrownWeapon, List<Magazine> uselessMagazines, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
 
-        var rootItem = _lootingBrain.ActiveLoot.GetRootItem();
         var primary = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.FirstPrimaryWeapon).ContainedItem as Weapon;
         var secondary = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.SecondPrimaryWeapon).ContainedItem as Weapon;
         var holster = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Holster).ContainedItem as Weapon;
@@ -713,7 +721,7 @@ public class LootingInventoryController
 
         if (_log.DebugEnabled)
         {
-            _log.LogDebug("Cleaning up old mags...");
+            _log.LogDebug("Cleaning up old magazines...");
         }
 
         var reservedCount = 0;
@@ -737,31 +745,86 @@ public class LootingInventoryController
             }
             else if (!fitsInEquipped || reservedCount >= 2)
             {
-                if (_log.DebugEnabled)
-                {
-                    _log.LogDebug($"Removing useless mag {mag.Name.Localized()}");
-                }
-
-                if (!await _transactionController.TransferOrThrowItemAsync(mag, rootItem, token))
-                {
-                    continue;
-                }
-
-                var magPrice = _itemAppraiser.GetItemPrice(mag, _log);
-                if (_log.DebugEnabled)
-                {
-                    _log.LogDebug($"Thrown {mag.ShortName.Localized()} (-{magPrice:N0}₽)");
-                }
-                Stats.SubtractNetValue(magPrice);
-                Stats.AvailableGridSpaces += mag.GetItemSize();
-                _lootingBrain.IgnoreLoot(mag.Id);
+                uselessMagazines.Add(mag);
             }
+        }
+
+        if (uselessMagazines.Count == 0)
+        {
+            if (_log.DebugEnabled)
+            {
+                _log.LogDebug("No magazines to clean up");
+            }
+            return new ValueTask();
         }
 
         if (_log.DebugEnabled)
         {
-            _log.LogDebug("Cleaning up old mags...done");
+            _log.LogDebug($"Throwing {uselessMagazines.Count} useless magazines");
         }
+        return new ValueTask(TransferOrThrowItemsAsync(uselessMagazines, _lootingBrain.ActiveLoot.GetRootItem(), token));
+    }
+
+    /// <summary>
+    /// Try to transfer items to another item's grid, or throw.
+    /// </summary>
+    /// <param name="itemsToThrow">A list of items to throw</param>
+    /// <param name="transferTo">A container to transfer items to.</param>
+    public async Task TransferOrThrowItemsAsync<TItem>(List<TItem> itemsToThrow, Item transferTo = null, CancellationToken token = default)
+        where TItem : Item
+    {
+        foreach (var item in itemsToThrow)
+        {
+            token.ThrowIfCancellationRequested();
+
+            if (!await _transactionController.TransferOrThrowItemAsync(item, transferTo, token))
+            {
+                continue;
+            }
+
+            ThrownItem(item, _itemAppraiser.GetItemPrice(item, _log));
+        }
+    }
+
+    /// <summary>
+    /// Try to transfer items to another item's grid, or throw.
+    /// Overload that supports taking in a Dictionary with the item's value.
+    /// </summary>
+    /// <param name="itemsToThrow">A Dictionary of key: items, value: prices to throw</param>
+    /// <param name="transferTo">A container to transfer items to.</param>
+    public async Task TransferOrThrowItemsAsync<TItem>(
+        Dictionary<TItem, float> itemsToThrow,
+        Item transferTo = null,
+        CancellationToken token = default
+    )
+        where TItem : Item
+    {
+        foreach (var (item, price) in itemsToThrow)
+        {
+            token.ThrowIfCancellationRequested();
+
+            if (!await _transactionController.TransferOrThrowItemAsync(item, transferTo, token))
+            {
+                continue;
+            }
+
+            ThrownItem(item, price);
+        }
+    }
+
+    /// <summary>
+    /// Post throw actions.
+    /// </summary>
+    private void ThrownItem(Item item, float price)
+    {
+        if (_log.DebugEnabled)
+        {
+            _log.LogDebug($"Thrown {item.LocalizedShortName()} (-{price:N0}₽)");
+        }
+        Stats.SubtractNetValue(price);
+        Stats.AvailableGridSpaces += item.GetItemSize();
+        Stats.Gear.TryRemoveContainedItem(item);
+        _lootingBrain.IgnoreLoot(item.Id);
     }
 
     /// <summary>
@@ -1210,93 +1273,61 @@ public class LootingInventoryController
     /// <summary>
     /// Searches through the child items of a container and attempts to throw them
     /// </summary>
-    /// <param name="item">Only throws items of a container of type <see cref="SearchableItem"/></param>
-    public async Task ThrowUndervaluedItemsAsync(Item item, CancellationToken token = default)
+    /// <param name="container">Only throws items of a container of type <see cref="SearchableItem"/></param>
+    public ValueTask ThrowUndervaluedItemsAsync(Item container, Dictionary<Item, float> itemsToThrow, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
 
         // Limit to only SearchableItem
         // As opposed to LootNestedItems, we only need to throw away its children if it's a container
-        if (item is not SearchableItem parentItem)
+        if (container is not SearchableItem)
         {
-            return;
+            return new ValueTask();
         }
 
         var minimumValue = _isPMC ? LootingBots.PMCMinLootThreshold.Value : LootingBots.ScavMinLootThreshold.Value;
 
-        using var pooledDictionary = DictionaryPool<Item, float>.Get(out var itemsToThrow);
-        foreach (var grid in parentItem.Grids)
+        using var pooledList = UnityEngine.Pool.ListPool<Item>.Get(out var items);
+        container.GetAllGridContainedItems(items);
+        foreach (var item in items)
         {
-            foreach (var childItem in grid.ItemCollection.ItemsList)
+            // Check the conditions to filter out items to keep
+            if (item.QuestItem || item.IsDogtag() || item is Meds or Money || (item is Ammo ammo && IsUsableAmmo(ammo)))
             {
-                // Iterate and throw useless items for child container
-                if (childItem is SearchableItem)
-                {
-                    await ThrowUndervaluedItemsAsync(childItem, token);
-                    continue;
-                }
+                continue;
+            }
 
-                // Check the conditions to filter out items to keep
-                if (
-                    childItem.QuestItem
-                    || childItem.IsDogtag()
-                    || childItem is Meds or Money
-                    || (childItem is Ammo ammo && IsUsableAmmo(ammo))
-                )
+            if (item is Magazine mag)
+            {
+                // If it's a magazine we cannot use, throw it
+                if (!IsUsableMag(mag))
                 {
-                    continue;
+                    itemsToThrow.Add(mag, _itemAppraiser.GetItemPrice(mag, _log));
                 }
+                continue;
+            }
 
-                if (childItem is Magazine mag)
-                {
-                    // If it's a magazine we cannot use, throw it
-                    if (!IsUsableMag(mag))
-                    {
-                        itemsToThrow.Add(mag, _itemAppraiser.GetItemPrice(mag, _log));
-                    }
-                    continue;
-                }
-
-                var value = _itemAppraiser.GetItemPrice(childItem, _log);
-                if (value < minimumValue)
-                {
-                    itemsToThrow.Add(childItem, value);
-                }
+            var value = _itemAppraiser.GetItemPrice(item, _log);
+            if (value < minimumValue)
+            {
+                itemsToThrow.Add(item, value);
             }
         }
 
-        if (itemsToThrow.Count > 0)
+        if (itemsToThrow.Count == 0)
         {
-            if (_log.InfoEnabled)
+            if (_log.DebugEnabled)
             {
-                _log.LogInfo($"Throwing {itemsToThrow.Count} undervalued items from {parentItem.Name.Localized()}");
+                _log.LogDebug($"No undervalued items found to throw in {container.Name.Localized()}");
             }
-            var rootItem = _lootingBrain.ActiveLoot.GetRootItem();
-
-            foreach (var (toThrow, value) in itemsToThrow)
-            {
-                if (!await _transactionController.TransferOrThrowItemAsync(toThrow, rootItem, token))
-                {
-                    continue;
-                }
-
-                if (_log.DebugEnabled)
-                {
-                    _log.LogDebug($"Thrown {toThrow.Name.Localized()} (-{value:N0}₽)");
-                }
-                Stats.SubtractNetValue(value);
-                Stats.AvailableGridSpaces += toThrow.GetItemSize();
-                _lootingBrain.IgnoreLoot(toThrow.Id);
-                // TODO: Stats.Gear.Contained
-            }
-
-            return;
+            return new ValueTask();
         }
 
-        if (_log.DebugEnabled)
+        if (_log.InfoEnabled)
         {
-            _log.LogDebug($"No undervalued items found to throw in {parentItem.Name.Localized()}");
+            _log.LogInfo($"Throwing {itemsToThrow.Count} undervalued items from {container.Name.Localized()}");
         }
+        return new ValueTask(TransferOrThrowItemsAsync(itemsToThrow, _lootingBrain.ActiveLoot.GetRootItem(), token));
     }
 
     /// <summary>
