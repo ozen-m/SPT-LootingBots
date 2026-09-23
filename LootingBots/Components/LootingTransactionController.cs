@@ -129,26 +129,26 @@ public class LootingTransactionController
     /// <summary>
     /// Tries to find an open Slot to equip the current item to. If a slot is found, issue a move action to equip the item.
     /// </summary>
-    public Task<bool> TryEquipItemAsync(Item item, CancellationToken token = default)
+    public ValueTask<bool> TryEquipItemAsync(Item item, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
 
         // Check to see if we can equip the item
-        var ableToEquip = _inventoryController.FindSlotToPickUp(item);
-        if (ableToEquip is null)
+        var slotAddress = _inventoryController.FindSlotToPickUp(item);
+        if (slotAddress is null)
         {
             if (_log.DebugEnabled)
             {
                 _log.LogDebug($"Could not find a place to equip: {item.Name.Localized()}");
             }
-            return Task.FromResult(false);
+            return new ValueTask<bool>(false);
         }
 
         if (_log.DebugEnabled)
         {
-            _log.LogDebug($"Equipping: {item.Name.Localized()} [place: {ableToEquip.Container.ID.Localized()}]");
+            _log.LogDebug($"Equipping: {item.Name.Localized()} [place: {slotAddress.Container.ID.Localized()}]");
         }
-        return MoveItemAsync(item, ableToEquip, token);
+        return new ValueTask<bool>(MoveItemAsync(item, slotAddress, token));
     }
 
     public ValueTask<bool> TryMergeItemAsync(Item item, CancellationToken token = default)
@@ -161,26 +161,26 @@ public class LootingTransactionController
     /// Tries to find a valid grid for the item being looted. Checks all containers currently equipped to the bot.
     /// If there is a valid grid to place the item inside, issue a merge/move action to pick up the item.
     /// </summary>
-    public Task<bool> TryPickupItemAsync(Item item, CancellationToken token = default)
+    public ValueTask<bool> TryPickupItemAsync(Item item, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
 
         // Find an empty grid slot to put the item in
         var gridAddress = _inventoryController.Inventory.Equipment.FindGridToPickUpLootNonAlloc(item);
-        if (gridAddress != null)
+        if (gridAddress is null)
         {
             if (_log.DebugEnabled)
             {
-                _log.LogDebug($"Picking up: {item.Name.Localized()} [place: {gridAddress.GetRootItem()?.Name.Localized()}]");
+                _log.LogDebug($"Could not find a place to pickup: {item.Name.Localized()}");
             }
-            return MoveItemAsync(item, gridAddress, token);
+            return new ValueTask<bool>(false);
         }
 
         if (_log.DebugEnabled)
         {
-            _log.LogDebug($"Could not find a place to pickup: {item.Name.Localized()}");
+            _log.LogDebug($"Picking up: {item.Name.Localized()} [place: {gridAddress.GetRootItem()?.Name.Localized()}]");
         }
-        return Task.FromResult(false);
+        return new ValueTask<bool>(MoveItemAsync(item, gridAddress, token));
     }
 
     /// <summary>

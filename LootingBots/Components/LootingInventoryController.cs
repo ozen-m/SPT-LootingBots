@@ -1287,6 +1287,7 @@ public class LootingInventoryController
                 Stats.SubtractNetValue(value);
                 Stats.AvailableGridSpaces += toThrow.GetItemSize();
                 _lootingBrain.IgnoreLoot(toThrow.Id);
+                // TODO: Stats.Gear.Contained
             }
 
             return;
@@ -1301,33 +1302,33 @@ public class LootingInventoryController
     /// <summary>
     /// Strip and loot a weapon's attachments.
     /// </summary>
-    public Task<bool> StripWeaponAsync(Weapon weapon, List<Item> itemsToAdd, CancellationToken token = default)
+    public ValueTask<bool> StripWeaponAsync(Weapon weapon, List<Item> modsToLoot, CancellationToken token = default)
     {
         foreach (var mod in weapon.Mods)
         {
             // Check if the mod's slot is not required, can be modded in raid, and is not a magazine
             if (mod.Parent.Container is Slot { Required: false } && mod is { RaidModdable: true } and not Magazine)
             {
-                itemsToAdd.Add(mod);
+                modsToLoot.Add(mod);
             }
         }
 
-        if (itemsToAdd.Count > 0)
+        if (modsToLoot.Count == 0)
         {
-            if (_log.InfoEnabled)
+            if (_log.DebugEnabled)
             {
-                _log.LogInfo($"Trying to strip attachments of weapon: {weapon.Name.Localized()}");
+                _log.LogDebug($"No attachments to strip for weapon: {weapon.Name.Localized()}");
             }
-
-            // Call TryAddItemsToBot with the filtered items
-            return TryAddItemsToBotAsync(itemsToAdd, token);
+            return new ValueTask<bool>(false);
         }
 
-        if (_log.DebugEnabled)
+        if (_log.InfoEnabled)
         {
-            _log.LogDebug($"No attachments to strip for weapon: {weapon.Name.Localized()}");
+            _log.LogInfo($"Trying to strip attachments of weapon: {weapon.Name.Localized()}");
         }
-        return Task.FromResult(true);
+
+        // TODO: Mod already looted but still trying to loot its child
+        return new ValueTask<bool>(TryAddItemsToBotAsync(modsToLoot, token));
     }
 
     /// <summary>
