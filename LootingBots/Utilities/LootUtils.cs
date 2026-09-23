@@ -164,27 +164,13 @@ public static class LootUtils
             return null;
         }
 
-        // Use the item's template id to search for the same item in the inventory
-        foreach (var foundItem in controller.Inventory.GetAllItemByTemplate(item.TemplateId))
+        // Use the item's template id to search for the same item in the inventory.
+        // Do not try to merge with cartridges or weapon chambers, so get only grid items.
+        // And do not include items from the secured container.
+        using var pooled = UnityEngine.Pool.ListPool<Item>.Get(out var foundItems);
+        controller.GetAllGridItemsInStorageSlotsNonAlloc(foundItems, item.TemplateId);
+        foreach (var foundItem in foundItems)
         {
-            if (foundItem is null)
-            {
-                continue;
-            }
-
-            var rootItem = foundItem.GetRootItem();
-
-            // Do not try to merge with cartridges or weapon chambers
-            if (foundItem.Parent.Container is StackSlot or Slot)
-            {
-                continue;
-            }
-
-            if (rootItem.Parent.Container.ID.Equals("securedcontainer", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
             if (item.StackObjectsCount + foundItem.StackObjectsCount <= foundItem.StackMaxSize)
             {
                 return foundItem;
@@ -338,10 +324,13 @@ public static class LootUtils
     }
 
     /// <summary>
-    /// Gets all contained items (grid) of an item and its children
+    /// Gets all contained items (grid) of an item and its children.
     /// </summary>
+    /// <param name="item">The item whose grids are searched.</param>
+    /// <param name="templateId">Optional template ID to match a specific item template.</param>
     /// <remarks>Does not get items in its Slots</remarks>
-    public static void GetAllContainedItems(this Item item, List<Item> preAllocatedList)
+    public static void GetAllGridContainedItems<TItem>(this Item item, List<TItem> preAllocatedList, MongoID? templateId = null)
+        where TItem : Item
     {
         if (item is not CompoundItem compoundItem)
         {
@@ -352,40 +341,123 @@ public static class LootUtils
         {
             foreach (var containedItem in grid.ItemCollection.ItemsList)
             {
-                preAllocatedList.Add(containedItem);
-                containedItem.GetAllContainedItems(preAllocatedList);
+                if (containedItem is TItem tItem && (templateId is null || tItem.TemplateId == templateId))
+                {
+                    preAllocatedList.Add(tItem);
+                }
+                containedItem.GetAllGridContainedItems(preAllocatedList, templateId);
             }
         }
     }
 
-    public static void GetAcceptableItemsInStorageSlotsNonAlloc<TItem>(
+    /// <summary>
+    /// Get all grid items from the equipment's storage slots.
+    /// The SecuredContainer slot is excluded.
+    /// </summary>
+    /// <param name="templateId">Optional template ID to match a specific item template.</param>
+    public static void GetAllGridItemsInStorageSlotsNonAlloc<TItem>(
         this InventoryController inventoryController,
-        IList<TItem> preAllocatedList,
-        Predicate<TItem> predicate = null
+        List<TItem> preAllocatedList,
+        MongoID? templateId = null
     )
         where TItem : Item
     {
-        inventoryController.GetAcceptableItemsNonAlloc(StorageSlots, preAllocatedList, predicate);
+        var equipment = inventoryController.Inventory.Equipment;
+        foreach (var slotName in StorageSlots)
+        {
+            equipment.GetSlot(slotName).ContainedItem.GetAllGridContainedItems(preAllocatedList, templateId);
+        }
     }
 
-    public static void GetPrioritizedGridsNonAlloc(this Item item, List<Grid> preAllocatedList)
+    /// <summary>
+    /// Based on <see cref="InventoryExtension.FindGridToPickUp"/>
+    /// </summary>
+    public static GridItemAddress FindGridToPickUpLootNonAlloc(this Item transferTo, Item item)
     {
-        switch (item)
+        if (transferTo.Owner is not ItemController controller)
+        {
+            return null;
+        }
+
+        using var pooled = UnityEngine.Pool.ListPool<Grid>.Get(out var grids);
+        transferTo.GetPrioritizedGridsForLootNonAlloc(item, grids);
+        foreach (var grid in grids)
+        {
+            var location = grid.FindLocationForItem(item);
+            if (location == null)
+            {
+                continue;
+            }
+            if (!ItemManipulator.DestinationCheck(item.Parent, location, controller).Value)
+            {
+                continue;
+            }
+
+            return location;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Based on <see cref="InventoryEquipmentExtension.GetPrioritizedContainersForLoot"/>.
+    /// Does not include the SecuredContainer slot for InventoryEquipment.
+    /// </summary>
+    public static void GetPrioritizedGridsForLootNonAlloc(this Item transferTo, Item loot, List<Grid> preAllocatedList)
+    {
+        switch (transferTo)
         {
             case InventoryEquipment equipment:
-                var pocketsContainers = (equipment.GetSlot(EquipmentSlot.Pockets).ContainedItem as CompoundItem)?.Grids ?? [];
-                var vestContainers = (equipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem as CompoundItem)?.Grids ?? [];
-                var backpackContainers = (equipment.GetSlot(EquipmentSlot.Backpack).ContainedItem as CompoundItem)?.Grids ?? [];
-                preAllocatedList.AddRange(backpackContainers);
-                preAllocatedList.AddRange(vestContainers);
-                preAllocatedList.AddRange(pocketsContainers);
+            {
+                var armbandGrids = (equipment.GetSlot(EquipmentSlot.ArmBand).ContainedItem as CompoundItem)?.Grids ?? [];
+                var pocketsGrids = (equipment.GetSlot(EquipmentSlot.Pockets).ContainedItem as CompoundItem)?.Grids ?? [];
+                var vestGrids = (equipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem as CompoundItem)?.Grids ?? [];
+                var backpackGrids = (equipment.GetSlot(EquipmentSlot.Backpack).ContainedItem as CompoundItem)?.Grids ?? [];
+
+                switch (loot)
+                {
+                    case Ammo:
+                        preAllocatedList.AddRange(armbandGrids);
+                        preAllocatedList.AddRange(vestGrids);
+                        preAllocatedList.AddRange(pocketsGrids);
+                        preAllocatedList.AddRange(backpackGrids);
+                        break;
+                    case Magazine:
+                        preAllocatedList.AddRange(vestGrids);
+                        preAllocatedList.AddRange(armbandGrids);
+                        preAllocatedList.AddRange(pocketsGrids);
+                        preAllocatedList.AddRange(backpackGrids);
+                        break;
+                    case Money:
+                        preAllocatedList.AddRange(backpackGrids);
+                        preAllocatedList.AddRange(armbandGrids);
+                        preAllocatedList.AddRange(vestGrids);
+                        preAllocatedList.AddRange(pocketsGrids);
+                        break;
+                    case ThrowWeap:
+                        preAllocatedList.AddRange(pocketsGrids);
+                        preAllocatedList.AddRange(armbandGrids);
+                        preAllocatedList.AddRange(vestGrids);
+                        preAllocatedList.AddRange(backpackGrids);
+                        break;
+                    default:
+                        preAllocatedList.AddRange(backpackGrids);
+                        preAllocatedList.AddRange(vestGrids);
+                        preAllocatedList.AddRange(armbandGrids);
+                        preAllocatedList.AddRange(pocketsGrids);
+                        break;
+                }
                 return;
+            }
             case LootContainer container:
+            {
                 preAllocatedList.AddRange(container.Grids);
                 return;
+            }
             default:
+            {
                 // Loose loot
                 return;
+            }
         }
     }
 }

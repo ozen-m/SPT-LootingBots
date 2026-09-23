@@ -708,7 +708,7 @@ public class LootingInventoryController
         var holsterMagSlot = holster?.GetMagazineSlot();
 
         using var pooledList = UnityEngine.Pool.ListPool<Magazine>.Get(out var magazines);
-        _botInventoryController.GetAcceptableItemsInStorageSlotsNonAlloc(magazines);
+        _botInventoryController.GetAllGridItemsInStorageSlotsNonAlloc(magazines);
 
         if (_log.DebugEnabled)
         {
@@ -1451,7 +1451,7 @@ public class LootingInventoryController
         var price = 0f;
 
         using var pooledList = UnityEngine.Pool.ListPool<Item>.Get(out var containedItems);
-        item.GetAllContainedItems(containedItems);
+        item.GetAllGridContainedItems(containedItems);
         foreach (var containedItem in containedItems)
         {
             price += _itemAppraiser.GetItemPrice(containedItem, _log);

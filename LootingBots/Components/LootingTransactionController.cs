@@ -4,7 +4,6 @@ using EFT;
 using EFT.InventoryLogic;
 using LootingBots.Utilities;
 using UnityEngine;
-using Grid = EFT.InventoryLogic.Grid;
 using Object = UnityEngine.Object;
 
 namespace LootingBots.Components;
@@ -168,11 +167,8 @@ public class LootingTransactionController
         }
 
         // Otherwise, find an empty grid slot to put the item in
-        var gridAddress = _inventoryController.FindGridToPickUp(item);
-        if (
-            gridAddress != null
-            && !string.Equals(gridAddress.GetRootItem()?.Parent?.Container?.ID, "securedcontainer", StringComparison.OrdinalIgnoreCase)
-        )
+        var gridAddress = _inventoryController.Inventory.Equipment.FindGridToPickUpLootNonAlloc(item);
+        if (gridAddress != null)
         {
             if (_log.DebugEnabled)
             {
@@ -415,30 +411,14 @@ public class LootingTransactionController
             _log.LogDebug($"Transferring or throwing item: {toThrow.Name.Localized()}...");
         }
 
-        using var pooled = UnityEngine.Pool.ListPool<Grid>.Get(out var grids);
-        transferTo.GetPrioritizedGridsNonAlloc(grids);
-        foreach (var grid in grids)
-        {
-            var location = grid.FindLocationForItem(toThrow);
-            if (location == null)
-            {
-                continue;
-            }
-            if (!ItemManipulator.DestinationCheck(toThrow.Parent, location, (ItemController)transferTo.Owner).Value)
-            {
-                continue;
-            }
-
-            return MoveItemAsync(toThrow, location, token);
-        }
-
-        return ThrowItemAsync(toThrow, token);
+        var gridAddress = transferTo.FindGridToPickUpLootNonAlloc(toThrow);
+        return gridAddress is not null ? MoveItemAsync(toThrow, gridAddress, token) : ThrowItemAsync(toThrow, token);
     }
 
     /// <summary>
     /// Replace items by trying to swap the two items, or transfer to another item's grid, or throw
     /// </summary>
-    public async Task<bool> ReplaceItemAsync(Item toKeep, Item toThrow, Item rootItem = null, CancellationToken token = default)
+    public async Task<bool> ReplaceItemAsync(Item toKeep, Item toThrow, Item transferTo = null, CancellationToken token = default)
     {
         if (_log.DebugEnabled)
         {
@@ -451,7 +431,7 @@ public class LootingTransactionController
         }
 
         var grid = toThrow.Parent.Container;
-        if (!await TransferOrThrowItemAsync(toThrow, rootItem, token))
+        if (!await TransferOrThrowItemAsync(toThrow, transferTo, token))
         {
             return false;
         }
