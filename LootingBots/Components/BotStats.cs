@@ -120,6 +120,7 @@ public class ContainedItems
 
     /// <summary>
     /// Find from the collection a viable item to be replaced.
+    /// This assumes <see cref="_items"/> is sorted ascending by <see cref="ContainedLootItem.ValuePerSlot"/>.
     /// </summary>
     /// <param name="potentialLoot">The replacement</param>
     /// <param name="index">Index of the item to be replaced</param>
@@ -130,9 +131,13 @@ public class ContainedItems
         {
             var replacedItem = _items[index];
 
-            if (potentialLoot.ValuePerSlot < replacedItem.ValuePerSlot)
+            if (potentialLoot.ValuePerSlot <= replacedItem.ValuePerSlot)
             {
                 break;
+            }
+            if (potentialLoot.Value <= replacedItem.Value)
+            {
+                continue;
             }
             if (potentialLoot.Size <= replacedItem.Size)
             {
@@ -255,5 +260,10 @@ public readonly struct ContainedLootItem : IComparable<ContainedLootItem>
     public int CompareTo(ContainedLootItem other)
     {
         return ValuePerSlot.CompareTo(other.ValuePerSlot);
+    }
+
+    public override string ToString()
+    {
+        return $"LootItem: {Item.LocalizedName()}, Size: {Size}, Value: {ValuePerSlot}, ValuePerSlot: {ValuePerSlot}";
     }
 }
