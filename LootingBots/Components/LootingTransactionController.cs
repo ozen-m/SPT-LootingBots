@@ -520,7 +520,7 @@ public class LootingTransactionController
     /// <summary>
     /// Simulate decisions while looting by performing a delay.
     /// </summary>
-    public static Task SimulatePlayerDelayAsync(double delay = -1f, CancellationToken token = default)
+    public static Task SimulatePlayerDelayAsync(double delay = -1D, CancellationToken token = default)
     {
         if (delay == -1D)
         {
