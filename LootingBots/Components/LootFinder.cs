@@ -232,7 +232,6 @@ public class LootFinder : MonoBehaviour
 
             const int maxRangeCalculations = 3;
             var rangeCalculations = 0;
-            var availableGridSpaces = _lootingBrain.Stats.AvailableGridSpaces;
 
             // Process sorted colliders
             for (var i = 0; i < hits; i++)
@@ -278,7 +277,7 @@ public class LootFinder : MonoBehaviour
                         && (
                             rootItem is SearchableItem // If the item is something that can be searched, consider it lootable
                             || (_lootingBrain.InventoryController.IsBetterArmorThanEquipped(rootItem))
-                            || (_lootingBrain.IsValuableEnough(rootItem) && availableGridSpaces > rootItem.GetItemSize())
+                            || (_lootingBrain.IsValuableEnough(rootItem))
                         )
                     )
                     {
