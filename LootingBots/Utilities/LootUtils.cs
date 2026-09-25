@@ -27,11 +27,11 @@ public static class LootUtils
         EquipmentSlot.TacticalVest,
         EquipmentSlot.ArmorVest,
         EquipmentSlot.Pockets,
+        EquipmentSlot.ArmBand, // Pack 'n' Strap
     ];
 
     public static readonly EquipmentSlot[] OtherSlots =
     [
-        EquipmentSlot.ArmBand,
         EquipmentSlot.Headwear,
         EquipmentSlot.Earpiece,
         EquipmentSlot.Dogtag,
