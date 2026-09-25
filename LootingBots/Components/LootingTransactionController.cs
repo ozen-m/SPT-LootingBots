@@ -546,11 +546,12 @@ public class LootingTransactionController
     /// </summary>
     private bool IsItemReachable(Item item)
     {
-        if (item.Owner == _rootItemOwner)
+        var itemOwner = item.Owner;
+        if (itemOwner == _rootItemOwner)
         {
             return true;
         }
-        if (item.Owner == _inventoryController)
+        if (itemOwner == _inventoryController)
         {
             return true;
         }
@@ -561,7 +562,7 @@ public class LootingTransactionController
 
         if (_log.DebugEnabled)
         {
-            _log.LogDebug($"Cannot reach {item.Name.Localized()} [with owner: {item.Owner}, location: {item.Parent}]");
+            _log.LogDebug($"Cannot reach {item.Name.Localized()} [with owner: {itemOwner}, location: {item.Parent}]");
         }
         return false;
     }
