@@ -307,22 +307,6 @@ public static class LootUtils
         return false;
     }
 
-    public static Item GetFirstItem(this IEnumerable<Item> items)
-    {
-        switch (items)
-        {
-            case null:
-                return null;
-            case List<Item> list:
-                return list.Count > 0 ? list[0] : null;
-            default:
-            {
-                using var enumerator = items.GetEnumerator();
-                return enumerator.MoveNext() ? enumerator.Current : null;
-            }
-        }
-    }
-
     /// <summary>
     /// Gets all contained items (grid) of an item and its children.
     /// </summary>
