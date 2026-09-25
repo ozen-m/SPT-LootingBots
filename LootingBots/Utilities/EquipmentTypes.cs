@@ -135,8 +135,12 @@ public static class EquipmentTypeUtils
     }
 
     /// <summary>
-    /// GClasses based off InventoryExtension.FindSlotToPickUp
+    /// Can the bot equip or pick up this item based on <paramref name="allowedGear"/>.
     /// </summary>
+    /// <param name="allowedGear">Types of equipment the bot is allowed.</param>
+    /// <param name="item">The item to check.</param>
+    /// <param name="toPickup">Whether the item should be picked up when no specific gear restriction applies.</param>
+    /// <returns>Returns true if able to equip or pick up.</returns>
     public static bool IsItemEligible(this EquipmentType allowedGear, Item item, bool toPickup = false)
     {
         return item switch
@@ -154,6 +158,7 @@ public static class EquipmentTypeUtils
             Weapon => allowedGear.HasWeapon(),
             ArmBand => allowedGear.HasArmband(),
             BarterOther barter when barter.IsDogtag() => allowedGear.HasDogtag(),
+            Pockets => false,
             _ => toPickup,
         };
     }
