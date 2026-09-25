@@ -255,15 +255,6 @@ public class LootingInventoryController
         {
             token.ThrowIfCancellationRequested();
 
-            if (string.IsNullOrEmpty(item.Name))
-            {
-                if (_log.DebugEnabled)
-                {
-                    _log.LogDebug("Item is NULL");
-                }
-                continue;
-            }
-
             if (LootingBots.UseExamineTime.Value)
             {
                 await SimulateExamineTimeAsync(item, token);
@@ -280,14 +271,13 @@ public class LootingInventoryController
                 _log.LogDebug($"Loot found: {itemName} ({itemValue})");
             }
 
-            // Ignore magazines that a bot cannot actively use
-            if (item is Magazine mag && !IsUsableMag(mag))
+            // Ignore magazines or ammo that a bot cannot actively use
+            if ((item is Magazine mag && !IsUsableMag(mag)) || (item is Ammo ammo && !IsUsableAmmo(ammo)))
             {
                 if (_log.DebugEnabled)
                 {
-                    _log.LogDebug($"Cannot use mag: {itemName}. Skipping");
+                    _log.LogDebug($"Cannot use mag/ammo: {itemName}. Skipping");
                 }
-
                 continue;
             }
 
