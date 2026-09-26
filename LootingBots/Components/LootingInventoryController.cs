@@ -1340,7 +1340,7 @@ public class LootingInventoryController
             {
                 _log.LogDebug($"No attachments to strip for weapon: {weapon.Name.Localized()}");
             }
-            return new ValueTask<bool>(false);
+            return new ValueTask<bool>(true);
         }
 
         if (_log.InfoEnabled)
