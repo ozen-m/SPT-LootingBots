@@ -159,7 +159,7 @@ public class LootingInventoryController
                 case SearchableItem searchableItem:
                 {
                     // Get the price of the searchable item and its contained items
-                    Stats.NetWorth += _itemAppraiser.GetItemPrice(searchableItem, _log) + GetAllContainedItemsValue(searchableItem);
+                    Stats.NetWorth += _itemAppraiser.GetItemPrice(searchableItem, _log) + searchableItem.GetAllContainedItemsValue(_log);
                     continue;
                 }
                 default:
@@ -391,7 +391,7 @@ public class LootingInventoryController
                 Stats.AddNetValue(CurrentItemPrice);
                 if (item is SearchableItem)
                 {
-                    Stats.AddNetValue(GetAllContainedItemsValue(item));
+                    Stats.AddNetValue(item.GetAllContainedItemsValue(_log));
                 }
                 continue;
             }
@@ -1446,8 +1446,8 @@ public class LootingInventoryController
         }
 
         // Include contained items in calculating NetWorthDelta
-        toEquipValue += GetAllContainedItemsValue(toEquip);
-        toSwapValue += GetAllContainedItemsValue(toSwap);
+        toEquipValue += toEquip.GetAllContainedItemsValue(_log);
+        toSwapValue += toSwap.GetAllContainedItemsValue(_log);
 
         var swapAction = LootingSwapAction.Rent(toEquip, toSwap, toEquipValue - toSwapValue, transferItems);
         lootingActions.Add(swapAction);
@@ -1464,23 +1464,6 @@ public class LootingInventoryController
         {
             action();
         }
-    }
-
-    /// <summary>
-    /// Calculates the sum value of its children (recursive). Excludes slots.
-    /// </summary>
-    private float GetAllContainedItemsValue(Item item)
-    {
-        var price = 0f;
-
-        using var pooledList = UnityEngine.Pool.ListPool<Item>.Get(out var containedItems);
-        item.GetAllGridContainedItems(containedItems);
-        foreach (var containedItem in containedItems)
-        {
-            price += _itemAppraiser.GetItemPrice(containedItem, _log);
-        }
-
-        return price;
     }
 
     /// <summary>
