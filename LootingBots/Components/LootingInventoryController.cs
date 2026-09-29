@@ -1089,7 +1089,8 @@ public class LootingInventoryController
         }
 
         // If the item is a container and is bigger than what is equipped, only equip it if the armor class is the same
-        if (armorDifference == 0 && LootHasLargerContainer(itemToLoot, equipped))
+        var sizeDifference = GetContainerSizeDifference(itemToLoot, equipped);
+        if (armorDifference == 0 && sizeDifference > 0)
         {
             if (_log.DebugEnabled)
             {
@@ -1098,8 +1099,8 @@ public class LootingInventoryController
             return true;
         }
 
-        // If the item is more valuable than what is equipped, only equip it if the armor class is the same
-        if (armorDifference == 0 && LootIsMoreValuable(equipped))
+        // If the item is more valuable than what is equipped, only equip it if the armor class and container size is the same
+        if (armorDifference == 0 && sizeDifference == 0 && LootIsMoreValuable(equipped))
         {
             if (_log.DebugEnabled)
             {
@@ -1114,9 +1115,19 @@ public class LootingInventoryController
     /// <summary>
     /// Compare if <paramref name="potentialLoot"/> has a larger container than <paramref name="equipped"/>
     /// </summary>
+    /// <returns>Returns true if the item to loot has a larger container than what is equipped</returns>
     public bool LootHasLargerContainer(Item potentialLoot, Item equipped)
     {
-        return potentialLoot.GetContainerSize() > equipped.GetContainerSize();
+        return GetContainerSizeDifference(potentialLoot, equipped) > 0;
+    }
+
+    /// <summary>
+    /// Calculate the difference between the container sizes of <paramref name="potentialLoot"/> and <paramref name="equipped"/>
+    /// </summary>
+    /// <returns>Returns a positive integer if the item to loot has a larger container than what is equipped</returns>
+    public int GetContainerSizeDifference(Item potentialLoot, Item equipped)
+    {
+        return potentialLoot.GetContainerSize() - equipped.GetContainerSize();
     }
 
     /// <summary>
