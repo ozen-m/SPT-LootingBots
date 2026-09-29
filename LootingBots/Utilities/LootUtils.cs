@@ -356,23 +356,29 @@ public static class LootUtils
     /// <summary>
     /// Based on <see cref="InventoryExtension.FindGridToPickUp"/>
     /// </summary>
-    public static GridItemAddress FindGridToPickUpLootNonAlloc(this Item transferTo, Item item)
+    public static GridItemAddress FindGridToPickUpLootNonAlloc(this Item transferTo, Item loot)
     {
         if (transferTo.Owner is not ItemController controller)
         {
             return null;
         }
+        var lootParent = loot.Parent.Container.ParentItem;
 
         using var pooled = UnityEngine.Pool.ListPool<Grid>.Get(out var grids);
-        transferTo.GetPrioritizedGridsForLootNonAlloc(item, grids);
+        transferTo.GetPrioritizedGridsForLootNonAlloc(loot, grids);
         foreach (var grid in grids)
         {
-            var location = grid.FindLocationForItem(item);
+            if (lootParent == grid._parentItem)
+            {
+                // Skip grids with the same parent
+                continue;
+            }
+            var location = grid.FindLocationForItem(loot);
             if (location == null)
             {
                 continue;
             }
-            if (!ItemManipulator.DestinationCheck(item.Parent, location, controller).Value)
+            if (!ItemManipulator.DestinationCheck(loot.Parent, location, controller).Value)
             {
                 continue;
             }
