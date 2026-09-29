@@ -295,8 +295,9 @@ public class LootingInventoryController
                     _log.LogDebug($"Found equip action for: {itemName}");
                 }
 
-                foreach (var action in lootingActions)
+                for (var i = 0; i < lootingActions.Count; i++)
                 {
+                    var action = lootingActions[i];
                     var actionResult = await action.ExecuteAsync(_transactionController, token);
                     if (actionResult)
                     {
@@ -316,7 +317,7 @@ public class LootingInventoryController
                             if (swapAction.ToSwap is Weapon thrownWeapon)
                             {
                                 // If we swapped away our previous weapon, throw away its mags and strip the attachments
-                                using (UnityEngine.Pool.ListPool<Magazine>.Get(out var uselessMagazines))
+                                using (DictionaryPool<Magazine, float>.Get(out var uselessMagazines))
                                 {
                                     await ThrowUselessMagsAsync(thrownWeapon, uselessMagazines, token);
                                 }
@@ -331,12 +332,26 @@ public class LootingInventoryController
                             else
                             {
                                 // To make space we throw undervalued items in our newly equipped item
-                                // Then loot the thrown item
                                 using (DictionaryPool<Item, float>.Get(out var itemsToThrow))
                                 {
-                                    await ThrowUndervaluedItemsAsync(swapAction.Item, itemsToThrow, token);
+                                    GetUndervaluedItems(swapAction.Item, itemsToThrow);
+                                    await ThrowUndervaluedItemsAsync(
+                                        swapAction.Item,
+                                        itemsToThrow,
+                                        _botInventoryController,
+                                        _lootingBrain.ActiveLoot.GetRootItem(),
+                                        token
+                                    );
                                 }
-                                await LootNestedItemsAsync(swapAction.ToSwap, token);
+
+                                // Then loot the thrown item and its children
+                                if (swapAction.ToSwap is Vest oldVest)
+                                {
+                                    // Try to pick up any nested items in the old vest before trying to pick up the item.
+                                    // This helps to transfer ammo to the bots active rig
+                                    await LootNestedItemsAsync(oldVest, token);
+                                }
+                                lootingActions.Add(LootingLootAction.Rent(swapAction.ToSwap, this));
                             }
                         }
                     }
@@ -352,7 +367,7 @@ public class LootingInventoryController
                             if (thrownItem is Weapon thrownWeapon)
                             {
                                 // Throw mags of thrown weapon and strip attachments
-                                using (UnityEngine.Pool.ListPool<Magazine>.Get(out var uselessMagazines))
+                                using (DictionaryPool<Magazine, float>.Get(out var uselessMagazines))
                                 {
                                     await ThrowUselessMagsAsync(thrownWeapon, uselessMagazines, token);
                                 }
@@ -366,8 +381,14 @@ public class LootingInventoryController
                             }
                             else
                             {
-                                // Loot thrown item's children
-                                await LootNestedItemsAsync(thrownItem, token);
+                                // Loot the thrown item and its children
+                                if (thrownItem is Vest oldVest)
+                                {
+                                    // Try to pick up any nested items in the old vest before trying to pick up the item.
+                                    // This helps to transfer ammo to the bots active rig
+                                    await LootNestedItemsAsync(oldVest, token);
+                                }
+                                lootingActions.Add(LootingLootAction.Rent(thrownItem, this));
                             }
                         }
                     }
@@ -398,17 +419,6 @@ public class LootingInventoryController
                     Stats.AddNetValue(item.GetAllContainedItemsValue(_log));
                 }
                 continue;
-            }
-
-            // Try to pick up any nested items before trying to pick up the item.
-            // This helps when looting rigs to transfer ammo to the bots active rig
-            if (item is SearchableItem searchableItem)
-            {
-                var success = await LootNestedItemsAsync(searchableItem, token);
-                if (!success)
-                {
-                    return false;
-                }
             }
 
             // Check to see if we can pick up the item
@@ -456,17 +466,26 @@ public class LootingInventoryController
                 }
             }
 
-            // Strip the weapon of its mods if we cannot pick up the weapon
-            if (item is Weapon weaponToStrip && LootingBots.CanStripAttachments.Value)
+            // We cannot equip or pick up this item,
+            // so strip its mods if it's a weapon, or loot nested items if it's a compound item.
+            if (item is Weapon weaponToStrip)
             {
+                if (!LootingBots.CanStripAttachments.Value)
+                {
+                    continue;
+                }
+
                 using (UnityEngine.Pool.ListPool<Item>.Get(out var modsToLoot))
                 {
-                    var successful = await StripWeaponAsync(weaponToStrip, modsToLoot, token);
-                    if (!successful)
+                    if (!await StripWeaponAsync(weaponToStrip, modsToLoot, token))
                     {
                         return false;
                     }
                 }
+            }
+            else if (!await LootNestedItemsAsync(item, token))
+            {
+                return false;
             }
         }
 
@@ -767,7 +786,7 @@ public class LootingInventoryController
     /// Throws all magazines from the rig that are not used by any of the weapons that the bot currently has equipped.
     /// Also records thrown mag value.
     /// </summary>
-    public ValueTask ThrowUselessMagsAsync(Weapon thrownWeapon, List<Magazine> uselessMagazines, CancellationToken token)
+    public ValueTask ThrowUselessMagsAsync(Weapon thrownWeapon, Dictionary<Magazine, float> uselessMagazines, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
 
@@ -809,7 +828,7 @@ public class LootingInventoryController
             }
             else if (!fitsInEquipped || reservedCount >= 2)
             {
-                uselessMagazines.Add(mag);
+                uselessMagazines.Add(mag, _itemAppraiser.GetItemPrice(mag, _log));
             }
         }
 
@@ -826,43 +845,28 @@ public class LootingInventoryController
         {
             _log.LogDebug($"Throwing {uselessMagazines.Count} useless magazines");
         }
-        return new ValueTask(TransferOrThrowItemsAsync(uselessMagazines, _lootingBrain.ActiveLoot.GetRootItem(), token));
-    }
-
-    /// <summary>
-    /// Try to transfer items to another item's grid, or throw.
-    /// </summary>
-    /// <param name="itemsToThrow">A list of items to throw</param>
-    /// <param name="transferTo">A container to transfer items to.</param>
-    public async Task TransferOrThrowItemsAsync<TItem>(List<TItem> itemsToThrow, Item transferTo = null, CancellationToken token = default)
-        where TItem : Item
-    {
-        foreach (var item in itemsToThrow)
-        {
-            token.ThrowIfCancellationRequested();
-
-            if (!await _transactionController.TransferOrThrowItemAsync(item, transferTo, token))
-            {
-                continue;
-            }
-
-            ThrownItem(item, _itemAppraiser.GetItemPrice(item, _log));
-        }
+        return new ValueTask(
+            TransferOrThrowItemsAsync(uselessMagazines, _botInventoryController, _lootingBrain.ActiveLoot.GetRootItem(), token)
+        );
     }
 
     /// <summary>
     /// Try to transfer items to another item's grid, or throw.
     /// Overload that supports taking in a Dictionary with the item's value.
     /// </summary>
-    /// <param name="itemsToThrow">A Dictionary of key: items, value: prices to throw</param>
+    /// <param name="itemsToThrow">A Dictionary of key: items, value: prices to throw.</param>
+    /// <param name="previousOwner">The owner of items to throw.</param>
     /// <param name="transferTo">A container to transfer items to.</param>
     public async Task TransferOrThrowItemsAsync<TItem>(
         Dictionary<TItem, float> itemsToThrow,
+        IItemOwner previousOwner,
         Item transferTo = null,
         CancellationToken token = default
     )
         where TItem : Item
     {
+        var wasPreviousOwner = _botInventoryController == previousOwner;
+
         foreach (var (item, price) in itemsToThrow)
         {
             token.ThrowIfCancellationRequested();
@@ -872,23 +876,18 @@ public class LootingInventoryController
                 continue;
             }
 
-            ThrownItem(item, price);
+            if (wasPreviousOwner)
+            {
+                _lootingBrain.IgnoreLoot(item.Id);
+                Stats.SubtractNetValue(price);
+                Stats.AvailableGridSpaces += item.GetItemSize();
+                Stats.Gear.TryRemoveContainedItem(item);
+            }
+            if (_log.DebugEnabled)
+            {
+                _log.LogDebug($"Thrown {item.LocalizedShortName()}{(wasPreviousOwner ? $" (-{price:N0}₽)" : string.Empty)}");
+            }
         }
-    }
-
-    /// <summary>
-    /// Post throw actions.
-    /// </summary>
-    private void ThrownItem(Item item, float price)
-    {
-        if (_log.DebugEnabled)
-        {
-            _log.LogDebug($"Thrown {item.LocalizedShortName()} (-{price:N0}₽)");
-        }
-        Stats.SubtractNetValue(price);
-        Stats.AvailableGridSpaces += item.GetItemSize();
-        Stats.Gear.TryRemoveContainedItem(item);
-        _lootingBrain.IgnoreLoot(item.Id);
     }
 
     /// <summary>
@@ -1328,38 +1327,32 @@ public class LootingInventoryController
             }
         }
 
-        if (items.Count > 0)
+        if (items.Count == 0)
         {
-            if (_log.DebugEnabled)
-            {
-                _log.LogDebug($"Looting {items.Count} items from {parentItem.Name.Localized()}");
-            }
-
-            await LootingTransactionController.SimulatePlayerDelayAsync(LootingBrain.LootingStartDelay, token);
-            return await TryAddItemsToBotAsync(items, token);
+            return true;
         }
 
         if (_log.DebugEnabled)
         {
-            _log.LogDebug($"No nested items found to loot in {parentItem.Name.Localized()}");
+            _log.LogDebug($"Looting {items.Count} items from {parentItem.Name.Localized()}");
         }
 
-        return true;
+        await LootingTransactionController.SimulatePlayerDelayAsync(LootingBrain.LootingStartDelay, token);
+        return await TryAddItemsToBotAsync(items, token);
     }
 
     /// <summary>
-    /// Searches through the child items of a container and attempts to throw them
+    /// Searches through the child items of a container
     /// </summary>
     /// <param name="container">Only throws items of a container of type <see cref="SearchableItem"/></param>
-    public ValueTask ThrowUndervaluedItemsAsync(Item container, Dictionary<Item, float> itemsToThrow, CancellationToken token = default)
+    /// <param name="undervaluedItems"></param>
+    public void GetUndervaluedItems(Item container, Dictionary<Item, float> undervaluedItems)
     {
-        token.ThrowIfCancellationRequested();
-
         // Limit to only SearchableItem
         // As opposed to LootNestedItems, we only need to throw away its children if it's a container
         if (container is not SearchableItem)
         {
-            return new ValueTask();
+            return;
         }
 
         var minimumValue = _isPMC ? LootingBots.PMCMinLootThreshold.Value : LootingBots.ScavMinLootThreshold.Value;
@@ -1369,7 +1362,7 @@ public class LootingInventoryController
         foreach (var item in items)
         {
             // Check the conditions to filter out items to keep
-            if (item.QuestItem || item.IsDogtag() || item is Meds or Money || (item is Ammo ammo && IsUsableAmmo(ammo)))
+            if (item.QuestItem || item.IsDogtag() || item is Meds or Money or SearchableItem || (item is Ammo ammo && IsUsableAmmo(ammo)))
             {
                 continue;
             }
@@ -1379,7 +1372,7 @@ public class LootingInventoryController
                 // If it's a magazine we cannot use, throw it
                 if (!IsUsableMag(mag))
                 {
-                    itemsToThrow.Add(mag, _itemAppraiser.GetItemPrice(mag, _log));
+                    undervaluedItems.Add(mag, _itemAppraiser.GetItemPrice(mag, _log));
                 }
                 continue;
             }
@@ -1387,9 +1380,32 @@ public class LootingInventoryController
             var value = _itemAppraiser.GetItemPrice(item, _log);
             if (value < minimumValue)
             {
-                itemsToThrow.Add(item, value);
+                undervaluedItems.Add(item, value);
             }
         }
+    }
+
+    /// <summary>
+    /// Searches through the child items of a container and attempts to throw them.
+    /// </summary>
+    /// <param name="container">The container from which itemsToThrow came from.</param>
+    /// <param name="itemsToThrow">A Dictionary of key: items, value: prices to throw.</param>
+    /// <param name="previousOwner">The owner of items to throw.</param>
+    /// <param name="transferTo">A container to transfer items to.</param>
+    public ValueTask ThrowUndervaluedItemsAsync(
+        Item container,
+        Dictionary<Item, float> itemsToThrow,
+        IItemOwner previousOwner,
+        Item transferTo,
+        CancellationToken token = default
+    )
+    {
+        if (container is null)
+        {
+            return new ValueTask();
+        }
+
+        token.ThrowIfCancellationRequested();
 
         if (itemsToThrow.Count == 0)
         {
@@ -1404,7 +1420,7 @@ public class LootingInventoryController
         {
             _log.LogInfo($"Throwing {itemsToThrow.Count} undervalued items from {container.Name.Localized()}");
         }
-        return new ValueTask(TransferOrThrowItemsAsync(itemsToThrow, _lootingBrain.ActiveLoot.GetRootItem(), token));
+        return new ValueTask(TransferOrThrowItemsAsync(itemsToThrow, previousOwner, transferTo, token));
     }
 
     /// <summary>
