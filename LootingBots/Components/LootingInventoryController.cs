@@ -532,7 +532,25 @@ public class LootingInventoryController
         // Bosses cannot swap gear as many bosses have custom logic tailored to their loadouts
         if (lootItem is Weapon lootWeapon && !BotTypeUtils.IsBoss(_botOwner.Profile.Info.Settings.Role))
         {
-            GetWeaponEquipAction(lootWeapon, lootingActions);
+            using var pooledObject = UnityEngine.Pool.ListPool<Item>.Get(out var usableMagazines);
+            if (IsAbleToEquip(lootWeapon, _lootingBrain.ActiveLoot.GetRootItem(), usableMagazines))
+            {
+                GetWeaponEquipAction(lootWeapon, lootingActions);
+
+                if (lootingActions.Count > 0 && usableMagazines.Count > 0)
+                {
+                    if (_log.DebugEnabled)
+                    {
+                        _log.LogDebug($"Trying to loot {usableMagazines.Count} magazines for {lootWeapon.LocalizedName()}");
+                    }
+                    lootingActions.Add(LootingLootAction.Rent(usableMagazines, this));
+                }
+            }
+            else if (_log.DebugEnabled)
+            {
+                _log.LogDebug($"Unable to equip {lootWeapon.LocalizedName()}, cannot find any magazines for it");
+            }
+
             return lootingActions.Count > 0;
         }
 
@@ -688,6 +706,56 @@ public class LootingInventoryController
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Check if a weapon can be equipped and give the weapon's magazines.
+    ///
+    /// A bot can equip a weapon if:
+    ///   2. We're looting a loose weapon on the world.
+    ///   1. The weapon has magazines/loose ammo it can loot from a corpse
+    ///
+    /// </summary>
+    /// <param name="weapon">Weapon to loot.</param>
+    /// <param name="corpseEquipment">Corpse inventory to check for magazines.</param>
+    /// <param name="usableMagazines">Pre-allocated list for looting found usable magazines.</param>
+    public bool IsAbleToEquip(Weapon weapon, Item corpseEquipment, List<Item> usableMagazines)
+    {
+        if (corpseEquipment is not InventoryEquipment equipment)
+        {
+            // We're not looting a corpse, just allow to equip
+            return true;
+        }
+
+        var magazineSlot = weapon.GetMagazineSlot();
+        var chambers = weapon.Chambers;
+
+        using var pooledList = UnityEngine.Pool.ListPool<Item>.Get(out var items);
+        equipment.GetAllGridItemsInStorageSlotsNonAlloc(items);
+
+        foreach (var item in items)
+        {
+            if (item is Magazine)
+            {
+                // TODO: CanAccept is incompatible with multi-caliber weapons
+                if (magazineSlot?.CanAccept(item) == true)
+                {
+                    usableMagazines.Add(item);
+                }
+            }
+            else if (item is Ammo)
+            {
+                foreach (var chamber in chambers)
+                {
+                    if (chamber.CanAccept(item))
+                    {
+                        usableMagazines.Add(item);
+                    }
+                }
+            }
+        }
+
+        return usableMagazines.Count > 0;
     }
 
     /// <summary>

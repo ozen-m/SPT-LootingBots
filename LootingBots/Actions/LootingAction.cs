@@ -20,6 +20,9 @@ public abstract class LootingAction
 
     public abstract Task<bool> ExecuteAsync(LootingTransactionController controller, CancellationToken token);
 
+    /// <summary>
+    /// Called for a derived instance to return to its pool
+    /// </summary>
     public abstract void Return();
 
     protected virtual void Reset()
