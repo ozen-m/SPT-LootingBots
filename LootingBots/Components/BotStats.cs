@@ -149,10 +149,11 @@ public class ContainedItems
             {
                 continue;
             }
-            if (potentialLoot.Size <= replacedItem.Size)
+            if (potentialLoot.Size > replacedItem.Size)
             {
-                return true;
+                continue;
             }
+            return true;
         }
 
         index = -1;
@@ -208,7 +209,6 @@ public class ContainedItems
         }
 
         AddAllContainedLootItems(searchableItem);
-        _items.Sort();
     }
 
     /// <summary>
@@ -217,6 +217,11 @@ public class ContainedItems
     /// <param name="item"></param>
     private void AddInternal(ContainedLootItem item)
     {
+        if (_items.Contains(item))
+        {
+            return;
+        }
+
         var index = _items.BinarySearch(item);
         if (index < 0)
         {
@@ -242,7 +247,7 @@ public class ContainedItems
                         {
                             continue;
                         }
-                        _items.Add(new ContainedLootItem(gridItem));
+                        AddInternal(new ContainedLootItem(gridItem));
                         break;
                 }
             }
@@ -255,7 +260,7 @@ public class ContainedItems
     }
 }
 
-public readonly struct ContainedLootItem : IComparable<ContainedLootItem>
+public readonly struct ContainedLootItem : IComparable<ContainedLootItem>, IEquatable<ContainedLootItem>
 {
     public readonly Item Item;
     public readonly int Size;
@@ -285,8 +290,33 @@ public readonly struct ContainedLootItem : IComparable<ContainedLootItem>
         return ValuePerSlot.CompareTo(other.ValuePerSlot);
     }
 
+    public bool Equals(ContainedLootItem other)
+    {
+        return Item == other.Item;
+    }
+
+    public override bool Equals(object obj)
+    {
+        return obj is ContainedLootItem other && Equals(other);
+    }
+
+    public override int GetHashCode()
+    {
+        return Item.GetHashCode();
+    }
+
     public override string ToString()
     {
         return $"LootItem: {Item.LocalizedName()}, Size: {Size}, Value: {Value}, ValuePerSlot: {ValuePerSlot}";
+    }
+
+    public static bool operator ==(ContainedLootItem left, ContainedLootItem right)
+    {
+        return left.Item == right.Item;
+    }
+
+    public static bool operator !=(ContainedLootItem left, ContainedLootItem right)
+    {
+        return left.Item != right.Item;
     }
 }
