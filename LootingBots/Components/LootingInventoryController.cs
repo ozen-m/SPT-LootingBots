@@ -88,9 +88,10 @@ public class LootingInventoryController
             _log.LogDebug("Calculating gear value...");
         }
 
-        var primary = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.FirstPrimaryWeapon).ContainedItem;
-        var secondary = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.SecondPrimaryWeapon).ContainedItem;
-        var holster = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Holster).ContainedItem;
+        var equipment = _botInventoryController.Inventory.Equipment;
+        var primary = equipment.GetSlot(EquipmentSlot.FirstPrimaryWeapon).ContainedItem;
+        var secondary = equipment.GetSlot(EquipmentSlot.SecondPrimaryWeapon).ContainedItem;
+        var holster = equipment.GetSlot(EquipmentSlot.Holster).ContainedItem;
 
         if (primary != null)
         {
@@ -177,15 +178,17 @@ public class LootingInventoryController
     {
         Action<Item> updateGridStatsAction = UpdateGridStats;
 
-        var tacVestSlot = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.TacticalVest);
+        var equipment = _botInventoryController.Inventory.Equipment;
+
+        var tacVestSlot = equipment.GetSlot(EquipmentSlot.TacticalVest);
         _unsubActions.Add(tacVestSlot.ReactiveContainedItem.Subscribe(updateGridStatsAction));
         _unsubActions.Add(tacVestSlot.ReactiveContainedItem.Bind(Stats.Gear.Vest.OnChangeContainer));
 
-        var backpackSlot = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Backpack);
+        var backpackSlot = equipment.GetSlot(EquipmentSlot.Backpack);
         _unsubActions.Add(backpackSlot.ReactiveContainedItem.Subscribe(updateGridStatsAction));
         _unsubActions.Add(backpackSlot.ReactiveContainedItem.Bind(Stats.Gear.Backpack.OnChangeContainer));
 
-        var pockets = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Pockets).ContainedItem;
+        var pockets = equipment.GetSlot(EquipmentSlot.Pockets).ContainedItem;
         Stats.Gear.Pockets.OnChangeContainer(pockets);
     }
 
@@ -194,9 +197,10 @@ public class LootingInventoryController
     /// </summary>
     public void UpdateGridStats()
     {
-        var tacVest = (SearchableItem)_botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem;
-        var pockets = (SearchableItem)_botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Pockets).ContainedItem;
-        var backpack = (SearchableItem)_botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Backpack).ContainedItem;
+        var equipment = _botInventoryController.Inventory.Equipment;
+        var tacVest = (SearchableItem)equipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem;
+        var pockets = (SearchableItem)equipment.GetSlot(EquipmentSlot.Pockets).ContainedItem;
+        var backpack = (SearchableItem)equipment.GetSlot(EquipmentSlot.Backpack).ContainedItem;
 
         var tacVestGrids = (tacVest?.Grids).GetTotalAndAvailableGridSlots();
         var pocketsGrids = (pockets?.Grids).GetTotalAndAvailableGridSlots();
@@ -554,14 +558,15 @@ public class LootingInventoryController
             return lootingActions.Count > 0;
         }
 
-        var helmet = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Headwear).ContainedItem;
-        var earpiece = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Earpiece).ContainedItem;
-        var faceCover = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.FaceCover).ContainedItem;
-        var eyewear = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Eyewear).ContainedItem;
-        var chest = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.ArmorVest).ContainedItem;
-        var armBand = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.ArmBand).ContainedItem;
-        var tacVest = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem;
-        var backpack = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Backpack).ContainedItem;
+        var equipment = _botInventoryController.Inventory.Equipment;
+        var helmet = equipment.GetSlot(EquipmentSlot.Headwear).ContainedItem;
+        var earpiece = equipment.GetSlot(EquipmentSlot.Earpiece).ContainedItem;
+        var faceCover = equipment.GetSlot(EquipmentSlot.FaceCover).ContainedItem;
+        var eyewear = equipment.GetSlot(EquipmentSlot.Eyewear).ContainedItem;
+        var chest = equipment.GetSlot(EquipmentSlot.ArmorVest).ContainedItem;
+        var armBand = equipment.GetSlot(EquipmentSlot.ArmBand).ContainedItem;
+        var tacVest = equipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem;
+        var backpack = equipment.GetSlot(EquipmentSlot.Backpack).ContainedItem;
 
         switch (lootItem)
         {
@@ -766,9 +771,10 @@ public class LootingInventoryController
     {
         token.ThrowIfCancellationRequested();
 
-        var primary = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.FirstPrimaryWeapon).ContainedItem as Weapon;
-        var secondary = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.SecondPrimaryWeapon).ContainedItem as Weapon;
-        var holster = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Holster).ContainedItem as Weapon;
+        var equipment = _botInventoryController.Inventory.Equipment;
+        var primary = equipment.GetSlot(EquipmentSlot.FirstPrimaryWeapon).ContainedItem as Weapon;
+        var secondary = equipment.GetSlot(EquipmentSlot.SecondPrimaryWeapon).ContainedItem as Weapon;
+        var holster = equipment.GetSlot(EquipmentSlot.Holster).ContainedItem as Weapon;
         var thrownMagSlot = thrownWeapon?.GetMagazineSlot();
         var primaryMagSlot = primary?.GetMagazineSlot();
         var secondaryMagSlot = secondary?.GetMagazineSlot();
@@ -891,14 +897,16 @@ public class LootingInventoryController
     /// </summary>
     public void GetWeaponEquipAction(Weapon lootWeapon, List<LootingAction> lootingActions)
     {
-        var primary = (Weapon)_botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.FirstPrimaryWeapon).ContainedItem;
-        var secondary = (Weapon)_botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.SecondPrimaryWeapon).ContainedItem;
-        var holster = (Weapon)_botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Holster).ContainedItem;
+        var equipment = _botInventoryController.Inventory.Equipment;
+        var primary = (Weapon)equipment.GetSlot(EquipmentSlot.FirstPrimaryWeapon).ContainedItem;
+        var secondary = (Weapon)equipment.GetSlot(EquipmentSlot.SecondPrimaryWeapon).ContainedItem;
+        var holster = (Weapon)equipment.GetSlot(EquipmentSlot.Holster).ContainedItem;
 
         var lootValue = CurrentItemPrice;
 
-        // Loot weapon is a pistol for the holster slot
-        if (lootWeapon.WeapClass.Equals("pistol"))
+        // Loot weapon can fit in the holster slot
+        // Some mods allow SMGs in the holster.
+        if (equipment.GetSlot(EquipmentSlot.Holster).CanAccept(lootWeapon))
         {
             if (holster is null)
             {
