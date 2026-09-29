@@ -67,13 +67,13 @@ public class GearValue
     public readonly ValuePair Secondary = new(string.Empty, 0f);
     public readonly ValuePair Holster = new(string.Empty, 0f);
 
-    public readonly ContainedItems Vest = new();
     public readonly ContainedItems Backpack = new();
+    public readonly ContainedItems Vest = new();
     public readonly ContainedItems Pockets = new();
 
     public bool TryAddContainedItem(Item item, int size, float value)
     {
-        if (ContainedItems.IsNotReplaceable(item))
+        if (item.IsNotReplaceable())
         {
             return false;
         }
@@ -83,12 +83,32 @@ public class GearValue
 
     public bool TryRemoveContainedItem(Item item)
     {
-        if (ContainedItems.IsNotReplaceable(item))
+        if (item.IsNotReplaceable())
         {
             return false;
         }
 
-        return Backpack.TryRemove(item) || Vest.TryRemove(item) || Pockets.TryRemove(item);
+        if (item is not SearchableItem searchableItem)
+        {
+            return Backpack.TryRemove(item) || Vest.TryRemove(item) || Pockets.TryRemove(item);
+        }
+
+        // Technically unreachable since we don't throw SearchableItems
+        var removedSome = false;
+        using var pooledList = UnityEngine.Pool.ListPool<Item>.Get(out var gridItems);
+        searchableItem.GetAllGridContainedItems(gridItems);
+        foreach (var gridItem in gridItems)
+        {
+            var wasRemoved = Backpack.TryRemove(gridItem) || Vest.TryRemove(gridItem) || Pockets.TryRemove(gridItem);
+            if (!removedSome)
+            {
+                removedSome = wasRemoved;
+            }
+            LootingBots.LootLog.LogError(
+                $"BotStats::TryRemoveContainedItem SearchableItem removed {gridItem.LocalizedName()} {wasRemoved}"
+            );
+        }
+        return removedSome;
     }
 }
 
@@ -153,6 +173,19 @@ public class ContainedItems
             {
                 continue;
             }
+            if (potentialLoot.Item.CurrentAddress == null)
+            {
+                // TODO: Check if still needed
+                if (LootingBots.LootLog.WarningEnabled)
+                {
+                    LootingBots.LootLog.LogWarning(
+                        $"Removing invalid contained item: has no valid parent, discarded? [{potentialLoot.Item.ToFullString()}]"
+                    );
+                }
+                _items.RemoveAt(index);
+                index--;
+                continue;
+            }
             return true;
         }
 
@@ -171,6 +204,11 @@ public class ContainedItems
             return false;
         }
 
+        if (item is SearchableItem container)
+        {
+            AddAllContainedLootItems(container);
+            return true;
+        }
         AddInternal(new ContainedLootItem(item, size, value));
         return true;
     }
@@ -191,7 +229,7 @@ public class ContainedItems
     public void Replace(int index, ContainedLootItem loot)
     {
         _items.RemoveAt(index);
-        if (IsNotReplaceable(loot.Item))
+        if (loot.Item.IsNotReplaceable())
         {
             return;
         }
@@ -243,7 +281,7 @@ public class ContainedItems
                         AddAllContainedLootItems(childContainer);
                         continue;
                     default:
-                        if (IsNotReplaceable(gridItem))
+                        if (gridItem.IsNotReplaceable())
                         {
                             continue;
                         }
@@ -252,11 +290,6 @@ public class ContainedItems
                 }
             }
         }
-    }
-
-    public static bool IsNotReplaceable(Item item)
-    {
-        return item.QuestItem || item.IsDogtag() || item is Magazine or Ammo or Meds or Money;
     }
 }
 
@@ -271,9 +304,7 @@ public readonly struct ContainedLootItem : IComparable<ContainedLootItem>, IEqua
     {
         Item = item;
         Value = LootingBots.ItemAppraiser.GetItemPrice(item, null);
-
-        var cellSize = item.CalculateCellSize();
-        Size = cellSize.X * cellSize.Y;
+        Size = item.GetItemSize();
         ValuePerSlot = Value / Size;
     }
 

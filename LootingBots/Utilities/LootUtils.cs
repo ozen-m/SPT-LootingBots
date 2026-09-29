@@ -10,6 +10,7 @@ namespace LootingBots.Utilities;
 public static class LootUtils
 {
     public const int RESERVED_SLOT_COUNT = 2;
+    public const float VEST_GRID_CELL_MIN_RATIO = 4f / 3f;
     public static readonly int LowPolyMask = LayerMask.GetMask("LowPolyCollider");
     public static readonly int LootMask = LayerMask.GetMask("Interactive", "Loot", "Deadbody");
     public static readonly AccessTools.FieldRef<Player, Corpse> PlayerCorpseField = AccessTools.FieldRefAccess<Player, Corpse>("Corpse");
@@ -62,17 +63,6 @@ public static class LootUtils
     }
 
     /// <summary>
-    /// Checks if a key is a Single Use Item like the "Unknown Key"
-    /// </summary>
-    /// <param name="item">The item to check</param>
-    /// <returns>returns true if it's single use, false otherwise</returns>
-    public static bool IsSingleUseKey(this Item item)
-    {
-        var key = item.GetItemComponent<KeyComponent>();
-        return key != null && key.Template.MaximumNumberOfUsage == 1;
-    }
-
-    /// <summary>
     /// Triggers a container to open/close.
     /// </summary>
     public static ValueTask<bool> InteractAsync(
@@ -101,7 +91,8 @@ public static class LootUtils
     }
 
     /// <summary>
-    /// Calculates the amount of total and available grid slots in a container
+    /// Calculates the amount of total and available grid slots in a container.
+    /// Available grid slots is computed with the total grid slots less the amount of space taken up by all the items in a grid.
     /// </summary>
     /// <returns>(Total Size Grid Slots, Available Grid Slots)</returns>
     public static (int total, int available) GetTotalAndAvailableGridSlots(this Grid[] grids)
@@ -118,28 +109,43 @@ public static class LootUtils
         foreach (var grid in grids)
         {
             gridSize += grid.GridHeight * grid.GridWidth;
-            containedSize += grid.GetSizeOfContainedItems();
+
+            foreach (var item in grid.ItemCollection.ItemsList)
+            {
+                containedSize += item.GetItemSize();
+
+                if (item is SearchableItem nestedContainer)
+                {
+                    var (nestedTotal, nestedAvailable) = nestedContainer.Grids.GetTotalAndAvailableGridSlots();
+                    gridSize += nestedTotal;
+                    containedSize += nestedTotal - nestedAvailable; // Compute containedSize from nested containers
+                }
+            }
         }
 
         return (gridSize, gridSize - containedSize);
     }
 
     /// <summary>
-    /// returns the amount of space taken up by all the items in a given grid slot
+    /// Calculates the amount of total and available grid slots in a container.
     /// </summary>
-    /// <param name="grid">The grid to calculate the amount of space taken up for</param>
-    /// <returns>Returns the item size as an integer</returns>
-    public static int GetSizeOfContainedItems(this Grid grid)
+    /// <returns>(Total Size Grid Slots, Available Grid Slots)</returns>
+    public static int GetTotalGridSlots(this Grid[] grids)
     {
-        var containedItemSize = 0;
-
-        // Loop through each item in grid.Items (same as grid.ItemCollection.ItemsList) and accumulate the item size
-        foreach (var item in grid.ItemCollection.ItemsList)
+        if (grids is null)
         {
-            containedItemSize += item.GetItemSize();
+            return 0;
         }
 
-        return containedItemSize;
+        var gridSize = 0;
+
+        // Loop through each grid and calculate the total and contained spaces
+        foreach (var grid in grids)
+        {
+            gridSize += grid.GridHeight * grid.GridWidth;
+        }
+
+        return gridSize;
     }
 
     /// <summary>
@@ -346,7 +352,21 @@ public static class LootUtils
     )
         where TItem : Item
     {
-        var equipment = inventoryController.Inventory.Equipment;
+        inventoryController.Inventory.Equipment.GetAllGridItemsInStorageSlotsNonAlloc(preAllocatedList, templateId);
+    }
+
+    /// <summary>
+    /// Get all grid items from the equipment's storage slots.
+    /// The SecuredContainer slot is excluded.
+    /// </summary>
+    /// <param name="templateId">Optional template ID to match a specific item template.</param>
+    public static void GetAllGridItemsInStorageSlotsNonAlloc<TItem>(
+        this InventoryEquipment equipment,
+        List<TItem> preAllocatedList,
+        MongoID? templateId = null
+    )
+        where TItem : Item
+    {
         foreach (var slotName in StorageSlots)
         {
             equipment.GetSlot(slotName).ContainedItem.GetAllGridContainedItems(preAllocatedList, templateId);
@@ -373,7 +393,7 @@ public static class LootUtils
                 // Skip grids with the same parent
                 continue;
             }
-            var location = grid.FindLocationForItem(loot);
+            var location = grid.FindLocationForItem(loot) ?? grid.FindLocationForItemInNestedGrids(loot);
             if (location == null)
             {
                 continue;
@@ -409,29 +429,23 @@ public static class LootUtils
                         preAllocatedList.AddRange(armbandGrids);
                         preAllocatedList.AddRange(vestGrids);
                         preAllocatedList.AddRange(pocketsGrids);
-                        preAllocatedList.AddRange(backpackGrids);
+                        // preAllocatedList.AddRange(backpackGrids);
                         break;
                     case Magazine:
                         preAllocatedList.AddRange(vestGrids);
                         preAllocatedList.AddRange(armbandGrids);
                         preAllocatedList.AddRange(pocketsGrids);
-                        preAllocatedList.AddRange(backpackGrids);
+                        // preAllocatedList.AddRange(backpackGrids); // Bots can't reach magazines in the backpack
                         break;
-                    case Money:
-                        preAllocatedList.AddRange(backpackGrids);
-                        preAllocatedList.AddRange(armbandGrids);
-                        preAllocatedList.AddRange(vestGrids);
-                        preAllocatedList.AddRange(pocketsGrids);
-                        break;
-                    case ThrowWeap:
+                    case ThrowWeap or Meds:
                         preAllocatedList.AddRange(pocketsGrids);
                         preAllocatedList.AddRange(armbandGrids);
                         preAllocatedList.AddRange(vestGrids);
-                        preAllocatedList.AddRange(backpackGrids);
+                        // preAllocatedList.AddRange(backpackGrids);
                         break;
                     default:
                         preAllocatedList.AddRange(backpackGrids);
-                        preAllocatedList.AddRange(vestGrids);
+                        // preAllocatedList.AddRange(vestGrids); // Reserve vest for Magazine, Ammo, Meds, ThrowWeap
                         preAllocatedList.AddRange(armbandGrids);
                         preAllocatedList.AddRange(pocketsGrids);
                         break;
@@ -443,12 +457,42 @@ public static class LootUtils
                 preAllocatedList.AddRange(container.Grids);
                 return;
             }
+            case SearchableItem searchableItem:
+                preAllocatedList.AddRange(searchableItem.Grids);
+                foreach (var grid in searchableItem.Grids)
+                {
+                    foreach (var item in grid._itemCollection.ItemsList)
+                    {
+                        item.GetPrioritizedGridsForLootNonAlloc(null, preAllocatedList);
+                    }
+                }
+                return;
             default:
             {
                 // Loose loot
                 return;
             }
         }
+    }
+
+    /// <summary>
+    /// Try to find a location in nested grids.
+    /// </summary>
+    /// <param name="grid">Grid to find nested searchable items' grids</param>
+    /// <param name="item">Item to find location for</param>
+    public static GridItemAddress FindLocationForItemInNestedGrids(this Grid grid, Item item)
+    {
+        foreach (var gridItem in grid._itemCollection.ItemsList)
+        {
+            if (gridItem is not SearchableItem searchableItem)
+            {
+                continue;
+            }
+
+            return searchableItem.FindGridToPickUpLootNonAlloc(item);
+        }
+
+        return null;
     }
 
     /// <summary>

@@ -1,4 +1,5 @@
 using Comfort.Common;
+using Diz.LanguageExtensions;
 using EFT;
 using EFT.InventoryLogic;
 using LootingBots.Actions;
@@ -430,8 +431,17 @@ public class LootingInventoryController
                     continue;
                 }
 
+                // Try nest the container if we're allowed
+                // TODO: Add weight check
+                if (item is SearchableItem searchableItem && LootingBots.AllowContainerNesting.Value)
+                {
+                    if (await TryNestContainerAsync(searchableItem, itemSize, token))
+                    {
+                        continue;
+                    }
+                }
                 // If we're allowed to pick up the item, but we don't have space, try to find an item to replace it with
-                if (!_lootingBrain.HasFreeSpace)
+                else if (!_lootingBrain.HasFreeSpace)
                 {
                     if (
                         HasReplacement(item, itemSize, out var source, out var index, out var loot)
@@ -459,9 +469,18 @@ public class LootingInventoryController
                 }
                 else if (await _transactionController.TryPickupItemAsync(item, token))
                 {
-                    Stats.AddNetValue(CurrentItemPrice + GetAllContainedItemsValue(item));
+                    Stats.AddNetValue(CurrentItemPrice);
                     Stats.AvailableGridSpaces -= itemSize;
                     Stats.Gear.TryAddContainedItem(item, itemSize, CurrentItemPrice);
+
+                    if (item is SearchableItem pickedUpContainer)
+                    {
+                        Stats.AddNetValue(pickedUpContainer.GetAllContainedItemsValue(_log));
+                        var (total, available) = pickedUpContainer.Grids.GetTotalAndAvailableGridSlots();
+                        Stats.TotalGridSpaces += total;
+                        Stats.AvailableGridSpaces += available; // TODO: Double check
+                    }
+
                     continue;
                 }
             }
@@ -1341,6 +1360,70 @@ public class LootingInventoryController
         return await TryAddItemsToBotAsync(items, token);
     }
 
+    public async Task<bool> TryNestContainerAsync(SearchableItem item, int itemSize, CancellationToken token = default)
+    {
+        // BUG: Swapping out item then looting item can cause a ghost loot item in the world
+        if (_log.DebugEnabled)
+        {
+            _log.LogDebug($"Trying to pick up container [{item.LocalizedName()}]...");
+        }
+
+        using var pooledUseless = DictionaryPool<Item, float>.Get(out var uselessItems);
+        using var pooledOperations = UnityEngine.Pool.ListPool<OperationResult<RemoveResult>>.Get(out var removeOperations);
+
+        // Get undervalued items and remove them so they won't interfere with TryFillContainerAndPickUp, but roll it back afterward
+        GetUndervaluedItems(item, uselessItems);
+        foreach (var (uselessItem, _) in uselessItems)
+        {
+            removeOperations.Add(ItemManipulator.RemoveWithoutRestrictions(uselessItem, _botInventoryController));
+        }
+
+        var fillResult = ItemManipulatorEx.TryFillContainerAndPickUp(item, _botInventoryController, _transactionController, _log);
+
+        foreach (var removeResult in removeOperations)
+        {
+            removeResult.Value?.RollBack();
+        }
+
+        if (fillResult.Failed)
+        {
+            if (_log.DebugEnabled)
+            {
+                _log.LogDebug(fillResult._error);
+            }
+            return false;
+        }
+
+        // Only actually throw them if we succeeded
+        await ThrowUndervaluedItemsAsync(item, uselessItems, null, _lootingBrain.ActiveLoot.GetRootItem(), token);
+
+        await LootingTransactionController.SimulatePlayerDelayAsync(LootingBots.TransactionDelay.Value * fillResult.Value.Count, token);
+
+        var networkResult = await fillResult.Value.ExecuteAsync();
+        if (networkResult.Failed)
+        {
+            if (_log.ErrorEnabled)
+            {
+                _log.LogError(
+                    $"Failed to fill container [{item.LocalizedName()}] with items from backpack and pick up. Network Error: {networkResult.Error}"
+                );
+            }
+            return false;
+        }
+
+        Stats.AddNetValue(CurrentItemPrice + fillResult.Value.NetWorthDelta);
+        Stats.Gear.TryAddContainedItem(item, itemSize, CurrentItemPrice);
+        UpdateGridStats();
+
+        if (_log.InfoEnabled)
+        {
+            _log.LogInfo(
+                $"Filled container [{item.LocalizedName()}] with items from backpack and picked up [place: {item.CurrentAddress.GetRootItem()?.Name.Localized()}]"
+            );
+        }
+        return true;
+    }
+
     /// <summary>
     /// Searches through the child items of a container
     /// </summary>
@@ -1493,6 +1576,7 @@ public class LootingInventoryController
 
         // All usable mags and money should be considered eligible to loot. Otherwise, all other items fall subject to the mod settings for restricting pickup and loot value thresholds
         return lootItem is Money
+            || lootItem is SearchableItem searchableItem and not Pockets && CanPickupContainer(searchableItem)
             || lootItem is Magazine mag && IsUsableMag(mag)
             || lootItem is Ammo ammo && IsUsableAmmo(ammo)
             || (
@@ -1501,6 +1585,21 @@ public class LootingInventoryController
                     lootItem.IsDogtag() || IsValuableEnough(CurrentItemPrice / itemSize) // Divide by slots to get price per slot
                 )
             );
+    }
+
+    /// <summary>
+    /// Check if this container can be picked up.
+    /// </summary>
+    /// <param name="container">The container to pick up.</param>
+    /// <returns>True if container has a ratio more than <see cref="LootUtils.VEST_GRID_CELL_MIN_RATIO"/> if a Vest, or >1f if a backpack.</returns>
+    public bool CanPickupContainer(SearchableItem container)
+    {
+        var ratio = (float)container.Grids.GetTotalGridSlots() / container.GetItemSize();
+        return container switch
+        {
+            Vest => ratio > LootUtils.VEST_GRID_CELL_MIN_RATIO,
+            _ => ratio > 1f,
+        };
     }
 
     /// <summary>
@@ -1517,7 +1616,7 @@ public class LootingInventoryController
             source = Stats.Gear.Backpack;
             return true;
         }
-        if (Stats.Gear.Vest.TryFindReplacement(loot, out index))
+        if (lootItem.IsPlacedInFastAccessSlots() && Stats.Gear.Vest.TryFindReplacement(loot, out index))
         {
             source = Stats.Gear.Vest;
             return true;
