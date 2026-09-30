@@ -798,10 +798,15 @@ public class LootingInventoryController
     }
 
     /// <summary>
-    /// Check if this magazine can be used by any equipped weapon
+    /// Check if this magazine can be used by any equipped weapon.
     /// </summary>
     public bool IsUsableMag(Magazine mag)
     {
+        if (mag.FirstRealAmmo() is not Ammo ammoInMag)
+        {
+            return false;
+        }
+
         var equipment = _botInventoryController.Inventory.Equipment;
         foreach (var weaponSlot in LootUtils.WeaponSlots)
         {
@@ -809,9 +814,7 @@ public class LootingInventoryController
             {
                 continue;
             }
-
-            var magazineSlot = weapon.GetMagazineSlot();
-            if (magazineSlot != null && magazineSlot.CanAccept(mag))
+            if (IsUsableAmmoForWeapon(weapon, ammoInMag) && weapon.GetMagazineSlot() is { } slot && slot.CanAccept(mag))
             {
                 return true;
             }
@@ -821,7 +824,20 @@ public class LootingInventoryController
     }
 
     /// <summary>
-    /// Check if this ammo can be used by any equipped weapon
+    /// Check if this magazine can be used by <paramref name="weapon"/>.
+    /// We need to check if the ammo inside the magazine is compatible with the weapon
+    /// since some magazines can support multiple calibers.
+    /// </summary>
+    public bool IsUsableMagForWeapon(Weapon weapon, Magazine mag)
+    {
+        return mag.FirstRealAmmo() is Ammo ammoInMag
+            && IsUsableAmmoForWeapon(weapon, ammoInMag)
+            && weapon.GetMagazineSlot() is { } slot
+            && slot.CanAccept(mag);
+    }
+
+    /// <summary>
+    /// Check if this ammo can be used by any equipped weapon.
     /// </summary>
     public bool IsUsableAmmo(Ammo ammo)
     {
@@ -832,13 +848,25 @@ public class LootingInventoryController
             {
                 continue;
             }
-
-            foreach (var chamber in weapon.Chambers)
+            if (IsUsableAmmoForWeapon(weapon, ammo))
             {
-                if (chamber.CanAccept(ammo))
-                {
-                    return true;
-                }
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Check if this magazine can be used by <paramref name="weapon"/>.
+    /// </summary>
+    public bool IsUsableAmmoForWeapon(Weapon weapon, Ammo ammo)
+    {
+        foreach (var chamber in weapon.Chambers)
+        {
+            if (chamber.CanAccept(ammo))
+            {
+                return true;
             }
         }
 
@@ -864,30 +892,23 @@ public class LootingInventoryController
             return true;
         }
 
-        var magazineSlot = weapon.GetMagazineSlot();
-        var chambers = weapon.Chambers;
-
         using var pooledList = UnityEngine.Pool.ListPool<Item>.Get(out var items);
         equipment.GetAllGridItemsInStorageSlotsNonAlloc(items);
 
         foreach (var item in items)
         {
-            if (item is Magazine)
+            if (item is Magazine mag)
             {
-                // TODO: CanAccept is incompatible with multi-caliber weapons
-                if (magazineSlot?.CanAccept(item) == true)
+                if (IsUsableMagForWeapon(weapon, mag))
                 {
                     usableMagazines.Add(item);
                 }
             }
-            else if (item is Ammo)
+            else if (item is Ammo ammo)
             {
-                foreach (var chamber in chambers)
+                if (IsUsableAmmoForWeapon(weapon, ammo))
                 {
-                    if (chamber.CanAccept(item))
-                    {
-                        usableMagazines.Add(item);
-                    }
+                    usableMagazines.Add(item);
                 }
             }
         }
@@ -905,12 +926,11 @@ public class LootingInventoryController
 
         var equipment = _botInventoryController.Inventory.Equipment;
         var primary = equipment.GetSlot(EquipmentSlot.FirstPrimaryWeapon).ContainedItem as Weapon;
+        var hasPrimary = primary is not null;
         var secondary = equipment.GetSlot(EquipmentSlot.SecondPrimaryWeapon).ContainedItem as Weapon;
+        var hasSecondary = secondary is not null;
         var holster = equipment.GetSlot(EquipmentSlot.Holster).ContainedItem as Weapon;
-        var thrownMagSlot = thrownWeapon?.GetMagazineSlot();
-        var primaryMagSlot = primary?.GetMagazineSlot();
-        var secondaryMagSlot = secondary?.GetMagazineSlot();
-        var holsterMagSlot = holster?.GetMagazineSlot();
+        var hasHolster = holster is not null;
 
         using var pooledList = UnityEngine.Pool.ListPool<Magazine>.Get(out var magazines);
         _botInventoryController.GetAllGridItemsInStorageSlotsNonAlloc(magazines);
@@ -923,10 +943,10 @@ public class LootingInventoryController
         var reservedCount = 0;
         foreach (var mag in magazines)
         {
-            var fitsInThrown = thrownMagSlot?.CanAccept(mag) == true;
-            var fitsInPrimary = primaryMagSlot?.CanAccept(mag) == true;
-            var fitsInSecondary = secondaryMagSlot?.CanAccept(mag) == true;
-            var fitsInHolster = holsterMagSlot?.CanAccept(mag) == true;
+            var fitsInThrown = IsUsableMagForWeapon(thrownWeapon, mag);
+            var fitsInPrimary = hasPrimary && IsUsableMagForWeapon(primary, mag);
+            var fitsInSecondary = hasSecondary && IsUsableMagForWeapon(secondary, mag);
+            var fitsInHolster = hasHolster && IsUsableMagForWeapon(holster, mag);
 
             var fitsInEquipped = fitsInPrimary || fitsInSecondary || fitsInHolster;
             var isSharedMag = fitsInThrown && fitsInEquipped;

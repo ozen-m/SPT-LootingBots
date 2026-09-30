@@ -72,10 +72,10 @@ public class ItemAppraiser(Log _log)
         // Get the price of an ammo box by its ammo
         if (lootItem is AmmoBox box)
         {
-            var cartridges = box.Cartridges._items;
-            if (cartridges.Count > 0)
+            var ammo = box.Cartridges.Last;
+            if (ammo is not null)
             {
-                lootItem = cartridges[0];
+                lootItem = ammo;
             }
         }
 
