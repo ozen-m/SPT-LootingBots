@@ -1605,7 +1605,9 @@ public class LootingInventoryController
     /// </summary>
     public ValueTask<bool> StripWeaponAsync(Weapon weapon, List<Item> modsToLoot, CancellationToken token = default)
     {
-        foreach (var mod in weapon.Mods)
+        using var pooledList = UnityEngine.Pool.ListPool<Mod>.Get(out var mods);
+        weapon.GetAllSlotContainedItems(mods);
+        foreach (var mod in mods)
         {
             // Check if the mod's slot is not required, can be modded in raid, and is not a magazine
             if (mod.Parent.Container is Slot { Required: false } && mod is { RaidModdable: true } and not Magazine)

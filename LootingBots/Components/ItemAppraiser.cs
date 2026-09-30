@@ -140,9 +140,11 @@ public class ItemAppraiser(Log _log)
         var finalPrice = 0f;
 
         // Iterate over each weapon mod and accumulate the price
-        foreach (var weaponMod in lootWeapon.Mods)
+        using var pooledList = UnityEngine.Pool.ListPool<Mod>.Get(out var mods);
+        lootWeapon.GetAllSlotContainedItems(mods);
+        foreach (var mod in mods)
         {
-            finalPrice += GetItemHandbookPrice(weaponMod, log);
+            finalPrice += GetItemHandbookPrice(mod, log);
         }
         finalPrice *= GetQualityModifier(lootWeapon);
 
@@ -256,9 +258,11 @@ public class ItemAppraiser(Log _log)
         var finalPrice = 0f;
 
         // Iterate over each weapon mod and accumulate the price
-        foreach (var weaponMod in lootWeapon.Mods)
+        using var pooledList = UnityEngine.Pool.ListPool<Mod>.Get(out var mods);
+        lootWeapon.GetAllSlotContainedItems(mods);
+        foreach (var mod in mods)
         {
-            finalPrice += GetItemMarketPrice(weaponMod, log);
+            finalPrice += GetItemMarketPrice(mod, log);
         }
         finalPrice *= GetQualityModifier(lootWeapon);
 

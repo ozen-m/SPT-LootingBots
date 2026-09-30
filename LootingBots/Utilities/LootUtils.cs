@@ -314,11 +314,10 @@ public static class LootUtils
     }
 
     /// <summary>
-    /// Gets all contained items (grid) of an item and its children.
+    /// Gets all contained items in all grids of an item and its children.
     /// </summary>
     /// <param name="item">The item whose grids are searched.</param>
     /// <param name="templateId">Optional template ID to match a specific item template.</param>
-    /// <remarks>Does not get items in its Slots</remarks>
     public static void GetAllGridContainedItems<TItem>(this Item item, List<TItem> preAllocatedList, MongoID? templateId = null)
         where TItem : Item
     {
@@ -337,6 +336,30 @@ public static class LootUtils
                 }
                 containedItem.GetAllGridContainedItems(preAllocatedList, templateId);
             }
+        }
+    }
+
+    /// <summary>
+    /// Gets all contained items in all slots of an item and its children.
+    /// </summary>
+    /// <param name="item">The item whose slots are searched.</param>
+    /// <param name="templateId">Optional template ID to match a specific item template.</param>
+    public static void GetAllSlotContainedItems<TItem>(this Item item, List<TItem> preAllocatedList, MongoID? templateId = null)
+        where TItem : Item
+    {
+        if (item is not CompoundItem compoundItem)
+        {
+            return;
+        }
+
+        foreach (var slot in compoundItem.Slots)
+        {
+            var containedItem = slot.ContainedItem;
+            if (containedItem is TItem tItem && (templateId is null || tItem.TemplateId == templateId))
+            {
+                preAllocatedList.Add(tItem);
+            }
+            containedItem?.GetAllSlotContainedItems(preAllocatedList, templateId);
         }
     }
 
