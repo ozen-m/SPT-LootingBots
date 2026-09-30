@@ -594,7 +594,7 @@ public class LootingBots : BaseUnityPlugin
         }
 
         ItemAppraiserLog.LogInfo("Updating item appraiser");
-        _ = ItemAppraiser.UpdatePricesAsync();
+        _ = ItemAppraiser.UpdatePricesAsync(destroyCancellationToken);
     }
 
     /// <summary>

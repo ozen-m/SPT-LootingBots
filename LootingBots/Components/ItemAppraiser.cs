@@ -12,12 +12,12 @@ public class ItemAppraiser(Log _log)
     private const float PriceUpdateInterval = 1800f; // 30 minutes
     public float NextPriceUpdate = -1f;
 
-    public Dictionary<MongoID, HandbookData> HandbookData;
+    public Dictionary<MongoID, float> HandbookData;
     public Dictionary<MongoID, float> MarketData;
 
     public bool IsUpdatingPrices { get; private set; }
 
-    public async Task UpdatePricesAsync()
+    public async Task UpdatePricesAsync(CancellationToken token = default)
     {
         IsUpdatingPrices = true;
         try
@@ -25,6 +25,10 @@ public class ItemAppraiser(Log _log)
             if (LootingBots.UseMarketPrices.Value)
             {
                 var tcs = new TaskCompletionSource<Result<Dictionary<string, float>>>();
+                using var registration = token.Register(
+                    static tcs => ((TaskCompletionSource<Result<Dictionary<string, float>>>)tcs).SetCanceled(),
+                    tcs
+                );
                 Singleton<ClientApplication<IEftSession>>.Instance.GetClientBackEndSession().RagfairGetPrices(tcs.SetResult);
                 var ragfairPrices = await tcs.Task;
                 if (ragfairPrices.Succeed)
@@ -39,7 +43,7 @@ public class ItemAppraiser(Log _log)
             else
             {
                 // This is the handbook instance which is initialized when the client first starts.
-                HandbookData = Singleton<Handbook>.Instance.Items.ToDictionary(item => new MongoID(item.Id));
+                HandbookData = Singleton<Handbook>.Instance.Items.ToDictionary(item => new MongoID(item.Id), item => item.Price);
                 if (HandbookData is null)
                 {
                     _log.LogError("Failed to get handbook data");
@@ -135,10 +139,12 @@ public class ItemAppraiser(Log _log)
 
         var finalPrice = 0f;
 
+        // Iterate over each weapon mod and accumulate the price
         foreach (var weaponMod in lootWeapon.Mods)
         {
             finalPrice += GetItemHandbookPrice(weaponMod, log);
         }
+        finalPrice *= GetQualityModifier(lootWeapon);
 
         if (_log.DebugEnabled)
         {
@@ -209,19 +215,21 @@ public class ItemAppraiser(Log _log)
     /// </summary>
     public float GetItemHandbookPrice(Item lootItem, BotLog log)
     {
-        HandbookData.TryGetValue(lootItem.TemplateId, out var value);
-        var price = value?.Price ?? 0f;
-        price *= lootItem.StackObjectsCount;
+        if (HandbookData.TryGetValue(lootItem.TemplateId, out var price))
+        {
+            price *= GetQualityModifier(lootItem);
+            price *= lootItem.StackObjectsCount;
+        }
 
         // if (_log.DebugEnabled)
         // {
         //     if (log != null)
         //     {
-        //         log.LogDebug($"Price of {lootItem.Name.Localized()} is {price}");
+        //         log.LogDebug($"Handbook price of {lootItem.Name.Localized()}: {price:N0}₽");
         //     }
         //     else
         //     {
-        //         _log.LogDebug($"Price of {lootItem.Name.Localized()} is {price}");
+        //         _log.LogDebug($"Handbook price of {lootItem.Name.Localized()}: {price:N0}₽");
         //     }
         // }
 
@@ -252,6 +260,7 @@ public class ItemAppraiser(Log _log)
         {
             finalPrice += GetItemMarketPrice(weaponMod, log);
         }
+        finalPrice *= GetQualityModifier(lootWeapon);
 
         if (_log.DebugEnabled)
         {
@@ -324,17 +333,18 @@ public class ItemAppraiser(Log _log)
     {
         if (MarketData.TryGetValue(lootItem.TemplateId, out var price))
         {
+            price *= GetQualityModifier(lootItem);
             price *= lootItem.StackObjectsCount;
 
             // if (_log.DebugEnabled)
             // {
             //     if (log != null)
             //     {
-            //         log.LogDebug($"Price of {lootItem.Name.Localized()} is {price}");
+            //         log.LogDebug($"Market price of {lootItem.Name.Localized()}: {price:N0}₽");
             //     }
             //     else
             //     {
-            //         _log.LogDebug($"Price of {lootItem.Name.Localized()} is {price}");
+            //         _log.LogDebug($"Market price of {lootItem.Name.Localized()}: {price:N0}₽");
             //     }
             // }
 
@@ -343,5 +353,44 @@ public class ItemAppraiser(Log _log)
 
         // Fallback
         return GetItemHandbookPrice(lootItem, log);
+    }
+
+    private static float GetQualityModifier(Item item)
+    {
+        var modifier = 1f;
+        foreach (var component in item.Components)
+        {
+            switch (component)
+            {
+                case ResourceComponent resource:
+                    if (resource.Value > 0f)
+                    {
+                        modifier *= resource.Value / resource.MaxResource;
+                    }
+                    break;
+                case MedKitComponent medKit:
+                    modifier *= medKit.HpResource / medKit.MaxHpResource;
+                    break;
+                case FoodDrinkComponent foodDrink:
+                    modifier *= foodDrink.HpPercent / foodDrink.MaxResource;
+                    break;
+                case RepairableComponent repairable:
+                    var durability = repairable.Durability / repairable.TemplateDurability;
+                    modifier *= durability != 0f ? Mathf.Sqrt(durability) : 1f;
+                    break;
+                case KeyComponent key:
+                    if (key.NumberOfUsages > 0 && key.Template.MaximumNumberOfUsage > 0)
+                    {
+                        var maximumNumberOfUsage = key.Template.MaximumNumberOfUsage;
+                        modifier *= (maximumNumberOfUsage - key.NumberOfUsages) / (float)maximumNumberOfUsage;
+                    }
+                    break;
+                case RepairKitComponent repairKit:
+                    modifier *= repairKit.Resource / repairKit._template.MaxRepairResource;
+                    break;
+            }
+        }
+
+        return modifier;
     }
 }

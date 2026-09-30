@@ -182,12 +182,15 @@ public class LootingInventoryController
         }
 
         Stats.NetWorth = 0f;
+        Stats.NetWorth += Stats.PrimaryValue;
+        Stats.NetWorth += Stats.SecondaryValue;
+        Stats.NetWorth += Stats.HolsterValue;
         foreach (var slot in _botInventoryController.Inventory.Equipment._cachedSlots)
         {
             var containedItem = slot.ContainedItem;
             switch (containedItem)
             {
-                case null or MobContainer:
+                case null or MobContainer or Weapon:
                     continue;
                 case SearchableItem searchableItem:
                 {
