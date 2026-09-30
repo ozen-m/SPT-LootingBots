@@ -73,10 +73,41 @@ public class LootingInventoryController
         _transactionController = new LootingTransactionController(botOwner, _botInventoryController, _log);
         _isPMC = _botOwner.Profile.Info.Settings.Role.IsPMC();
 
-        CalculateGearValue();
-        CalculateInitialNetWorth();
-        SubscribeToGearSlots();
-        UpdateGridStats();
+        _ = OnSpawnAsync();
+    }
+
+    public async Task OnSpawnAsync(CancellationToken token = default)
+    {
+        try
+        {
+            var equipment = _botInventoryController.Inventory.Equipment;
+            await TransferItemsToBackpackAsync(equipment.GetSlot(EquipmentSlot.Pockets).ContainedItem);
+            await TransferItemsToBackpackAsync(equipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem);
+            await TransferItemsToBackpackAsync(equipment.GetSlot(EquipmentSlot.ArmBand).ContainedItem);
+
+            var backpack = equipment.GetSlot(EquipmentSlot.Backpack).ContainedItem;
+            using (DictionaryPool<Item, float>.Get(out var itemsToThrow))
+            {
+                GetUndervaluedItems(backpack, itemsToThrow);
+                if (itemsToThrow.Count > 0)
+                {
+                    await ThrowUndervaluedItemsAsync(backpack, itemsToThrow, null, null, token);
+                }
+            }
+
+            CalculateGearValue();
+            CalculateInitialNetWorth();
+            SubscribeToGearSlots();
+            UpdateGridStats();
+        }
+        catch (OperationCanceledException)
+        {
+            // Ignore
+        }
+        catch (Exception ex)
+        {
+            LootingBots.LootLog.LogError(ex.ToString());
+        }
     }
 
     /// <summary>
@@ -216,6 +247,60 @@ public class LootingInventoryController
         UpdateGridStats();
     }
 
+    public ValueTask TransferItemsToBackpackAsync(Item source)
+    {
+        if (source is not SearchableItem)
+        {
+            return new ValueTask();
+        }
+        var backpack = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Backpack).ContainedItem;
+        if (backpack is null)
+        {
+            return new ValueTask();
+        }
+
+        using var pooledItems = UnityEngine.Pool.ListPool<Item>.Get(out var items);
+        using var pooledMove = UnityEngine.Pool.ListPool<MoveResult>.Get(out var moveResults);
+
+        source.GetAllGridContainedItems(items);
+        foreach (var item in items)
+        {
+            // Keep these items
+            if (item.IsPlacedInFastAccessSlots())
+            {
+                continue;
+            }
+            var location = backpack.FindGridToPickUpLootNonAlloc(item);
+            if (location is null)
+            {
+                continue;
+            }
+            var moveResult = ItemManipulator.Move(item, location, _botInventoryController, true);
+            if (moveResult.Failed)
+            {
+                continue;
+            }
+
+            moveResults.Add(moveResult.Value);
+        }
+
+        if (moveResults.Count == 0)
+        {
+            if (_log.DebugEnabled)
+            {
+                _log.LogDebug($"No items to transfer from {source.LocalizedName()} to the backpack");
+            }
+            return new ValueTask();
+        }
+
+        var moveOperationsResults = new MoveMultipleResult(moveResults, _transactionController, 0f);
+        if (_log.DebugEnabled)
+        {
+            _log.LogDebug($"Transferring {moveOperationsResults.Count} items from {source.LocalizedName()} to the backpack");
+        }
+        return new ValueTask(moveOperationsResults.ExecuteAsync());
+    }
+
     /// <summary>
     /// Sorts the items in the tactical vest so that items prefer to be in slots that match their size.
     /// i.e a 1x1 item will be placed in a 1x1 slot instead of a 1x2 slot
@@ -343,6 +428,12 @@ public class LootingInventoryController
                                         _lootingBrain.ActiveLoot.GetRootItem(),
                                         token
                                     );
+                                }
+
+                                // Clean up vest of other items
+                                if (swapAction.Item is Vest newVest)
+                                {
+                                    await TransferItemsToBackpackAsync(newVest);
                                 }
 
                                 // Then loot the thrown item and its children
