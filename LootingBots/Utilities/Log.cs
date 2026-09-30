@@ -36,11 +36,6 @@ public enum LogLevel
     ///     All log levels.
     /// </summary>
     All = Error | Warning | Info | Debug,
-
-    /// <summary>
-    ///     Default log levels.
-    /// </summary>
-    Default = Error | Warning,
 }
 
 public class BotLog

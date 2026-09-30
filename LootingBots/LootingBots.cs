@@ -39,6 +39,8 @@ public class LootingBots : BaseUnityPlugin
         | EquipmentType.Eyewear
         | EquipmentType.Armband;
 
+    public const LogLevel DefaultLogLevel = LogLevel.Error | LogLevel.Warning;
+
     // Loot Finder Settings
     public static ConfigEntry<BotType> CorpseLootingEnabled;
     public static ConfigEntry<BotType> ContainerLootingEnabled;
@@ -191,7 +193,7 @@ public class LootingBots : BaseUnityPlugin
         LootingLogLevels = Config.Bind(
             "Loot Finder",
             "Debug: Log Levels",
-            LogLevel.Default,
+            DefaultLogLevel,
             new ConfigDescription(
                 "Enable different levels of log messages to show in the logs",
                 null,
@@ -201,7 +203,7 @@ public class LootingBots : BaseUnityPlugin
         InteropLogLevels = Config.Bind(
             "Loot Finder",
             "Debug: Interop Log Levels",
-            LogLevel.Default,
+            DefaultLogLevel,
             new ConfigDescription(
                 "Enable different levels of log messages specific to the mod interop methods",
                 null,
@@ -428,7 +430,7 @@ public class LootingBots : BaseUnityPlugin
         ItemAppraiserLogLevels = Config.Bind(
             "Loot Settings",
             "Debug: Item Appraiser Log Levels",
-            LogLevel.Error,
+            DefaultLogLevel,
             new ConfigDescription(
                 "Enables logs for the item appraiser that calculates the weapon values",
                 null,
