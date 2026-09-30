@@ -19,6 +19,7 @@ public enum EquipmentType
     FaceCover = 1024,
     Eyewear = 2048,
     Armband = 4096,
+    Meds = 8192,
 
     All =
         Backpack
@@ -33,7 +34,8 @@ public enum EquipmentType
         | Earpiece
         | FaceCover
         | Eyewear
-        | Armband,
+        | Armband
+        | Meds,
 }
 
 [Flags]
@@ -134,6 +136,12 @@ public static class EquipmentTypeUtils
         return (equipmentType & EquipmentType.Armband) != 0;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool HasMeds(this EquipmentType equipmentType)
+    {
+        return (equipmentType & EquipmentType.Meds) != 0;
+    }
+
     /// <summary>
     /// Can the bot equip or pick up this item based on <paramref name="allowedGear"/>.
     /// </summary>
@@ -158,6 +166,7 @@ public static class EquipmentTypeUtils
             Weapon => allowedGear.HasWeapon(),
             ArmBand => allowedGear.HasArmband(),
             BarterOther barter when barter.IsDogtag() => allowedGear.HasDogtag(),
+            Meds => allowedGear.HasMeds(),
             Pockets => false,
             _ => toPickup,
         };
