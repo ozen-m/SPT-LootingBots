@@ -172,6 +172,11 @@ public static class EquipmentTypeUtils
         };
     }
 
+    public static bool IsArmoredRig(Item item)
+    {
+        return item is Vest vest && IsArmoredRig(vest);
+    }
+
     public static bool IsArmoredRig(Vest vest)
     {
         foreach (var slot in vest.Slots)

@@ -36,7 +36,7 @@ public class LootingMoveAction : LootingAction
 
     public override Task<bool> ExecuteAsync(LootingTransactionController controller, CancellationToken token)
     {
-        return controller.MoveItemAsync(Item, Place, token);
+        return Place is not null ? controller.MoveItemAsync(Item, Place, token) : controller.TryEquipItemAsync(Item, token).AsTask();
     }
 
     public override void Return()
