@@ -44,14 +44,13 @@ public enum CanEquipEquipmentType
     ArmoredRig = EquipmentType.ArmoredRig,
     Chest = EquipmentType.Chest,
     Weapon = EquipmentType.Weapon,
-    Grenade = EquipmentType.Grenade,
     Helmet = EquipmentType.Helmet,
     Earpiece = EquipmentType.Earpiece,
     FaceCover = EquipmentType.FaceCover,
     Eyewear = EquipmentType.Eyewear,
     Armband = EquipmentType.Armband,
 
-    All = Backpack | TacticalRig | ArmoredRig | Chest | Weapon | Helmet | Grenade | Earpiece | FaceCover | Eyewear | Armband,
+    All = Backpack | TacticalRig | ArmoredRig | Chest | Weapon | Helmet | Earpiece | FaceCover | Eyewear | Armband,
 }
 
 public static class EquipmentTypeUtils
