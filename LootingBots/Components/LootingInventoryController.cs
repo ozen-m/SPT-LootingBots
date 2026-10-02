@@ -1400,7 +1400,7 @@ public class LootingInventoryController
         foreach (var item in items)
         {
             // Check the conditions to filter out items to keep
-            if (item.QuestItem || item.IsDogtag() || item is Meds or Money or SearchableItem || (item is Ammo ammo && IsUsableAmmo(ammo)))
+            if (item.QuestItem || item.IsDogtag() || item is Money or SearchableItem || (item is Ammo ammo && IsUsableAmmo(ammo)))
             {
                 continue;
             }

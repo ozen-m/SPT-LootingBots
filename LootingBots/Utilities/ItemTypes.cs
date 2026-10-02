@@ -14,7 +14,7 @@ public static class ItemTypes
 
     public static bool IsNotReplaceable(this Item item)
     {
-        return item.QuestItem || item.IsDogtag() || item is Weapon or Magazine or Ammo or Meds or Money;
+        return item.QuestItem || item.IsDogtag() || item is Weapon or Magazine or Ammo or Money;
     }
 
     /// <summary>
