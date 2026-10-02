@@ -460,11 +460,17 @@ public static class LootUtils
                         preAllocatedList.AddRange(pocketsGrids);
                         // preAllocatedList.AddRange(backpackGrids); // Bots can't reach magazines in the backpack
                         break;
-                    case ThrowWeap or Meds:
+                    case ThrowWeap:
                         preAllocatedList.AddRange(pocketsGrids);
                         preAllocatedList.AddRange(armbandGrids);
                         preAllocatedList.AddRange(vestGrids);
                         // preAllocatedList.AddRange(backpackGrids);
+                        break;
+                    case Meds:
+                        preAllocatedList.AddRange(pocketsGrids);
+                        preAllocatedList.AddRange(armbandGrids);
+                        preAllocatedList.AddRange(backpackGrids);
+                        // preAllocatedList.AddRange(vestGrids);
                         break;
                     default:
                         preAllocatedList.AddRange(backpackGrids);
