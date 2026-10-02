@@ -315,7 +315,7 @@ public class LootingBrain : MonoBehaviour
             await LootingTransactionController.SimulatePlayerDelayAsync(LootingStartDelay, token);
 
             InventoryController.SetRootItemOwner(corpseInventoryEquipment.Owner);
-            isSuccessful = await InventoryController.TryAddItemsToBotAsync(_itemsToLoot, token);
+            isSuccessful = await InventoryController.TryAddItemsToBotAsync(_itemsToLoot, true, token);
         }
         catch (Exception e)
         {
@@ -417,7 +417,7 @@ public class LootingBrain : MonoBehaviour
             _itemsToLoot.Clear();
             _itemsToLoot.Add(item);
             InventoryController.SetRootItemOwner(item.Owner);
-            isSuccessful = await InventoryController.TryAddItemsToBotAsync(_itemsToLoot, token);
+            isSuccessful = await InventoryController.TryAddItemsToBotAsync(_itemsToLoot, true, token);
             if (isSuccessful)
             {
                 // Do pick up animation if we successfully looted the item

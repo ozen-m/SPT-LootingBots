@@ -53,9 +53,14 @@ public class LootingLootAction : LootingAction
 
     private LootingInventoryController LootingController { get; set; }
 
-    public override Task<bool> ExecuteAsync(LootingTransactionController controller, CancellationToken token)
+    public override Task<bool> ExecuteAsync(LootingTransactionController controller, CancellationToken token = default)
     {
-        return LootingController.TryAddItemsToBotAsync(ItemsToLoot, token);
+        return LootingController.TryAddItemsToBotAsync(ItemsToLoot, false, token);
+    }
+
+    public override Task PostActionsAsync(LootingInventoryController invController, CancellationToken token = default)
+    {
+        return Task.CompletedTask;
     }
 
     public override void Return()

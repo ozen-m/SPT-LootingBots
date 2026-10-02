@@ -340,7 +340,7 @@ public class LootingInventoryController
     /// If bots are looting something that is equippable, and they have nothing equipped in that slot, they will always equip it.
     /// If the bot decides not to equip the item then it will attempt to put in an available container slot.
     /// </summary>
-    public async Task<bool> TryAddItemsToBotAsync(List<Item> items, CancellationToken token = default)
+    public async Task<bool> TryAddItemsToBotAsync(List<Item> items, bool tryToEquip = true, CancellationToken token = default)
     {
         using var pooledList = ListActionPool.Get(out var lootingActions);
 
@@ -376,7 +376,7 @@ public class LootingInventoryController
 
             // Check to see if we need to swap gear
             lootingActions.Reset();
-            var canEquipGear = GetEquipAction(item, lootingActions);
+            var canEquipGear = tryToEquip && GetEquipAction(item, lootingActions);
             if (canEquipGear)
             {
                 if (_log.DebugEnabled)
@@ -384,117 +384,17 @@ public class LootingInventoryController
                     _log.LogDebug($"Found equip action for: {itemName}");
                 }
 
-                for (var i = 0; i < lootingActions.Count; i++)
+                foreach (var action in lootingActions)
                 {
-                    var action = lootingActions[i];
                     var actionResult = await action.ExecuteAsync(_transactionController, token);
-                    if (actionResult)
-                    {
-                        Stats.AddNetValue(action.NetWorthDelta);
-                    }
-                    else
+                    if (!actionResult)
                     {
                         // Break the chain if the action fails
                         break;
                     }
 
-                    // Do post actions
-                    if (action is LootingSwapAction swapAction)
-                    {
-                        if (swapAction.TransferItems)
-                        {
-                            if (swapAction.ToSwap is Weapon thrownWeapon)
-                            {
-                                // If we swapped away our previous weapon, throw away its mags and strip the attachments
-                                using (DictionaryPool<Magazine, float>.Get(out var uselessMagazines))
-                                {
-                                    await ThrowUselessMagsAsync(thrownWeapon, uselessMagazines, token);
-                                }
-                                if (LootingBots.CanStripAttachments.Value)
-                                {
-                                    using (UnityEngine.Pool.ListPool<Item>.Get(out var modsToLoot))
-                                    {
-                                        await StripWeaponAsync(thrownWeapon, modsToLoot, token);
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                // To make space we throw undervalued items in our newly equipped item
-                                using (DictionaryPool<Item, float>.Get(out var itemsToThrow))
-                                {
-                                    GetUndervaluedItems(swapAction.Item, itemsToThrow);
-                                    await ThrowUndervaluedItemsAsync(
-                                        swapAction.Item,
-                                        itemsToThrow,
-                                        _botInventoryController,
-                                        _lootingBrain.ActiveLoot.GetRootItem(),
-                                        token
-                                    );
-                                }
-
-                                // Clean up vest of other items
-                                if (swapAction.Item is Vest newVest)
-                                {
-                                    await TransferItemsToBackpackAsync(newVest);
-                                }
-
-                                // Then loot the thrown item and its children
-                                if (swapAction.ToSwap is Vest oldVest)
-                                {
-                                    // Try to pick up any nested items in the old vest before trying to pick up the item.
-                                    // This helps to transfer ammo to the bots active rig
-                                    await LootNestedItemsAsync(oldVest, token);
-                                }
-                                lootingActions.Add(LootingLootAction.Rent(swapAction.ToSwap, this));
-                            }
-                        }
-                    }
-                    else if (action is LootingThrowAction throwAction)
-                    {
-                        if (throwAction.TransferItems)
-                        {
-                            var thrownItem = throwAction.Item;
-
-                            // Ignore thrown loot
-                            _lootingBrain.IgnoreLoot(thrownItem.Id);
-
-                            if (thrownItem is Weapon thrownWeapon)
-                            {
-                                // Throw mags of thrown weapon and strip attachments
-                                using (DictionaryPool<Magazine, float>.Get(out var uselessMagazines))
-                                {
-                                    await ThrowUselessMagsAsync(thrownWeapon, uselessMagazines, token);
-                                }
-                                if (LootingBots.CanStripAttachments.Value)
-                                {
-                                    using (UnityEngine.Pool.ListPool<Item>.Get(out var modsToLoot))
-                                    {
-                                        await StripWeaponAsync(thrownWeapon, modsToLoot, token);
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                // Loot the thrown item and its children
-                                if (thrownItem is Vest oldVest)
-                                {
-                                    // Try to pick up any nested items in the old vest before trying to pick up the item.
-                                    // This helps to transfer ammo to the bots active rig
-                                    await LootNestedItemsAsync(oldVest, token);
-                                }
-                                lootingActions.Add(LootingLootAction.Rent(thrownItem, this));
-                            }
-                        }
-                    }
-                    else if (action is LootingMoveAction equipAction)
-                    {
-                        // Clean up vest of other items
-                        if (equipAction.Item is Vest vest)
-                        {
-                            await TransferItemsToBackpackAsync(vest);
-                        }
-                    }
+                    Stats.AddNetValue(action.NetWorthDelta);
+                    await action.PostActionsAsync(this, token);
                 }
 
                 // Do post-equip actions
@@ -508,18 +408,6 @@ public class LootingInventoryController
                 if (_log.DebugEnabled)
                 {
                     _log.LogDebug($"Finished equip action for: {itemName}");
-                }
-
-                continue;
-            }
-
-            // Check to see if we can equip the item
-            if (AllowedToEquip(item) && await _transactionController.TryEquipItemAsync(item, token))
-            {
-                Stats.AddNetValue(CurrentItemPrice);
-                if (item is SearchableItem)
-                {
-                    Stats.AddNetValue(item.GetAllContainedItemsValue(_log));
                 }
                 continue;
             }
@@ -1416,7 +1304,7 @@ public class LootingInventoryController
         }
 
         await LootingTransactionController.SimulatePlayerDelayAsync(LootingBrain.LootingStartDelay, token);
-        return await TryAddItemsToBotAsync(items, token);
+        return await TryAddItemsToBotAsync(items, true, token);
     }
 
     public async Task<bool> TryNestContainerAsync(SearchableItem item, int itemSize, CancellationToken token = default)
@@ -1596,7 +1484,7 @@ public class LootingInventoryController
         }
 
         // TODO: Mod already looted but still trying to loot its child
-        return new ValueTask<bool>(TryAddItemsToBotAsync(modsToLoot, token));
+        return new ValueTask<bool>(TryAddItemsToBotAsync(modsToLoot, false, token));
     }
 
     /// <summary>
@@ -1711,6 +1599,11 @@ public class LootingInventoryController
             if (ShouldSwapGear(equippedItem, lootItem))
             {
                 GetSwapAction(lootItem, equippedItem, lootingActions, transferItems);
+                if (transferItems)
+                {
+                    // Has to be outside GetSwapAction to not conflict with Vest logic below
+                    lootingActions.Add(LootingLootAction.Rent(equippedItem, this));
+                }
             }
             return;
         }
@@ -1733,9 +1626,10 @@ public class LootingInventoryController
                         );
                     }
 
-                    var chestValue = _itemAppraiser.GetItemPrice(chest, _log);
-                    lootingActions.Add(LootingThrowAction.Rent(chest, -chestValue));
+                    lootingActions.Add(LootingThrowAction.Rent(chest, -_itemAppraiser.GetItemPrice(chest, _log)));
                     GetSwapAction(lootItem, equippedItem, lootingActions, true);
+                    lootingActions.Add(LootingLootAction.Rent(equippedItem, this));
+                    lootingActions.Add(LootingLootAction.Rent(chest, this));
                 }
                 else
                 {
@@ -1748,6 +1642,7 @@ public class LootingInventoryController
             else
             {
                 GetSwapAction(lootItem, equippedItem, lootingActions, true);
+                lootingActions.Add(LootingLootAction.Rent(equippedItem, this));
             }
         }
         else if (
@@ -1755,10 +1650,10 @@ public class LootingInventoryController
         )
         {
             // At this point, the bot has an equipped armored rig so it won't be swapping for a normal rig,
-            // so if it has:
-            //   1. Better armor,
-            //   2. Same armor but larger container,
-            //   3. Same armor and same sized container but more valuable.
+            // so if:
+            //   1. Corpse armor is better armor,
+            //   2. OR same armor but corpse rig has larger container than equipped rig,
+            //   3. OR same armor and same sized container but more valuable.
             // Drop the current armored rig then loot the armor and tac vest.
             // Same with ShouldSwapGear, but chest armor is compared with the armored rig, and size and price is compared with the vest(lootItem).
             var corpseChestArmor = corpseEquipment.GetSlot(EquipmentSlot.ArmorVest).ContainedItem;
@@ -1799,13 +1694,14 @@ public class LootingInventoryController
             lootingActions.Add(LootingThrowAction.Rent(corpseChestArmor, 0f, false));
             GetSwapAction(lootItem, equippedItem, lootingActions, true);
             lootingActions.Add(LootingMoveAction.Rent(corpseChestArmor, null, _itemAppraiser.GetItemPrice(corpseChestArmor, _log)));
+            lootingActions.Add(LootingLootAction.Rent(equippedItem, this));
         }
     }
 
     /// <summary>
     /// Generates a SwapAction to be executed by the transaction controller.
     /// </summary>
-    public void GetSwapAction(Item lootItem, Item equippedItem, List<LootingAction> lootingActions, bool transferItems = false)
+    public void GetSwapAction(Item lootItem, Item equippedItem, List<LootingAction> lootingActions, bool transferItems)
     {
         var toEquipValue = CurrentItemPrice;
         var toSwapValue = _itemAppraiser.GetItemPrice(equippedItem, _log);
@@ -1822,6 +1718,11 @@ public class LootingInventoryController
         toSwapValue += equippedItem.GetAllContainedItemsValue(_log);
 
         lootingActions.Add(LootingSwapAction.Rent(lootItem, equippedItem, toEquipValue - toSwapValue, transferItems));
+    }
+
+    public void IgnoreLoot(string id)
+    {
+        _lootingBrain.IgnoreLoot(id);
     }
 
     public void SetRootItemOwner(IItemOwner owner)

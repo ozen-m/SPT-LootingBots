@@ -1,6 +1,7 @@
 ﻿using EFT.InventoryLogic;
 using LootingBots.Components;
 using LootingBots.Utilities;
+using UnityEngine.Pool;
 
 namespace LootingBots.Actions;
 
@@ -41,7 +42,7 @@ public class LootingSwapAction : LootingAction
     /// </summary>
     public bool TransferItems { get; set; }
 
-    public override async Task<bool> ExecuteAsync(LootingTransactionController controller, CancellationToken token)
+    public override async Task<bool> ExecuteAsync(LootingTransactionController controller, CancellationToken token = default)
     {
         if (await controller.SwapItemsAsync(Item, ToSwap, token))
         {
@@ -66,6 +67,51 @@ public class LootingSwapAction : LootingAction
 
         // If throw-equip simulation was successful, run it
         return await controller.ThrowItemAsync(ToSwap, token) && await controller.TryEquipItemAsync(Item, token);
+    }
+
+    public override async Task PostActionsAsync(LootingInventoryController invController, CancellationToken token = default)
+    {
+        if (!TransferItems)
+        {
+            return;
+        }
+
+        if (ToSwap is Weapon thrownWeapon)
+        {
+            // If we swapped away our previous weapon, throw away its mags and strip the attachments
+            using (DictionaryPool<Item, float>.Get(out var uselessMagazines))
+            {
+                await invController.ThrowUselessMagsAsync(thrownWeapon, uselessMagazines, token);
+            }
+            if (LootingBots.CanStripAttachments.Value)
+            {
+                using (UnityEngine.Pool.ListPool<Item>.Get(out var modsToLoot))
+                {
+                    await invController.StripWeaponAsync(thrownWeapon, modsToLoot, token);
+                }
+            }
+            return;
+        }
+
+        // To make space we throw undervalued items in our newly equipped item
+        using (DictionaryPool<Item, float>.Get(out var itemsToThrow))
+        {
+            invController.GetUndervaluedItems(Item, itemsToThrow);
+            await invController.ThrowUndervaluedItemsAsync(Item, itemsToThrow, token);
+        }
+
+        // Clean up vest of other items
+        if (Item is Vest newVest)
+        {
+            await invController.TransferItemsToBackpackAsync(newVest);
+        }
+
+        // Try to pick up any nested items in the old vest,
+        // this helps to transfer ammo to the bots active rig
+        if (ToSwap is Vest oldVest)
+        {
+            await invController.LootNestedItemsAsync(oldVest, token);
+        }
     }
 
     public override void Return()

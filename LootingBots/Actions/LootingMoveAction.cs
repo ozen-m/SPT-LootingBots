@@ -34,9 +34,19 @@ public class LootingMoveAction : LootingAction
     /// </summary>
     public ItemAddress Place { get; set; }
 
-    public override Task<bool> ExecuteAsync(LootingTransactionController controller, CancellationToken token)
+    public override Task<bool> ExecuteAsync(LootingTransactionController controller, CancellationToken token = default)
     {
         return Place is not null ? controller.MoveItemAsync(Item, Place, token) : controller.TryEquipItemAsync(Item, token).AsTask();
+    }
+
+    public override Task PostActionsAsync(LootingInventoryController invController, CancellationToken token = default)
+    {
+        // Clean up vest of other items
+        if (Item is Vest vest)
+        {
+            return invController.TransferItemsToBackpackAsync(vest).AsTask();
+        }
+        return Task.CompletedTask;
     }
 
     public override void Return()

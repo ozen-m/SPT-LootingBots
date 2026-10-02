@@ -18,7 +18,9 @@ public abstract class LootingAction
     /// </summary>
     public float NetWorthDelta { get; set; }
 
-    public abstract Task<bool> ExecuteAsync(LootingTransactionController controller, CancellationToken token);
+    public abstract Task<bool> ExecuteAsync(LootingTransactionController controller, CancellationToken token = default);
+
+    public abstract Task PostActionsAsync(LootingInventoryController invController, CancellationToken token = default);
 
     /// <summary>
     /// Called for a derived instance to return to its pool
