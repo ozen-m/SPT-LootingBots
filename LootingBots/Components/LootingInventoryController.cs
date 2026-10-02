@@ -249,12 +249,12 @@ public class LootingInventoryController
     /// Move items that are not placed in fast access slots to the bot's backpack.
     /// </summary>
     /// <param name="source">If null, defaults to the bot's equipment, which uses the tac vest, pockets, and armband slots.</param>
-    public ValueTask TransferItemsToBackpackAsync(Item source = null)
+    public ValueTask<IResult> TransferItemsToBackpackAsync(Item source = null)
     {
         var backpack = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Backpack).ContainedItem;
         if (backpack is null)
         {
-            return new ValueTask();
+            return new ValueTask<IResult>(SuccessfulResult.New);
         }
 
         // If source was not given or is null, clean up the bot's equipment instead
@@ -274,7 +274,7 @@ public class LootingInventoryController
                 searchableItem.GetAllGridContainedItems(items);
                 break;
             default:
-                return new ValueTask();
+                return new ValueTask<IResult>(SuccessfulResult.New);
         }
 
         foreach (var item in items)
@@ -289,7 +289,7 @@ public class LootingInventoryController
             {
                 continue;
             }
-            var moveResult = ItemManipulator.Move(item, location, _botInventoryController, true);
+            var moveResult = ItemManipulator.Move(item, location, _botInventoryController, false);
             if (moveResult.Failed)
             {
                 continue;
@@ -304,7 +304,12 @@ public class LootingInventoryController
             {
                 _log.LogDebug($"No items to transfer from {source.LocalizedName()} to the backpack");
             }
-            return new ValueTask();
+            return new ValueTask<IResult>(SuccessfulResult.New);
+        }
+
+        foreach (var moveResult in moveResults)
+        {
+            moveResult.RollBack();
         }
 
         var moveOperationsResults = new MoveMultipleResult(moveResults, _transactionController, 0f);
@@ -312,7 +317,7 @@ public class LootingInventoryController
         {
             _log.LogDebug($"Transferring {moveOperationsResults.Count} items from {source.LocalizedName()} to the backpack");
         }
-        return new ValueTask(moveOperationsResults.ExecuteAsync());
+        return new ValueTask<IResult>(moveOperationsResults.ExecuteAsync());
     }
 
     /// <summary>
