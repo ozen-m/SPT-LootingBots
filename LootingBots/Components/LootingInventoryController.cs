@@ -87,7 +87,7 @@ public class LootingInventoryController
             using (DictionaryPool<Item, float>.Get(out var itemsToThrow))
             {
                 GetUndervaluedItems(backpack, itemsToThrow);
-                await ThrowUndervaluedItemsAsync(backpack, itemsToThrow, null, null, token);
+                await ThrowUndervaluedItemsAsync(equipment, itemsToThrow, token);
             }
 
             CalculateGearValue();
@@ -822,9 +822,7 @@ public class LootingInventoryController
         {
             _log.LogDebug($"Throwing {uselessMagazines.Count} useless magazines");
         }
-        return new ValueTask(
-            TransferOrThrowItemsAsync(uselessMagazines, _botInventoryController, _lootingBrain.ActiveLoot.GetRootItem(), token)
-        );
+        return new ValueTask(TransferOrThrowItemsAsync(uselessMagazines, _lootingBrain.ActiveLoot.GetRootItem(), token));
     }
 
     /// <summary>
@@ -836,17 +834,16 @@ public class LootingInventoryController
     /// <param name="transferTo">A container to transfer items to.</param>
     public async Task TransferOrThrowItemsAsync<TItem>(
         Dictionary<TItem, float> itemsToThrow,
-        IItemOwner previousOwner,
         Item transferTo = null,
         CancellationToken token = default
     )
         where TItem : Item
     {
-        var wasPreviousOwner = _botInventoryController == previousOwner;
-
         foreach (var (item, price) in itemsToThrow)
         {
             token.ThrowIfCancellationRequested();
+
+            var wasPreviousOwner = _botInventoryController == item.Owner;
 
             if (!await _transactionController.TransferOrThrowItemAsync(item, transferTo, token))
             {
@@ -1353,7 +1350,7 @@ public class LootingInventoryController
         }
 
         // Only actually throw them if we succeeded
-        await ThrowUndervaluedItemsAsync(item, uselessItems, null, _lootingBrain.ActiveLoot.GetRootItem(), token);
+        await ThrowUndervaluedItemsAsync(item, uselessItems, token);
 
         await LootingTransactionController.SimulatePlayerDelayAsync(LootingBots.TransactionDelay.Value * fillResult.Value.Count, token);
 
@@ -1433,13 +1430,7 @@ public class LootingInventoryController
     /// <param name="itemsToThrow">A Dictionary of key: items, value: prices to throw.</param>
     /// <param name="previousOwner">The owner of items to throw.</param>
     /// <param name="transferTo">A container to transfer items to.</param>
-    public ValueTask ThrowUndervaluedItemsAsync(
-        Item container,
-        Dictionary<Item, float> itemsToThrow,
-        IItemOwner previousOwner,
-        Item transferTo,
-        CancellationToken token = default
-    )
+    public ValueTask ThrowUndervaluedItemsAsync(Item container, Dictionary<Item, float> itemsToThrow, CancellationToken token = default)
     {
         if (container is null)
         {
@@ -1461,7 +1452,7 @@ public class LootingInventoryController
         {
             _log.LogInfo($"Throwing {itemsToThrow.Count} undervalued items from {container.Name.Localized()}");
         }
-        return new ValueTask(TransferOrThrowItemsAsync(itemsToThrow, previousOwner, transferTo, token));
+        return new ValueTask(TransferOrThrowItemsAsync(itemsToThrow, _lootingBrain.ActiveLoot.GetRootItem(), token));
     }
 
     /// <summary>
