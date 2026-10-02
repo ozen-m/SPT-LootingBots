@@ -81,18 +81,13 @@ public class LootingInventoryController
         try
         {
             var equipment = _botInventoryController.Inventory.Equipment;
-            await TransferItemsToBackpackAsync(equipment.GetSlot(EquipmentSlot.Pockets).ContainedItem);
-            await TransferItemsToBackpackAsync(equipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem);
-            await TransferItemsToBackpackAsync(equipment.GetSlot(EquipmentSlot.ArmBand).ContainedItem);
+            await TransferItemsToBackpackAsync(equipment);
 
             var backpack = equipment.GetSlot(EquipmentSlot.Backpack).ContainedItem;
             using (DictionaryPool<Item, float>.Get(out var itemsToThrow))
             {
                 GetUndervaluedItems(backpack, itemsToThrow);
-                if (itemsToThrow.Count > 0)
-                {
-                    await ThrowUndervaluedItemsAsync(backpack, itemsToThrow, null, null, token);
-                }
+                await ThrowUndervaluedItemsAsync(backpack, itemsToThrow, null, null, token);
             }
 
             CalculateGearValue();
@@ -250,22 +245,38 @@ public class LootingInventoryController
         UpdateGridStats();
     }
 
-    public ValueTask TransferItemsToBackpackAsync(Item source)
+    /// <summary>
+    /// Move items that are not placed in fast access slots to the bot's backpack.
+    /// </summary>
+    /// <param name="source">If null, defaults to the bot's equipment, which uses the tac vest, pockets, and armband slots.</param>
+    public ValueTask TransferItemsToBackpackAsync(Item source = null)
     {
-        if (source is not SearchableItem)
-        {
-            return new ValueTask();
-        }
         var backpack = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Backpack).ContainedItem;
         if (backpack is null)
         {
             return new ValueTask();
         }
 
+        // If source was not given or is null, clean up the bot's equipment instead
+        source ??= _botInventoryController.Inventory.Equipment;
+
         using var pooledItems = UnityEngine.Pool.ListPool<Item>.Get(out var items);
         using var pooledMove = UnityEngine.Pool.ListPool<MoveResult>.Get(out var moveResults);
 
-        source.GetAllGridContainedItems(items);
+        switch (source)
+        {
+            case InventoryEquipment equipment:
+                equipment.GetSlot(EquipmentSlot.Pockets).ContainedItem.GetAllGridContainedItems(items);
+                equipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem.GetAllGridContainedItems(items);
+                equipment.GetSlot(EquipmentSlot.ArmBand).ContainedItem.GetAllGridContainedItems(items);
+                break;
+            case SearchableItem searchableItem:
+                searchableItem.GetAllGridContainedItems(items);
+                break;
+            default:
+                return new ValueTask();
+        }
+
         foreach (var item in items)
         {
             // Keep these items

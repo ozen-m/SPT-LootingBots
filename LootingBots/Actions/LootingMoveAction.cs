@@ -46,6 +46,14 @@ public class LootingMoveAction : LootingAction
         {
             return invController.TransferItemsToBackpackAsync(vest).AsTask();
         }
+
+        // Clean up the bot's tac vest, pockets and armband since the bot had just equipped a backpack,
+        // which it wasn't able to do OnSpawnAsync.
+        if (Item is Backpack)
+        {
+            return invController.TransferItemsToBackpackAsync().AsTask();
+        }
+
         return Task.CompletedTask;
     }
 
