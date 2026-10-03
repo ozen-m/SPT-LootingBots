@@ -1,4 +1,5 @@
 ﻿using System.Text;
+using Comfort.Common;
 using EFT;
 using EFT.InventoryLogic;
 using LootingBots.Utilities;
@@ -14,6 +15,22 @@ public class BotStats
     public float InitialNetWorth;
     public int AvailableGridSpaces;
     public int TotalGridSpaces;
+
+    public readonly Deferred<float> TotalWeight;
+    public float WarningLimit = 10000f;
+    public float OverweightLimit = 10000f;
+
+    private readonly Player _player;
+
+    public BotStats(Player player)
+    {
+        _player = player;
+        if (LootingBots.UseWeightRestriction.Value)
+        {
+            TotalWeight = new Deferred<float>(UpdateWeight);
+            UpdateWeightLimits();
+        }
+    }
 
     public float Looted
     {
@@ -58,6 +75,58 @@ public class BotStats
         debugPanel.AppendLabeledValue("Primary Value", $" {Gear.Primary.Value:n0}₽", Color.white, Color.white);
         debugPanel.AppendLabeledValue("Secondary Value", $" {Gear.Secondary.Value:n0}₽", Color.white, Color.white);
         debugPanel.AppendLabeledValue("Holster Value", $" {Gear.Holster.Value:n0}₽", Color.white, Color.white);
+
+        if (LootingBots.UseWeightRestriction.Value)
+        {
+            var weightColor =
+                TotalWeight > OverweightLimit ? Color.red
+                : TotalWeight > WarningLimit ? Color.yellow
+                : Color.green;
+            debugPanel.AppendLabeledValue("Weight", $" {TotalWeight.Value:N1}kg", Color.white, weightColor);
+        }
+    }
+
+    /// <summary>
+    /// Limits should be updated when: strength skill levels up, new/removed health.Effect of type IEndurance,
+    /// but is unlikely to happen to a bot so only initialize on spawn.
+    /// </summary>
+    /// <seealso cref="EFT.UI.Health.HealthParametersPanel.Show"/>
+    private void UpdateWeightLimits()
+    {
+        var health = _player.HealthController;
+        var relativeModifier = _player.Skills.CarryingWeightRelativeModifier * health.CarryingWeightRelativeModifier;
+        var absoluteModifier = health.CarryingWeightAbsoluteModifier;
+        var staminaConfig = Singleton<GlobalConfiguration>.Instance.Stamina;
+        var lowerOverweightLimit = Mathf.Min(staminaConfig.WalkOverweightLimits.x, staminaConfig.BaseOverweightLimits.x);
+        lowerOverweightLimit = Mathf.Min(lowerOverweightLimit, staminaConfig.SprintOverweightLimits.x);
+        lowerOverweightLimit = Mathf.Min(lowerOverweightLimit, staminaConfig.WalkSpeedOverweightLimits.x);
+
+        WarningLimit = lowerOverweightLimit * relativeModifier + absoluteModifier;
+        OverweightLimit = staminaConfig.UpperOverweightLimit * relativeModifier + absoluteModifier;
+    }
+
+    /// <summary>
+    /// Get the total weight of all items in all slots. Excludes the SecuredContainer.
+    /// </summary>
+    /// <remarks>
+    /// Cannot use Inventory.TotalWeight since SAIN overrides it, and base EFT includes the SecuredContainer.
+    /// <code>
+    /// TotalWeight = player.skills.StrengthBuffElite
+    ///     ? player.Inventory.TotalWeightEliteSkill
+    ///     : player.Inventory.TotalWeight;
+    /// </code>
+    /// </remarks>
+    private float UpdateWeight()
+    {
+        var equipment = _player.Inventory.Equipment;
+
+        var weight = 0f;
+        foreach (var slotName in LootUtils.AllSlots)
+        {
+            weight += equipment.GetSlot(slotName).ContainedItem?.TotalWeight ?? 0f;
+        }
+
+        return weight;
     }
 }
 
@@ -104,9 +173,6 @@ public class GearValue
             {
                 removedSome = wasRemoved;
             }
-            LootingBots.LootLog.LogError(
-                $"BotStats::TryRemoveContainedItem SearchableItem removed {gridItem.LocalizedName()} {wasRemoved}"
-            );
         }
         return removedSome;
     }

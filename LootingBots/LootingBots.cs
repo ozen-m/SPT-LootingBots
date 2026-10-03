@@ -72,6 +72,7 @@ public class LootingBots : BaseUnityPlugin
     public static ConfigEntry<bool> ValueFromPlates;
     public static ConfigEntry<bool> CanStripAttachments;
     public static ConfigEntry<bool> AllowContainerNesting;
+    public static ConfigEntry<bool> UseWeightRestriction;
     public static ConfigEntry<int> LootTimeout;
 
     public static ConfigEntry<float> PMCMinLootThreshold;
@@ -336,6 +337,16 @@ public class LootingBots : BaseUnityPlugin
                 new ConfigurationManagerAttributes { Order = 9 }
             )
         );
+        UseWeightRestriction = Config.Bind(
+            "Loot Settings",
+            "Use weight restriction",
+            false,
+            new ConfigDescription(
+                "Disallow bots from picking up an item if the item's weight will exceed their overweight limit. Takes effect next raid.", // Technically next bot spawn
+                null,
+                new ConfigurationManagerAttributes { Order = 8 }
+            )
+        );
         LootTimeout = Config.Bind(
             "Loot Settings",
             "Loot Timeout",
@@ -343,7 +354,7 @@ public class LootingBots : BaseUnityPlugin
             new ConfigDescription(
                 "Time in seconds before a looting bot is timed out and stops looting",
                 null,
-                new ConfigurationManagerAttributes { Order = 8 }
+                new ConfigurationManagerAttributes { Order = 7 }
             )
         );
         PMCMinLootThreshold = Config.Bind(
@@ -353,7 +364,7 @@ public class LootingBots : BaseUnityPlugin
             new ConfigDescription(
                 "PMC bots will only loot items that exceed the specified value in roubles. When set to 0, bots will ignore the minimum value threshold.",
                 null,
-                new ConfigurationManagerAttributes { Order = 7 }
+                new ConfigurationManagerAttributes { Order = 6 }
             )
         );
         PMCMaxLootThreshold = Config.Bind(
@@ -363,7 +374,7 @@ public class LootingBots : BaseUnityPlugin
             new ConfigDescription(
                 "PMC bots will NOT loot items that exceed the specified value in roubles. When set to 0, bots will ignore the maximum value threshold.",
                 null,
-                new ConfigurationManagerAttributes { Order = 6 }
+                new ConfigurationManagerAttributes { Order = 5 }
             )
         );
         PMCGearToEquip = Config.Bind(
@@ -373,7 +384,7 @@ public class LootingBots : BaseUnityPlugin
             new ConfigDescription(
                 "The equipment a PMC bot is able to equip during raid",
                 null,
-                new ConfigurationManagerAttributes { Order = 5 }
+                new ConfigurationManagerAttributes { Order = 4 }
             )
         );
         PMCGearToPickup = Config.Bind(
@@ -383,7 +394,7 @@ public class LootingBots : BaseUnityPlugin
             new ConfigDescription(
                 "The equipment a PMC bot is able to place in their backpack/rig",
                 null,
-                new ConfigurationManagerAttributes { Order = 4 }
+                new ConfigurationManagerAttributes { Order = 3 }
             )
         );
         ScavMinLootThreshold = Config.Bind(
@@ -393,7 +404,7 @@ public class LootingBots : BaseUnityPlugin
             new ConfigDescription(
                 "All non-PMC bots will only loot items that exceed the specified value in roubles. When set to 0, bots will ignore the minimum value threshold.",
                 null,
-                new ConfigurationManagerAttributes { Order = 3 }
+                new ConfigurationManagerAttributes { Order = 2 }
             )
         );
         ScavMaxLootThreshold = Config.Bind(
@@ -403,7 +414,7 @@ public class LootingBots : BaseUnityPlugin
             new ConfigDescription(
                 "All non-PMC bots will NOT loot items that exceed the specified value in roubles. When set to 0, bots will ignore the maximum value threshold.",
                 null,
-                new ConfigurationManagerAttributes { Order = 2 }
+                new ConfigurationManagerAttributes { Order = 1 }
             )
         );
         ScavGearToEquip = Config.Bind(
@@ -413,7 +424,7 @@ public class LootingBots : BaseUnityPlugin
             new ConfigDescription(
                 "The equipment a non-PMC bot is able to equip during raid",
                 null,
-                new ConfigurationManagerAttributes { Order = 1 }
+                new ConfigurationManagerAttributes { Order = 0 }
             )
         );
         ScavGearToPickup = Config.Bind(
@@ -423,7 +434,7 @@ public class LootingBots : BaseUnityPlugin
             new ConfigDescription(
                 "The equipment a non-PMC bot is able to place in their backpack/rig",
                 null,
-                new ConfigurationManagerAttributes { Order = 0 }
+                new ConfigurationManagerAttributes { Order = -1 }
             )
         );
 
@@ -434,7 +445,7 @@ public class LootingBots : BaseUnityPlugin
             new ConfigDescription(
                 "Enables logs for the item appraiser that calculates the weapon values",
                 null,
-                new ConfigurationManagerAttributes { Order = -1, IsAdvanced = true }
+                new ConfigurationManagerAttributes { Order = -2, IsAdvanced = true }
             )
         );
     }

@@ -19,7 +19,7 @@ public class LootingInventoryController
     private readonly ItemAppraiser _itemAppraiser;
     private readonly bool _isPMC;
 
-    public readonly BotStats Stats = new();
+    public readonly BotStats Stats;
 
     private readonly Action _updateActiveWeaponAction;
     private readonly Callback<IHandsController> _onWeaponTakenCallback;
@@ -73,6 +73,8 @@ public class LootingInventoryController
         _transactionController = new LootingTransactionController(botOwner, _botInventoryController, _log);
         _isPMC = _botOwner.Profile.Info.Settings.Role.IsPMC();
 
+        Stats = new BotStats(botOwner.GetPlayer);
+
         _ = OnSpawnAsync();
     }
 
@@ -94,6 +96,10 @@ public class LootingInventoryController
             CalculateInitialNetWorth();
             SubscribeToGearSlots();
             UpdateGridStats();
+            if (LootingBots.UseWeightRestriction.Value)
+            {
+                SubscribeToWeightChange();
+            }
         }
         catch (OperationCanceledException)
         {
@@ -243,6 +249,11 @@ public class LootingInventoryController
     private void UpdateGridStats(Item _)
     {
         UpdateGridStats();
+    }
+
+    private void SubscribeToWeightChange()
+    {
+        _unsubActions.Add(_botOwner.GetPlayer.Inventory.OnWeightUpdated.Bind(Stats.TotalWeight.SetDirty));
     }
 
     /// <summary>
@@ -444,7 +455,6 @@ public class LootingInventoryController
                 }
 
                 // Try nest the container if we're allowed
-                // TODO: Add weight check
                 if (item is SearchableItem searchableItem && LootingBots.AllowContainerNesting.Value)
                 {
                     if (await TryNestContainerAsync(searchableItem, itemSize, token))
@@ -452,34 +462,9 @@ public class LootingInventoryController
                         continue;
                     }
                 }
-                // If we're allowed to pick up the item, but we don't have space, try to find an item to replace it with
-                else if (!_lootingBrain.HasFreeSpace)
-                {
-                    if (
-                        HasReplacement(item, itemSize, out var source, out var index, out var loot)
-                        && await _transactionController.ReplaceItemAsync(
-                            item,
-                            source[index].Item,
-                            _lootingBrain.ActiveLoot.GetRootItem(),
-                            token
-                        )
-                    )
-                    {
-                        var replaced = source[index];
-                        Stats.AddNetValue(CurrentItemPrice - replaced.Value);
-                        Stats.AvailableGridSpaces -= itemSize - replaced.Size;
-                        source.Replace(index, loot);
 
-                        if (_log.DebugEnabled)
-                        {
-                            _log.LogDebug(
-                                $"Replaced {replaced.Item.LocalizedName()} with {item.LocalizedName()} (Net: {CurrentItemPrice - replaced.Value:N0}₽)"
-                            );
-                        }
-                        continue;
-                    }
-                }
-                else if (await _transactionController.TryPickupItemAsync(item, token))
+                // Try to pick this item up if we have the space and weight
+                if (_lootingBrain.HasFreeSpace && HasExcessWeightFor(item) && await _transactionController.TryPickupItemAsync(item, token))
                 {
                     Stats.AddNetValue(CurrentItemPrice);
                     Stats.AvailableGridSpaces -= itemSize;
@@ -490,9 +475,35 @@ public class LootingInventoryController
                         Stats.AddNetValue(pickedUpContainer.GetAllContainedItemsValue(_log));
                         var (total, available) = pickedUpContainer.Grids.GetTotalAndAvailableGridSlots();
                         Stats.TotalGridSpaces += total;
-                        Stats.AvailableGridSpaces += available; // TODO: Double check
+                        Stats.AvailableGridSpaces += available;
                     }
 
+                    continue;
+                }
+
+                // We don't have space, weight, or we can't pick the item up,
+                // try to find an item to replace it with
+                if (
+                    HasReplacement(item, itemSize, out var source, out var index, out var loot)
+                    && await _transactionController.ReplaceItemAsync(
+                        item,
+                        source[index].Item,
+                        _lootingBrain.ActiveLoot.GetRootItem(),
+                        token
+                    )
+                )
+                {
+                    var replaced = source[index];
+                    source.Replace(index, loot);
+                    Stats.AddNetValue(CurrentItemPrice - replaced.Value);
+                    Stats.AvailableGridSpaces -= itemSize - replaced.Size;
+
+                    if (_log.DebugEnabled)
+                    {
+                        _log.LogDebug(
+                            $"Replaced {replaced.Item.LocalizedName()} with {item.LocalizedName()} (Net: {CurrentItemPrice - replaced.Value:N0}₽)"
+                        );
+                    }
                     continue;
                 }
             }
@@ -1344,6 +1355,21 @@ public class LootingInventoryController
             removeOperations.Add(ItemManipulator.RemoveWithoutRestrictions(uselessItem, _botInventoryController));
         }
 
+        // Check if we'll exceed the limit will the undervalued items removed.
+        if (LootingBots.UseWeightRestriction.Value && !HasExcessWeightFor(item))
+        {
+            foreach (var removeResult in removeOperations)
+            {
+                removeResult.Value?.RollBack();
+            }
+
+            if (_log.DebugEnabled)
+            {
+                _log.LogDebug($"Cannot nest container [{item.LocalizedName()}], will exceed weight limit");
+            }
+            return false;
+        }
+
         var fillResult = ItemManipulatorEx.TryFillContainerAndPickUp(item, _botInventoryController, _transactionController, _log);
 
         foreach (var removeResult in removeOperations)
@@ -1552,6 +1578,14 @@ public class LootingInventoryController
                     lootItem.IsDogtag() || IsValuableEnough(CurrentItemPrice / itemSize) // Divide by slots to get price per slot
                 )
             );
+    }
+
+    /// <summary>
+    /// Check if picking this item up would exceed the weight limit.
+    /// </summary>
+    public bool HasExcessWeightFor(Item item)
+    {
+        return !LootingBots.UseWeightRestriction.Value || item.TotalWeight < Stats.OverweightLimit - Stats.TotalWeight;
     }
 
     /// <summary>

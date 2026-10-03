@@ -41,6 +41,8 @@ public static class LootUtils
         EquipmentSlot.Eyewear,
     ];
 
+    public static readonly EquipmentSlot[] AllSlots = [.. WeaponSlots, .. StorageSlots, .. OtherSlots];
+
     /// <summary>
     /// Calculate the size of a container
     /// </summary>
