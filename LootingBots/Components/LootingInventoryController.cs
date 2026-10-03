@@ -1567,15 +1567,17 @@ public class LootingInventoryController
             ? LootingBots.PMCGearToPickup.Value.IsItemEligible(lootItem, true)
             : LootingBots.ScavGearToPickup.Value.IsItemEligible(lootItem, true);
 
-        // All usable mags and money should be considered eligible to loot. Otherwise, all other items fall subject to the mod settings for restricting pickup and loot value thresholds
+        // All usable mags and money should be considered eligible to loot.
+        // Otherwise, all other items fall subject to the mod settings for restricting pickup and loot value thresholds.
         return lootItem is Money
-            || lootItem is SearchableItem searchableItem and not Pockets && CanPickupContainer(searchableItem)
             || lootItem is Magazine mag && IsUsableMag(mag)
             || lootItem is Ammo ammo && IsUsableAmmo(ammo)
             || (
                 pickupNotRestricted
                 && (
-                    lootItem.IsDogtag() || IsValuableEnough(CurrentItemPrice / itemSize) // Divide by slots to get price per slot
+                    lootItem is SearchableItem container and not Pockets && CanPickupContainer(container) // Allow pick up based on container ratio and not price
+                    || lootItem.IsDogtag() // Always pick up dog tags regardless of price
+                    || IsValuableEnough(CurrentItemPrice / itemSize) // Divide by slots to get price per slot
                 )
             );
     }
