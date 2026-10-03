@@ -318,10 +318,7 @@ public class LootingInventoryController
             return new ValueTask<IResult>(SuccessfulResult.New);
         }
 
-        foreach (var moveResult in moveResults)
-        {
-            moveResult.Value.RollBack();
-        }
+        moveResults.SafeRollBack();
 
         var moveOperationsResults = new MoveMultipleResult(moveResults, _transactionController, 0f);
         if (_log.DebugEnabled)
@@ -1358,10 +1355,7 @@ public class LootingInventoryController
         // Check if we'll exceed the limit will the undervalued items removed.
         if (LootingBots.UseWeightRestriction.Value && !HasExcessWeightFor(item))
         {
-            foreach (var removeResult in removeOperations)
-            {
-                removeResult.Value?.RollBack();
-            }
+            removeOperations.SafeRollBack();
 
             if (_log.DebugEnabled)
             {
@@ -1372,10 +1366,7 @@ public class LootingInventoryController
 
         var fillResult = ItemManipulatorEx.TryFillContainerAndPickUp(item, _botInventoryController, _transactionController, _log);
 
-        foreach (var removeResult in removeOperations)
-        {
-            removeResult.Value?.RollBack();
-        }
+        removeOperations.SafeRollBack();
 
         if (fillResult.Failed)
         {

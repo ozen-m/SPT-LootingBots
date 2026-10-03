@@ -75,10 +75,7 @@ public class MoveMultipleResult : IOperationResult
 
     public void RollBack()
     {
-        for (var i = _moveOperations.Count - 1; i >= 0; i--)
-        {
-            _moveOperations[i].Value.RollBack();
-        }
+        _moveOperations.SafeRollBack();
     }
 }
 
@@ -230,10 +227,7 @@ public static class ItemManipulatorEx
                         }
 
                         // Rollback all operations regardless of success
-                        for (var j = operations.Count - 1; j >= 0; j--)
-                        {
-                            operations[j].Value.RollBack();
-                        }
+                        operations.SafeRollBack();
 
                         if (success)
                         {
