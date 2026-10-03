@@ -4,6 +4,7 @@ using EFT;
 using EFT.InventoryLogic;
 using LootingBots.Actions;
 using LootingBots.Utilities;
+using LootingBots.Utilities.Extensions;
 using UnityEngine.Pool;
 using EquipmentType = LootingBots.Utilities.EquipmentType;
 
@@ -182,10 +183,10 @@ public class LootingInventoryController
             _log.LogDebug("Calculating initial net worth...");
         }
 
-        Stats.NetWorth = 0f;
-        Stats.NetWorth += Stats.PrimaryValue;
-        Stats.NetWorth += Stats.SecondaryValue;
-        Stats.NetWorth += Stats.HolsterValue;
+        var netWorth = 0f;
+        netWorth += Stats.PrimaryValue;
+        netWorth += Stats.SecondaryValue;
+        netWorth += Stats.HolsterValue;
         foreach (var slot in _botInventoryController.Inventory.Equipment._cachedSlots)
         {
             var containedItem = slot.ContainedItem;
@@ -196,15 +197,17 @@ public class LootingInventoryController
                 case SearchableItem searchableItem:
                 {
                     // Get the price of the searchable item and its contained items
-                    Stats.NetWorth += _itemAppraiser.GetItemPrice(searchableItem, _log) + searchableItem.GetAllContainedItemsValue(_log);
+                    netWorth += _itemAppraiser.GetItemPrice(searchableItem, _log) + searchableItem.GetAllContainedItemsValue(_log);
                     continue;
                 }
                 default:
-                    Stats.NetWorth += _itemAppraiser.GetItemPrice(containedItem, _log);
+                    netWorth += _itemAppraiser.GetItemPrice(containedItem, _log);
                     continue;
             }
         }
-        Stats.InitialNetWorth = Stats.NetWorth;
+
+        Stats.InitialNetWorth = netWorth;
+        Stats.NetWorth = netWorth;
     }
 
     /// <summary>
@@ -532,8 +535,8 @@ public class LootingInventoryController
     }
 
     /// <summary>
-    /// Use the ExamineTime of an object and the AttentionExamineValue of the bot to calculate the delay for discovering an item while looting.
-    /// Taken from ExamineOperationClass constructor
+    /// Use the ExamineTime of an item and the AttentionExamineValue of the bot to calculate the delay for discovering an item while looting.
+    /// Taken from <see cref="EFT.InventoryLogic.Operations.ExamineOperation"/> constructor.
     /// </summary>
     public Task SimulateExamineTimeAsync(Item item, CancellationToken token = default)
     {
@@ -1364,7 +1367,7 @@ public class LootingInventoryController
             return false;
         }
 
-        var fillResult = ItemManipulatorEx.TryFillContainerAndPickUp(item, _botInventoryController, _transactionController, _log);
+        var fillResult = OperationsUtils.TryFillContainerAndPickUp(item, _botInventoryController, _transactionController, _log);
 
         removeOperations.SafeRollBack();
 

@@ -2,6 +2,7 @@ using DrakiaXYZ.BigBrain.Brains;
 using EFT;
 using LootingBots.Components;
 using LootingBots.Utilities;
+using LootingBots.Utilities.Extensions;
 using UnityEngine;
 using UnityEngine.AI;
 

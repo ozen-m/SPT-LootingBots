@@ -3,6 +3,7 @@ using EFT;
 using EFT.HandBook;
 using EFT.InventoryLogic;
 using LootingBots.Utilities;
+using LootingBots.Utilities.Extensions;
 using UnityEngine;
 
 namespace LootingBots.Components;

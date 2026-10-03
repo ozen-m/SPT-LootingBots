@@ -22,6 +22,24 @@ public enum BotType
 
 public static class BotTypeUtils
 {
+    private static readonly HashSet<WildSpawnType> _bossWildTypes =
+    [
+        WildSpawnType.bossBully,
+        WildSpawnType.bossGluhar,
+        WildSpawnType.bossKilla,
+        WildSpawnType.bossKnight,
+        WildSpawnType.bossKojaniy,
+        WildSpawnType.bossSanitar,
+        WildSpawnType.bossTagilla,
+        WildSpawnType.bossTest,
+        WildSpawnType.bossZryachiy,
+        WildSpawnType.bossBoar,
+        WildSpawnType.bossKolontay,
+        WildSpawnType.bossPartisan,
+        WildSpawnType.bossTagillaAgro,
+        WildSpawnType.bossKillaAgro,
+    ];
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool HasScav(this BotType botType)
     {
@@ -183,22 +201,4 @@ public static class BotTypeUtils
         // Check for player Scavs created by SPT
         return profileInfo.Settings.Role == WildSpawnType.assault && !string.IsNullOrEmpty(profileInfo.MainProfileNickname);
     }
-
-    private static readonly HashSet<WildSpawnType> _bossWildTypes =
-    [
-        WildSpawnType.bossBully,
-        WildSpawnType.bossGluhar,
-        WildSpawnType.bossKilla,
-        WildSpawnType.bossKnight,
-        WildSpawnType.bossKojaniy,
-        WildSpawnType.bossSanitar,
-        WildSpawnType.bossTagilla,
-        WildSpawnType.bossTest,
-        WildSpawnType.bossZryachiy,
-        WildSpawnType.bossBoar,
-        WildSpawnType.bossKolontay,
-        WildSpawnType.bossPartisan,
-        WildSpawnType.bossTagillaAgro,
-        WildSpawnType.bossKillaAgro,
-    ];
 }

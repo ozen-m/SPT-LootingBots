@@ -3,7 +3,7 @@ using DrakiaXYZ.BigBrain.Brains;
 using EFT;
 using LootingBots.Components;
 using LootingBots.Logic;
-using LootingBots.Utilities;
+using LootingBots.Utilities.Extensions;
 using UnityEngine;
 
 namespace LootingBots;

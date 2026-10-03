@@ -6,6 +6,7 @@ using EFT.Interactive;
 using EFT.InventoryLogic;
 using LootingBots.Patches;
 using LootingBots.Utilities;
+using LootingBots.Utilities.Extensions;
 using UnityEngine;
 using UnityEngine.AI;
 

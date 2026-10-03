@@ -3,6 +3,7 @@ using Diz.LanguageExtensions;
 using EFT;
 using EFT.InventoryLogic;
 using LootingBots.Utilities;
+using LootingBots.Utilities.Extensions;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -219,7 +220,7 @@ public class LootingTransactionController
             if (_log.WarningEnabled)
             {
                 _log.LogWarning(
-                    $"Failed to move {item.Name.Localized()} to {location.Container.ID.Localized()} [{location.GetRootItem()?.Name.Localized()}]. Error: {moveResult.Error}"
+                    $"Cannot move {item.Name.Localized()} to {location.Container.ID.Localized()} [{location.GetRootItem()?.Name.Localized()}]. Error: {moveResult.Error}"
                 );
             }
             return false;

@@ -156,8 +156,8 @@ dotnet_diagnostic.CA1822.severity = none
 dotnet_diagnostic.UNT0029.severity = error
 
 # Xml project files
-[*.{csproj,vbproj,vcxproj,vcxproj.filters,proj,nativeproj,locproj}]
+[*.{csproj,vbproj,vcxproj,vcxproj.filters,proj,nativeproj,locproj,targets,sln,slnx}]
 indent_size = 2
 
-[*.{csproj,vbproj,proj,nativeproj,locproj}]
+[*.{csproj,vbproj,proj,nativeproj,locproj,targets,sln,slnx}]
 charset = utf-8
