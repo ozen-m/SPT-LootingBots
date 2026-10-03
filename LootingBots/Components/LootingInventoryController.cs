@@ -261,7 +261,7 @@ public class LootingInventoryController
         source ??= _botInventoryController.Inventory.Equipment;
 
         using var pooledItems = UnityEngine.Pool.ListPool<Item>.Get(out var items);
-        using var pooledMove = UnityEngine.Pool.ListPool<MoveResult>.Get(out var moveResults);
+        using var pooledMove = UnityEngine.Pool.ListPool<OperationResult<MoveResult>>.Get(out var moveResults);
 
         switch (source)
         {
@@ -295,7 +295,7 @@ public class LootingInventoryController
                 continue;
             }
 
-            moveResults.Add(moveResult.Value);
+            moveResults.Add(moveResult);
         }
 
         if (moveResults.Count == 0)
@@ -309,7 +309,7 @@ public class LootingInventoryController
 
         foreach (var moveResult in moveResults)
         {
-            moveResult.RollBack();
+            moveResult.Value.RollBack();
         }
 
         var moveOperationsResults = new MoveMultipleResult(moveResults, _transactionController, 0f);
@@ -1356,6 +1356,11 @@ public class LootingInventoryController
 
         // Only actually throw them if we succeeded
         await ThrowUndervaluedItemsAsync(item, uselessItems, token);
+
+        if (_log.DebugEnabled)
+        {
+            _log.LogDebug($"Filling container [{item.LocalizedName()}] with {fillResult.Value.Count - 1} items...");
+        }
 
         await LootingTransactionController.SimulatePlayerDelayAsync(LootingBots.TransactionDelay.Value * fillResult.Value.Count, token);
 

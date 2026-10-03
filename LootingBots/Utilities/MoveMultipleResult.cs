@@ -11,55 +11,53 @@ namespace LootingBots.Utilities;
 
 public class MoveMultipleResult : IOperationResult
 {
-    private readonly List<MoveResult> _moveResults;
-    private readonly LootingTransactionController _transactionController;
+    private readonly List<OperationResult<MoveResult>> _moveOperations;
+    private readonly LootingTransactionController _controller;
 
     public float NetWorthDelta { get; private set; }
 
     public int Count
     {
-        get { return _moveResults.Count; }
+        get { return _moveOperations.Count; }
     }
 
-    public MoveMultipleResult(List<MoveResult> moveResults, LootingTransactionController transactionController, float newItemsValue)
+    public MoveMultipleResult(List<OperationResult<MoveResult>> operations, LootingTransactionController controller, float netWorthDelta)
     {
-        _moveResults = UnityEngine.Pool.ListPool<MoveResult>.Get();
-        for (var i = 0; i < moveResults.Count; i++)
+        _moveOperations = UnityEngine.Pool.ListPool<OperationResult<MoveResult>>.Get();
+        for (var i = 0; i < operations.Count; i++)
         {
-            _moveResults.Add(moveResults[i]);
+            _moveOperations.Add(operations[i]);
         }
-        _transactionController = transactionController;
-        NetWorthDelta = newItemsValue;
+        _controller = controller;
+        NetWorthDelta = netWorthDelta;
     }
 
     public async Task<IResult> ExecuteAsync()
     {
         try
         {
-            foreach (var moveResult in _moveResults)
+            foreach (var moveOperation in _moveOperations)
             {
-                var operationResult = moveResult.Execute();
-                if (operationResult.Failed)
+                var networkResult = await _controller.TryRunNetworkTransactionWithTimeoutAsync(moveOperation);
+                if (networkResult.Failed)
                 {
-                    return new FailedResult(operationResult.Error!.ToString());
+                    return new FailedResult(networkResult.Error);
                 }
-
-                await _transactionController.TryRunNetworkTransactionWithTimeoutAsync(operationResult);
             }
 
             return SuccessfulResult.New;
         }
         finally
         {
-            UnityEngine.Pool.ListPool<MoveResult>.Release(_moveResults);
+            UnityEngine.Pool.ListPool<OperationResult<MoveResult>>.Release(_moveOperations);
         }
     }
 
     public bool CanExecute(ItemController itemController)
     {
-        foreach (var moveResult in _moveResults)
+        foreach (var moveOperation in _moveOperations)
         {
-            if (!moveResult.CanExecute(itemController))
+            if (!moveOperation.Value.CanExecute(itemController))
             {
                 return false;
             }
@@ -69,17 +67,17 @@ public class MoveMultipleResult : IOperationResult
 
     public void RaiseEvents(IItemOwner controller, CommandStatus status)
     {
-        foreach (var moveResult in _moveResults)
+        foreach (var moveOperation in _moveOperations)
         {
-            moveResult.RaiseEvents(controller, status);
+            moveOperation.Value.RaiseEvents(controller, status);
         }
     }
 
     public void RollBack()
     {
-        foreach (var moveResult in _moveResults)
+        for (var i = _moveOperations.Count - 1; i >= 0; i--)
         {
-            moveResult.RollBack();
+            _moveOperations[i].Value.RollBack();
         }
     }
 }
@@ -110,7 +108,7 @@ public static class ItemManipulatorEx
 
         using var pooledItems = UnityEngine.Pool.ListPool<GridItemRect>.Get(out var gridItems);
         using var pooledToMove = UnityEngine.Pool.ListPool<GridItemRect>.Get(out var itemsToMove);
-        using var pooledResults = UnityEngine.Pool.ListPool<MoveResult>.Get(out var operations);
+        using var pooledResults = UnityEngine.Pool.ListPool<OperationResult<MoveResult>>.Get(out var operations);
         using var pooledFailed = HashSetPool<Item>.Get(out var failedItems);
 
         var cellSize = container.CalculateCellSize();
@@ -216,7 +214,7 @@ public static class ItemManipulatorEx
                                 break;
                             }
 
-                            operations.Add(moveOperation.Value);
+                            operations.Add(moveOperation);
                         }
 
                         // Try placing the container into the grid, if we can now place it into the grid, we've successfully finished
@@ -226,7 +224,7 @@ public static class ItemManipulatorEx
                             var moveOperation = ItemManipulator.Move(container, gridAddress, controller, false);
                             if (moveOperation.Succeeded)
                             {
-                                operations.Add(moveOperation.Value);
+                                operations.Add(moveOperation);
                                 success = true;
                             }
                         }
@@ -234,7 +232,7 @@ public static class ItemManipulatorEx
                         // Rollback all operations regardless of success
                         for (var j = operations.Count - 1; j >= 0; j--)
                         {
-                            operations[j].RollBack();
+                            operations[j].Value.RollBack();
                         }
 
                         if (success)
