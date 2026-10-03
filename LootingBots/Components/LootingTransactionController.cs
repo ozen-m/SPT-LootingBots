@@ -151,10 +151,12 @@ public class LootingTransactionController
         return new ValueTask<bool>(MoveItemAsync(item, slotAddress, token));
     }
 
-    public ValueTask<bool> TryMergeItemAsync(Item item, CancellationToken token = default)
+    public ValueTask<OperationResult<MergeResult>> TryMergeItemAsync(Item item, CancellationToken token = default)
     {
         var mergeableItem = _inventoryController.FindItemToMerge(item);
-        return mergeableItem == null ? new ValueTask<bool>(false) : new ValueTask<bool>(MergeItemAsync(item, mergeableItem, token));
+        return mergeableItem == null
+            ? new ValueTask<OperationResult<MergeResult>>(Error.Skip)
+            : new ValueTask<OperationResult<MergeResult>>(MergeItemAsync(item, mergeableItem, token));
     }
 
     /// <summary>
@@ -302,7 +304,7 @@ public class LootingTransactionController
     /// <summary>
     /// Attempts to merge an item stack with another specified item stack.
     /// </summary>
-    public async Task<bool> MergeItemAsync(Item toMove, Item toItem, CancellationToken token = default)
+    public async Task<OperationResult<MergeResult>> MergeItemAsync(Item toMove, Item toItem, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
 
@@ -312,7 +314,7 @@ public class LootingTransactionController
             {
                 _log.LogWarning($"Cannot merge item {toMove} to NULL target item!");
             }
-            return false;
+            return Error.Skip;
         }
 
         if (_log.DebugEnabled)
@@ -324,7 +326,7 @@ public class LootingTransactionController
 
         if (!IsItemReachable(toMove))
         {
-            return false;
+            return Error.Skip;
         }
 
         await SimulatePlayerDelayAsync(token: token);
@@ -338,7 +340,7 @@ public class LootingTransactionController
                     $"Failed to merge {toMove.Name.Localized()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount}). Error: {mergeResult.Error}"
                 );
             }
-            return false;
+            return Error.Skip;
         }
 
         var mergeNetworkResult = await TryRunNetworkTransactionWithTimeoutAsync(mergeResult);
@@ -350,14 +352,16 @@ public class LootingTransactionController
                     $"Failed to merge {toMove.Name.Localized()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount}). Network Error: {mergeNetworkResult.Error}"
                 );
             }
-            return false;
+            return Error.Skip;
         }
 
         if (_log.InfoEnabled)
         {
-            _log.LogInfo($"Merged with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount})...done");
+            _log.LogInfo(
+                $"Merged {mergeResult.Value._transferResult.Count} with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount})...done"
+            );
         }
-        return true;
+        return mergeResult;
     }
 
     /// <summary>

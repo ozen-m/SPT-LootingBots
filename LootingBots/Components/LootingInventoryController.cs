@@ -432,8 +432,14 @@ public class LootingInventoryController
             if (AllowedToPickup(item, itemSize))
             {
                 // Check to see if this is an item that we can merge with another item in the inventory
-                if (await _transactionController.TryMergeItemAsync(item, token))
+                var mergeResult = await _transactionController.TryMergeItemAsync(item, token);
+                if (mergeResult.Succeeded)
                 {
+                    // Divide the item price with the item's original stack count then multiply with the merged count
+                    var mergedCount = mergeResult.Value._transferResult.Count;
+                    Stats.AddNetValue(
+                        (CurrentItemPrice / (mergeResult.Value._transferResult.Item.StackObjectsCount + mergedCount)) * mergedCount
+                    );
                     continue;
                 }
 
