@@ -164,18 +164,14 @@ public class GearValue
         }
 
         // Technically unreachable since we don't throw SearchableItems
-        var removedSome = false;
         using var pooledList = UnityEngine.Pool.ListPool<Item>.Get(out var gridItems);
-        searchableItem.GetAllGridContainedItems(gridItems);
-        foreach (var gridItem in gridItems)
-        {
-            var wasRemoved = Backpack.TryRemove(gridItem) || Vest.TryRemove(gridItem) || Pockets.TryRemove(gridItem);
-            if (!removedSome)
-            {
-                removedSome = wasRemoved;
-            }
-        }
-        return removedSome;
+        searchableItem.GetAllGridContainedItems(
+            gridItems,
+            static (gridItem, gear) =>
+                gear.Backpack.TryRemove(gridItem) || gear.Vest.TryRemove(gridItem) || gear.Pockets.TryRemove(gridItem),
+            this
+        );
+        return gridItems.Count > 0;
     }
 }
 

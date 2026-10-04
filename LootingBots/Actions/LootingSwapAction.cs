@@ -85,7 +85,7 @@ public class LootingSwapAction : LootingAction
             }
             if (LootingBots.CanStripAttachments.Value)
             {
-                using (UnityEngine.Pool.ListPool<Item>.Get(out var modsToLoot))
+                using (UnityEngine.Pool.ListPool<Mod>.Get(out var modsToLoot))
                 {
                     await invController.StripWeaponAsync(thrownWeapon, modsToLoot, token);
                 }

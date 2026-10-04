@@ -367,7 +367,8 @@ public class LootingInventoryController
     /// If bots are looting something that is equippable, and they have nothing equipped in that slot, they will always equip it.
     /// If the bot decides not to equip the item then it will attempt to put in an available container slot.
     /// </summary>
-    public async Task<bool> TryAddItemsToBotAsync(List<Item> items, bool tryToEquip = true, CancellationToken token = default)
+    public async Task<bool> TryAddItemsToBotAsync<TItem>(List<TItem> items, bool tryToEquip = true, CancellationToken token = default)
+        where TItem : Item
     {
         using var pooledList = ListActionPool.Get(out var lootingActions);
 
@@ -517,7 +518,7 @@ public class LootingInventoryController
                     continue;
                 }
 
-                using (UnityEngine.Pool.ListPool<Item>.Get(out var modsToLoot))
+                using (UnityEngine.Pool.ListPool<Mod>.Get(out var modsToLoot))
                 {
                     if (!await StripWeaponAsync(weaponToStrip, modsToLoot, token))
                     {
@@ -694,7 +695,7 @@ public class LootingInventoryController
     /// We need to check if the ammo inside the magazine is compatible with the weapon
     /// since some magazines can support multiple calibers.
     /// </summary>
-    public bool IsUsableMagForWeapon(Weapon weapon, Magazine mag)
+    public static bool IsUsableMagForWeapon(Weapon weapon, Magazine mag)
     {
         return mag.FirstRealAmmo() is Ammo ammoInMag
             && IsUsableAmmoForWeapon(weapon, ammoInMag)
@@ -726,7 +727,7 @@ public class LootingInventoryController
     /// <summary>
     /// Check if this magazine can be used by <paramref name="weapon"/>.
     /// </summary>
-    public bool IsUsableAmmoForWeapon(Weapon weapon, Ammo ammo)
+    public static bool IsUsableAmmoForWeapon(Weapon weapon, Ammo ammo)
     {
         foreach (var chamber in weapon.Chambers)
         {
@@ -758,26 +759,26 @@ public class LootingInventoryController
             return true;
         }
 
-        using var pooledList = UnityEngine.Pool.ListPool<Item>.Get(out var items);
-        equipment.GetAllGridItemsInStorageSlotsNonAlloc(items);
+        equipment.GetAllGridItemsInStorageSlotsNonAlloc(
+            usableMagazines,
+            static (gridItem, weapon) =>
+            {
+                return gridItem switch
+                {
+                    Magazine mag => IsUsableMagForWeapon(weapon, mag),
+                    Ammo ammo => IsUsableAmmoForWeapon(weapon, ammo),
+                    _ => false,
+                };
+            },
+            weapon
+        );
 
-        foreach (var item in items)
+        /*
+        if (usableMagazines.Count == 0)
         {
-            if (item is Magazine mag)
-            {
-                if (IsUsableMagForWeapon(weapon, mag))
-                {
-                    usableMagazines.Add(item);
-                }
-            }
-            else if (item is Ammo ammo)
-            {
-                if (IsUsableAmmoForWeapon(weapon, ammo))
-                {
-                    usableMagazines.Add(item);
-                }
-            }
+            // TODO: Check surroundings if a magazine is dropped?
         }
+        */
 
         return usableMagazines.Count > 0;
     }
@@ -786,7 +787,7 @@ public class LootingInventoryController
     /// Throws all magazines from the rig that are not used by any of the weapons that the bot currently has equipped.
     /// Also records thrown mag value.
     /// </summary>
-    public ValueTask ThrowUselessMagsAsync(Weapon thrownWeapon, Dictionary<Magazine, float> uselessMagazines, CancellationToken token)
+    public ValueTask ThrowUselessMagsAsync(Weapon thrownWeapon, Dictionary<Item, float> uselessMagazines, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
 
@@ -798,8 +799,8 @@ public class LootingInventoryController
         var holster = equipment.GetSlot(EquipmentSlot.Holster).ContainedItem as Weapon;
         var hasHolster = holster is not null;
 
-        using var pooledList = UnityEngine.Pool.ListPool<Magazine>.Get(out var magazines);
-        _botInventoryController.GetAllGridItemsInStorageSlotsNonAlloc(magazines);
+        using var pooledList = UnityEngine.Pool.ListPool<Item>.Get(out var items);
+        _botInventoryController.GetAllGridItemsInStorageSlotsNonAlloc(items, static (gridItem, _) => gridItem is Magazine or Ammo, this);
 
         if (_log.DebugEnabled)
         {
@@ -807,27 +808,38 @@ public class LootingInventoryController
         }
 
         var reservedCount = 0;
-        foreach (var mag in magazines)
+        foreach (var item in items)
         {
-            var fitsInThrown = IsUsableMagForWeapon(thrownWeapon, mag);
-            var fitsInPrimary = hasPrimary && IsUsableMagForWeapon(primary, mag);
-            var fitsInSecondary = hasSecondary && IsUsableMagForWeapon(secondary, mag);
-            var fitsInHolster = hasHolster && IsUsableMagForWeapon(holster, mag);
+            var fitsInEquipped = false;
+            var isSharedMag = false;
+            if (item is Magazine mag)
+            {
+                fitsInEquipped =
+                    hasPrimary && IsUsableMagForWeapon(primary, mag)
+                    || hasSecondary && IsUsableMagForWeapon(secondary, mag)
+                    || hasHolster && IsUsableMagForWeapon(holster, mag);
+                isSharedMag = fitsInEquipped && IsUsableMagForWeapon(thrownWeapon, mag);
+            }
+            else if (item is Ammo ammo)
+            {
+                fitsInEquipped =
+                    hasPrimary && IsUsableAmmoForWeapon(primary, ammo)
+                    || hasSecondary && IsUsableAmmoForWeapon(secondary, ammo)
+                    || hasHolster && IsUsableAmmoForWeapon(holster, ammo);
+            }
 
-            var fitsInEquipped = fitsInPrimary || fitsInSecondary || fitsInHolster;
-            var isSharedMag = fitsInThrown && fitsInEquipped;
             if (isSharedMag && reservedCount < 2)
             {
                 if (_log.DebugEnabled)
                 {
-                    _log.LogDebug($"Reserving shared mag {mag.Name.Localized()}");
+                    _log.LogDebug($"Reserving shared mag [{item.LocalizedName()}]");
                 }
 
                 reservedCount++;
             }
             else if (!fitsInEquipped || reservedCount >= 2)
             {
-                uselessMagazines.Add(mag, _itemAppraiser.GetItemPrice(mag, _log));
+                uselessMagazines.Add(item, _itemAppraiser.GetItemPrice(item, _log));
             }
         }
 
@@ -1431,23 +1443,25 @@ public class LootingInventoryController
 
         var minimumValue = _isPMC ? LootingBots.PMCMinLootThreshold.Value : LootingBots.ScavMinLootThreshold.Value;
 
-        using var pooledList = UnityEngine.Pool.ListPool<Item>.Get(out var items);
-        container.GetAllGridContainedItems(items);
-        foreach (var item in items)
-        {
-            // Check the conditions to filter out items to keep
-            if (item.QuestItem || item.IsDogtag() || item is Money or SearchableItem || (item is Ammo ammo && IsUsableAmmo(ammo)))
-            {
-                continue;
-            }
+        using var pooledList = UnityEngine.Pool.ListPool<Item>.Get(out var potentialUndervalued);
+        container.GetAllGridContainedItems(
+            potentialUndervalued,
+            static (item, controller) => // Check the conditions to get potential items to throw
+                !item.QuestItem
+                && !item.IsDogtag()
+                && item is not Money
+                && item is not SearchableItem
+                && (item is not Ammo ammo || !controller.IsUsableAmmo(ammo))
+                && (item is not Magazine mag || !controller.IsUsableMag(mag)),
+            this
+        );
 
-            if (item is Magazine mag)
+        foreach (var item in potentialUndervalued)
+        {
+            if (item is Ammo or Magazine)
             {
-                // If it's a magazine we cannot use, throw it
-                if (!IsUsableMag(mag))
-                {
-                    undervaluedItems.Add(mag, _itemAppraiser.GetItemPrice(mag, _log));
-                }
+                // Unusable ammo/mags do not need to be price checked
+                undervaluedItems.Add(item, _itemAppraiser.GetItemPrice(item, _log));
                 continue;
             }
 
@@ -1494,18 +1508,14 @@ public class LootingInventoryController
     /// <summary>
     /// Strip and loot a weapon's attachments.
     /// </summary>
-    public ValueTask<bool> StripWeaponAsync(Weapon weapon, List<Item> modsToLoot, CancellationToken token = default)
+    public ValueTask<bool> StripWeaponAsync(Weapon weapon, List<Mod> modsToLoot, CancellationToken token = default)
     {
-        using var pooledList = UnityEngine.Pool.ListPool<Mod>.Get(out var mods);
-        weapon.GetAllSlotContainedItems(mods);
-        foreach (var mod in mods)
-        {
-            // Check if the mod's slot is not required, can be modded in raid, and is not a magazine
-            if (mod.Parent.Container is Slot { Required: false } && mod is { RaidModdable: true } and not Magazine)
-            {
-                modsToLoot.Add(mod);
-            }
-        }
+        // Get all mods where parent slot is not required, can be modded in raid, and is not a magazine
+        weapon.GetAllSlotContainedItems(
+            modsToLoot,
+            static (mod, _) => mod.Parent.Container is Slot { Required: false } && mod is { RaidModdable: true } and not Magazine,
+            (object)null
+        );
 
         if (modsToLoot.Count == 0)
         {

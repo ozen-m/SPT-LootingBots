@@ -175,17 +175,11 @@ public static class LootUtils
         // Use the item's template id to search for the same item in the inventory.
         // Do not try to merge with cartridges or weapon chambers, so get only grid items.
         // And do not include items from the secured container.
-        using var pooled = UnityEngine.Pool.ListPool<Item>.Get(out var foundItems);
-        controller.GetAllGridItemsInStorageSlotsNonAlloc(foundItems, item.TemplateId);
-        foreach (var foundItem in foundItems)
-        {
-            if (item.StackObjectsCount + foundItem.StackObjectsCount <= foundItem.StackMaxSize)
-            {
-                return foundItem;
-            }
-        }
-
-        return null;
+        return controller.GetFirstGridItemInStorageSlotsNonAlloc(
+            static (gridItem, item) =>
+                item.TemplateId == gridItem.TemplateId && item.StackObjectsCount + gridItem.StackObjectsCount <= gridItem.StackMaxSize,
+            item
+        );
     }
 
     /// <summary>
