@@ -67,7 +67,7 @@ public class LootingBots : BaseUnityPlugin
     public static ConfigEntry<bool> BotsAlwaysCloseContainers;
     public static ConfigEntry<bool> UseMarketPrices;
     public static ConfigEntry<double> TransactionDelay;
-    public static ConfigEntry<bool> UseExamineTime;
+    public static ConfigEntry<bool> UseSearchTime;
     public static ConfigEntry<bool> ValueFromMods;
     public static ConfigEntry<bool> ValueFromPlates;
     public static ConfigEntry<bool> CanStripAttachments;
@@ -263,12 +263,12 @@ public class LootingBots : BaseUnityPlugin
                 new ConfigurationManagerAttributes { Order = 1 }
             )
         );
-        UseExamineTime = Config.Bind(
+        UseSearchTime = Config.Bind(
             "Loot Finder (Timing)",
-            "Enable examine time",
+            "Enable search time",
             true,
             new ConfigDescription(
-                "Adds a delay before looting an item to simulate the time it takes for a bot to \"uncover (examine)\" an item when searching containers, items and corpses. The delay is calculated using the ExamineTime of an object and the AttentionExamineTime of the bot.",
+                "Adds a delay before looting an item to simulate the time it takes for a bot to \"search\" an item in a searchable container. The delay is calculated using the AttentionLootSpeed and SearchBuffSpeed skills of the bot.",
                 null,
                 new ConfigurationManagerAttributes { Order = 0 }
             )

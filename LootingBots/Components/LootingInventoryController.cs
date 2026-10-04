@@ -385,9 +385,9 @@ public class LootingInventoryController
                 continue;
             }
 
-            if (LootingBots.UseExamineTime.Value)
+            if (LootingBots.UseSearchTime.Value)
             {
-                await SimulateExamineTimeAsync(item, token);
+                await SimulateSearchTimeAsync(item, token);
             }
 
             // Item info, such as: name, size, price
@@ -551,15 +551,22 @@ public class LootingInventoryController
     }
 
     /// <summary>
-    /// Use the ExamineTime of an item and the AttentionExamineValue of the bot to calculate the delay for discovering an item while looting.
-    /// Taken from <see cref="EFT.InventoryLogic.Operations.ExamineOperation"/> constructor.
+    /// Use the AttentionLootSpeedValue and SearchBuffSpeedValue of the bot
+    /// to calculate the delay for discovering an item while looting a searchable container.
+    /// Taken from <see cref="EFT.InventoryLogic.Operations.ActiveSearchContentOperation.SearchContent"/>.
     /// </summary>
-    public Task SimulateExamineTimeAsync(Item item, CancellationToken token = default)
+    public Task SimulateSearchTimeAsync(Item item, CancellationToken token = default)
     {
-        return LootingTransactionController.SimulatePlayerDelayAsync(
-            item.ExamineTime * 1000f / (1f + _botOwner.Profile.Skills.AttentionExamineValue),
-            token
-        );
+        // Unfortunately SPT does not generate these values.
+        /*
+         var skillsInfo = _botOwner.GetPlayer.Profile.SkillsInfo;
+        var lootSpeed = 1f + skillsInfo.AttentionLootSpeedValue + skillsInfo.SearchBuffSpeedValue;
+        var delay = UnityEngine.Random.Range(1, 3) / lootSpeed * 1000D;
+        */
+
+        return item.Parent.Container is not ISearchableContainer // || _discoveredItems.Contains(item)
+            ? Task.CompletedTask
+            : LootingTransactionController.SimulatePlayerDelayAsync(UnityEngine.Random.Range(1, 3) * 1000D, token);
     }
 
     /// <summary>
