@@ -171,7 +171,7 @@ public static class OperationsUtils
 
                         if (success)
                         {
-                            return new MoveMultipleResult(operations, transaction, backpack.GetAllContainedItemsValue(log));
+                            return new MoveMultipleResult(operations, transaction, backpack.GetAllGridContainedItemsValue(log));
                         }
                     }
                 }

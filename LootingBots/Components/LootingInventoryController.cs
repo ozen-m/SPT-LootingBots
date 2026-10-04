@@ -197,7 +197,7 @@ public class LootingInventoryController
                 case SearchableItem searchableItem:
                 {
                     // Get the price of the searchable item and its contained items
-                    netWorth += _itemAppraiser.GetItemPrice(searchableItem, _log) + searchableItem.GetAllContainedItemsValue(_log);
+                    netWorth += _itemAppraiser.GetItemPrice(searchableItem, _log) + searchableItem.GetAllGridContainedItemsValue(_log);
                     continue;
                 }
                 default:
@@ -376,6 +376,15 @@ public class LootingInventoryController
         {
             token.ThrowIfCancellationRequested();
 
+            if (item.Owner == _botInventoryController)
+            {
+                if (_log.DebugEnabled)
+                {
+                    _log.LogDebug($"Already owns item [{item.LocalizedName()}]. Skipping");
+                }
+                continue;
+            }
+
             if (LootingBots.UseExamineTime.Value)
             {
                 await SimulateExamineTimeAsync(item, token);
@@ -440,6 +449,12 @@ public class LootingInventoryController
                 continue;
             }
 
+            // Get the prices of items in its slots, we're now comparing the price of the item with its value per slot.
+            if (item is CompoundItem)
+            {
+                CurrentItemPrice += item.GetAllSlotContainedItemsValue(_log);
+            }
+
             // Check to see if we can pick up the item
             if (AllowedToPickup(item, itemSize))
             {
@@ -473,7 +488,7 @@ public class LootingInventoryController
 
                     if (item is SearchableItem pickedUpContainer)
                     {
-                        Stats.AddNetValue(pickedUpContainer.GetAllContainedItemsValue(_log));
+                        Stats.AddNetValue(pickedUpContainer.GetAllGridContainedItemsValue(_log));
                         var (total, available) = pickedUpContainer.Grids.GetTotalAndAvailableGridSlots();
                         Stats.TotalGridSpaces += total;
                         Stats.AvailableGridSpaces += available;
@@ -1531,7 +1546,6 @@ public class LootingInventoryController
             _log.LogInfo($"Trying to strip attachments of weapon: {weapon.LocalizedName()}");
         }
 
-        // TODO: Mod already looted but still trying to loot its child
         return new ValueTask<bool>(TryAddItemsToBotAsync(modsToLoot, false, token));
     }
 
@@ -1648,7 +1662,7 @@ public class LootingInventoryController
             {
                 _log.LogDebug($"GetGearAction: Trying to equip {lootItem.LocalizedName()} (₽{CurrentItemPrice:N0})");
             }
-            lootingActions.Add(LootingMoveAction.Rent(lootItem, null, CurrentItemPrice + lootItem.GetAllContainedItemsValue(_log)));
+            lootingActions.Add(LootingMoveAction.Rent(lootItem, null, CurrentItemPrice + lootItem.GetAllGridContainedItemsValue(_log)));
             return;
         }
 
@@ -1772,8 +1786,8 @@ public class LootingInventoryController
         }
 
         // Include contained items in calculating NetWorthDelta
-        toEquipValue += lootItem.GetAllContainedItemsValue(_log);
-        toSwapValue += equippedItem.GetAllContainedItemsValue(_log);
+        toEquipValue += lootItem.GetAllGridContainedItemsValue(_log);
+        toSwapValue += equippedItem.GetAllGridContainedItemsValue(_log);
 
         lootingActions.Add(LootingSwapAction.Rent(lootItem, equippedItem, toEquipValue - toSwapValue, transferItems));
     }
