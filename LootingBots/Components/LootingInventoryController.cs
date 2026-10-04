@@ -75,40 +75,17 @@ public class LootingInventoryController
         _isPMC = _botOwner.Profile.Info.Settings.Role.IsPMC();
 
         Stats = new BotStats(botOwner.GetPlayer);
-
-        _ = OnSpawnAsync();
     }
 
-    public async Task OnSpawnAsync(CancellationToken token = default)
+    public void Init()
     {
-        try
+        CalculateGearValue();
+        CalculateInitialNetWorth();
+        SubscribeToGearSlots();
+        UpdateGridStats();
+        if (LootingBots.UseWeightRestriction.Value)
         {
-            var equipment = _botInventoryController.Inventory.Equipment;
-            await TransferItemsToBackpackAsync(equipment);
-
-            var backpack = equipment.GetSlot(EquipmentSlot.Backpack).ContainedItem;
-            using (DictionaryPool<Item, float>.Get(out var itemsToThrow))
-            {
-                GetUndervaluedItems(backpack, itemsToThrow);
-                await ThrowUndervaluedItemsAsync(equipment, itemsToThrow, token);
-            }
-
-            CalculateGearValue();
-            CalculateInitialNetWorth();
-            SubscribeToGearSlots();
-            UpdateGridStats();
-            if (LootingBots.UseWeightRestriction.Value)
-            {
-                SubscribeToWeightChange();
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            // Ignore
-        }
-        catch (Exception ex)
-        {
-            LootingBots.LootLog.LogError(ex.ToString());
+            SubscribeToWeightChange();
         }
     }
 
@@ -257,6 +234,23 @@ public class LootingInventoryController
     private void SubscribeToWeightChange()
     {
         _unsubActions.Add(_botOwner.GetPlayer.Inventory.OnWeightUpdated.Bind(Stats.TotalWeight.SetDirty));
+    }
+
+    /// <summary>
+    /// Moves all non-vest items into the backpack, and throws any undervalued items from the backpack.
+    /// Called on bot spawn.
+    /// </summary>
+    public async Task CleanupInventoryAsync(CancellationToken token = default)
+    {
+        var equipment = _botInventoryController.Inventory.Equipment;
+        await TransferItemsToBackpackAsync(equipment);
+
+        var backpack = equipment.GetSlot(EquipmentSlot.Backpack).ContainedItem;
+        using (DictionaryPool<Item, float>.Get(out var itemsToThrow))
+        {
+            GetUndervaluedItems(backpack, itemsToThrow);
+            await ThrowUndervaluedItemsAsync(equipment, itemsToThrow, token);
+        }
     }
 
     /// <summary>

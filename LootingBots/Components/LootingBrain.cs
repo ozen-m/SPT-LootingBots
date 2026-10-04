@@ -129,6 +129,30 @@ public class LootingBrain : MonoBehaviour
         InventoryController = new LootingInventoryController(BotOwner, this);
 
         UpdateIsLootingEnabled();
+        _ = OnSpawnAsync();
+    }
+
+    /// <summary>
+    /// Clean up the bot's inventory on spawn, then initialize LootingInventoryController.
+    /// </summary>
+    public async Task OnSpawnAsync()
+    {
+        LootTaskRunning = true;
+        var token = _lootingSource.Timeout(180);
+        try
+        {
+            await InventoryController.CleanupInventoryAsync(token);
+        }
+        catch (Exception ex)
+        {
+            _log.LogError(ex.ToString());
+        }
+        finally
+        {
+            InventoryController.Init();
+            _lootingSource.ResetTimer();
+            LootTaskRunning = false;
+        }
     }
 
     /// <summary>
