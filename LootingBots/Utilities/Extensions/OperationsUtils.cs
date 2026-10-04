@@ -52,9 +52,8 @@ public static class OperationsUtils
         var cellSize = container.CalculateCellSize();
         var containerSize = cellSize.X * cellSize.Y;
 
-        for (var i = grids.Count - 1; i >= 0; i--)
+        foreach (var grid in grids)
         {
-            var grid = grids[i];
             var gridWidth = grid._gridWidth;
             var gridHeight = grid._gridHeight;
             var gridSize = gridWidth * gridHeight;

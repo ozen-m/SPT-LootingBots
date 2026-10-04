@@ -33,7 +33,7 @@ public static class LocationUtils
                 // Skip grids with the same parent
                 continue;
             }
-            var location = grid.FindLocationForItem(loot) ?? grid.FindLocationForItemInNestedGrids(loot);
+            var location = grid.FindLocationForItem(loot);
             if (location == null)
             {
                 continue;
@@ -49,26 +49,6 @@ public static class LocationUtils
     }
 
     /// <summary>
-    /// Try to find a location in nested grids.
-    /// </summary>
-    /// <param name="grid">Grid to find nested searchable items' grids</param>
-    /// <param name="item">Item to find location for</param>
-    public static GridItemAddress FindLocationForItemInNestedGrids(this Grid grid, Item item)
-    {
-        foreach (var gridItem in grid._itemCollection.ItemsList)
-        {
-            if (gridItem is not SearchableItem searchableItem)
-            {
-                continue;
-            }
-
-            return searchableItem.FindGridToPickUpLootNonAlloc(item);
-        }
-
-        return null;
-    }
-
-    /// <summary>
     /// Based on <see cref="InventoryEquipmentExtension.GetPrioritizedContainersForLoot"/>.
     /// Does not include the SecuredContainer slot for InventoryEquipment.
     /// </summary>
@@ -78,66 +58,63 @@ public static class LocationUtils
         {
             case InventoryEquipment equipment:
             {
-                var armbandGrids = (equipment.GetSlot(EquipmentSlot.ArmBand).ContainedItem as CompoundItem)?.Grids ?? [];
+                var armband = equipment.GetSlot(EquipmentSlot.ArmBand).ContainedItem;
+                var backpack = equipment.GetSlot(EquipmentSlot.Backpack).ContainedItem;
                 var pocketsGrids = (equipment.GetSlot(EquipmentSlot.Pockets).ContainedItem as CompoundItem)?.Grids ?? [];
                 var vestGrids = (equipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem as CompoundItem)?.Grids ?? [];
-                var backpackGrids = (equipment.GetSlot(EquipmentSlot.Backpack).ContainedItem as CompoundItem)?.Grids ?? [];
 
                 switch (loot)
                 {
                     case Ammo:
-                        preAllocatedList.AddRange(armbandGrids);
+                        armband.GetPrioritizedGridsForLootNonAlloc(loot, preAllocatedList);
                         preAllocatedList.AddRange(vestGrids);
                         preAllocatedList.AddRange(pocketsGrids);
-                        // preAllocatedList.AddRange(backpackGrids);
+                        // backpack.GetPrioritizedGridsForLootNonAlloc(loot, preAllocatedList);
                         break;
                     case Magazine:
                         preAllocatedList.AddRange(vestGrids);
-                        preAllocatedList.AddRange(armbandGrids);
+                        armband.GetPrioritizedGridsForLootNonAlloc(loot, preAllocatedList);
                         preAllocatedList.AddRange(pocketsGrids);
-                        // preAllocatedList.AddRange(backpackGrids); // Bots can't reach magazines in the backpack
+                        // backpack.GetPrioritizedGridsForLootNonAlloc(loot, preAllocatedList);
                         break;
                     case ThrowWeap:
                         preAllocatedList.AddRange(pocketsGrids);
-                        preAllocatedList.AddRange(armbandGrids);
+                        armband.GetPrioritizedGridsForLootNonAlloc(loot, preAllocatedList);
                         preAllocatedList.AddRange(vestGrids);
-                        // preAllocatedList.AddRange(backpackGrids);
+                        // backpack.GetPrioritizedGridsForLootNonAlloc(loot, preAllocatedList);
                         break;
                     case Meds:
                         preAllocatedList.AddRange(pocketsGrids);
-                        preAllocatedList.AddRange(armbandGrids);
-                        preAllocatedList.AddRange(backpackGrids);
+                        armband.GetPrioritizedGridsForLootNonAlloc(loot, preAllocatedList);
+                        backpack.GetPrioritizedGridsForLootNonAlloc(loot, preAllocatedList);
                         // preAllocatedList.AddRange(vestGrids);
                         break;
                     default:
-                        preAllocatedList.AddRange(backpackGrids);
+                        backpack.GetPrioritizedGridsForLootNonAlloc(loot, preAllocatedList);
                         // preAllocatedList.AddRange(vestGrids); // Reserve vest for Magazine, Ammo, ThrowWeap
-                        preAllocatedList.AddRange(armbandGrids);
+                        armband.GetPrioritizedGridsForLootNonAlloc(loot, preAllocatedList);
                         preAllocatedList.AddRange(pocketsGrids);
                         break;
                 }
                 return;
             }
-            case LootContainer container:
-            {
-                preAllocatedList.AddRange(container.Grids);
-                return;
-            }
             case SearchableItem searchableItem:
-                preAllocatedList.AddRange(searchableItem.Grids);
+                // Prioritize nested grids
                 foreach (var grid in searchableItem.Grids)
                 {
                     foreach (var item in grid._itemCollection.ItemsList)
                     {
-                        item.GetPrioritizedGridsForLootNonAlloc(null, preAllocatedList);
+                        if (item is SearchableItem)
+                        {
+                            item.GetPrioritizedGridsForLootNonAlloc(null, preAllocatedList);
+                        }
                     }
                 }
+                preAllocatedList.AddRange(searchableItem.Grids);
                 return;
             default:
-            {
                 // Loose loot
                 return;
-            }
         }
     }
 }
