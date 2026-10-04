@@ -130,11 +130,11 @@ public class ItemAppraiser(Log _log)
         {
             if (log != null)
             {
-                log.LogDebug($"Getting value of attachments for {lootWeapon.Name.Localized()}");
+                log.LogDebug($"Getting value of attachments for {lootWeapon.LocalizedName()}");
             }
             else
             {
-                _log.LogDebug($"Getting value of attachments for {lootWeapon.Name.Localized()}");
+                _log.LogDebug($"Getting value of attachments for {lootWeapon.LocalizedName()}");
             }
         }
 
@@ -173,11 +173,11 @@ public class ItemAppraiser(Log _log)
         {
             if (log != null)
             {
-                log.LogDebug($"Getting value of armor {lootArmor.Name.Localized()}");
+                log.LogDebug($"Getting value of armor {lootArmor.LocalizedName()}");
             }
             else
             {
-                _log.LogDebug($"Getting value of armor {lootArmor.Name.Localized()}");
+                _log.LogDebug($"Getting value of armor {lootArmor.LocalizedName()}");
             }
         }
 
@@ -228,11 +228,11 @@ public class ItemAppraiser(Log _log)
         // {
         //     if (log != null)
         //     {
-        //         log.LogDebug($"Handbook price of {lootItem.Name.Localized()}: {price:N0}₽");
+        //         log.LogDebug($"Handbook price of {lootItem.LocalizedName()}: {price:N0}₽");
         //     }
         //     else
         //     {
-        //         _log.LogDebug($"Handbook price of {lootItem.Name.Localized()}: {price:N0}₽");
+        //         _log.LogDebug($"Handbook price of {lootItem.LocalizedName()}: {price:N0}₽");
         //     }
         // }
 
@@ -248,11 +248,11 @@ public class ItemAppraiser(Log _log)
         {
             if (log != null)
             {
-                log.LogDebug($"Getting value of attachments for {lootWeapon.Name.Localized()}");
+                log.LogDebug($"Getting value of attachments for {lootWeapon.LocalizedName()}");
             }
             else
             {
-                _log.LogDebug($"Getting value of attachments for {lootWeapon.Name.Localized()}");
+                _log.LogDebug($"Getting value of attachments for {lootWeapon.LocalizedName()}");
             }
         }
 
@@ -291,11 +291,11 @@ public class ItemAppraiser(Log _log)
         {
             if (log != null)
             {
-                log.LogDebug($"Getting value of armor {lootArmor.Name.Localized()}");
+                log.LogDebug($"Getting value of armor {lootArmor.LocalizedName()}");
             }
             else
             {
-                _log.LogDebug($"Getting value of armor {lootArmor.Name.Localized()}");
+                _log.LogDebug($"Getting value of armor {lootArmor.LocalizedName()}");
             }
         }
 
@@ -345,11 +345,11 @@ public class ItemAppraiser(Log _log)
             // {
             //     if (log != null)
             //     {
-            //         log.LogDebug($"Market price of {lootItem.Name.Localized()}: {price:N0}₽");
+            //         log.LogDebug($"Market price of {lootItem.LocalizedName()}: {price:N0}₽");
             //     }
             //     else
             //     {
-            //         _log.LogDebug($"Market price of {lootItem.Name.Localized()}: {price:N0}₽");
+            //         _log.LogDebug($"Market price of {lootItem.LocalizedName()}: {price:N0}₽");
             //     }
             // }
 

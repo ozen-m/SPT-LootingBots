@@ -381,7 +381,7 @@ public class LootingInventoryController
             }
 
             // Item info, such as: name, size, price
-            var itemName = item.Name.Localized();
+            var itemName = item.LocalizedName();
             var itemSize = item.GetItemSize();
             CurrentItemPrice = _itemAppraiser.GetItemPrice(item, _log);
 
@@ -907,7 +907,7 @@ public class LootingInventoryController
             {
                 if (_log.DebugEnabled)
                 {
-                    _log.LogDebug($"Trying to equip {lootWeapon.Name.Localized()} (₽{lootValue}) to holster");
+                    _log.LogDebug($"Trying to equip {lootWeapon.LocalizedName()} (₽{lootValue}) to holster");
                 }
 
                 var moveAction = LootingMoveAction.Rent(lootWeapon, null, lootValue);
@@ -921,7 +921,7 @@ public class LootingInventoryController
                     if (_log.DebugEnabled)
                     {
                         _log.LogDebug(
-                            $"Trying to swap {lootWeapon.Name.Localized()} (₽{lootValue}) with {holster.Name.Localized()} (₽{holsterValue}) in holster"
+                            $"Trying to swap {lootWeapon.LocalizedName()} (₽{lootValue}) with {holster.LocalizedName()} (₽{holsterValue}) in holster"
                         );
                     }
 
@@ -939,7 +939,7 @@ public class LootingInventoryController
         {
             if (_log.DebugEnabled)
             {
-                _log.LogDebug($"Trying to equip {lootWeapon.Name.Localized()} (₽{lootValue}) to primary slot");
+                _log.LogDebug($"Trying to equip {lootWeapon.LocalizedName()} (₽{lootValue}) to primary slot");
             }
 
             var moveAction = LootingMoveAction.Rent(lootWeapon, null, lootValue);
@@ -949,7 +949,7 @@ public class LootingInventoryController
             {
                 if (_log.DebugEnabled)
                 {
-                    _log.LogDebug($"then swapping it to the secondary slot [Occupied by: {secondary.Name.Localized()}]");
+                    _log.LogDebug($"then swapping it to the secondary slot [Occupied by: {secondary.LocalizedName()}]");
                 }
 
                 var swapAction = LootingSwapAction.Rent(secondary, lootWeapon, 0f, false);
@@ -965,7 +965,7 @@ public class LootingInventoryController
         {
             if (_log.DebugEnabled)
             {
-                _log.LogDebug($"Trying to equip {lootWeapon.Name.Localized()} (₽{lootValue}) to secondary slot");
+                _log.LogDebug($"Trying to equip {lootWeapon.LocalizedName()} (₽{lootValue}) to secondary slot");
             }
 
             var moveAction = LootingMoveAction.Rent(lootWeapon, null, lootValue);
@@ -975,7 +975,7 @@ public class LootingInventoryController
             {
                 if (_log.DebugEnabled)
                 {
-                    _log.LogDebug($"then swapping it to the primary slot [Occupied by: {primary.Name.Localized()}]");
+                    _log.LogDebug($"then swapping it to the primary slot [Occupied by: {primary.LocalizedName()}]");
                 }
 
                 var swapAction = LootingSwapAction.Rent(lootWeapon, primary, 0f, false);
@@ -992,7 +992,7 @@ public class LootingInventoryController
             if (_log.DebugEnabled)
             {
                 _log.LogDebug(
-                    $"Trying to swap the secondary {secondary.Name.Localized()} with the primary ({primary.Name.Localized()}) because it is a better weapon"
+                    $"Trying to swap the secondary [{secondary.LocalizedName()}] with the primary [{primary.LocalizedName()}] because it is a better weapon"
                 );
             }
 
@@ -1013,7 +1013,7 @@ public class LootingInventoryController
             if (_log.DebugEnabled)
             {
                 _log.LogDebug(
-                    $"Trying to swap {lootWeapon.Name.Localized()} (₽{lootValue}) with secondary {secondary.Name.Localized()} (₽{Stats.SecondaryValue})"
+                    $"Trying to swap {lootWeapon.LocalizedName()} (₽{lootValue}) with secondary {secondary.LocalizedName()} (₽{Stats.SecondaryValue})"
                 );
             }
 
@@ -1027,8 +1027,8 @@ public class LootingInventoryController
             {
                 _log.LogDebug(
                     thrownSecondary
-                        ? $"then swapping it to the primary slot [Occupied by: {primary.Name.Localized()}]"
-                        : $"Trying to swap {lootWeapon.Name.Localized()} (₽{lootValue}) with primary {primary.Name.Localized()} (₽{Stats.PrimaryValue})"
+                        ? $"then swapping it to the primary slot [Occupied by: {primary.LocalizedName()}]"
+                        : $"Trying to swap {lootWeapon.LocalizedName()} (₽{lootValue}) with primary {primary.LocalizedName()} (₽{Stats.PrimaryValue})"
                 );
             }
 
@@ -1072,7 +1072,7 @@ public class LootingInventoryController
             if (_log.DebugEnabled)
             {
                 _log.LogDebug(
-                    $"Cannot swap {itemToLoot.Name.Localized()} with {equipped.Name.Localized()} because of conflicting item {conflictingItem.Name.Localized()}"
+                    $"Cannot swap {itemToLoot.LocalizedName()} with {equipped.LocalizedName()} because of conflicting item {conflictingItem.LocalizedName()}"
                 );
             }
             return false;
@@ -1085,7 +1085,7 @@ public class LootingInventoryController
             if (_log.DebugEnabled)
             {
                 _log.LogDebug(
-                    $"Found better armor {itemToLoot.Name.Localized()} versus {equipped.Name.Localized()}. Difference: {armorDifference}"
+                    $"Found better armor {itemToLoot.LocalizedName()} versus {equipped.LocalizedName()}. Difference: {armorDifference}"
                 );
             }
             return true;
@@ -1097,7 +1097,7 @@ public class LootingInventoryController
         {
             if (_log.DebugEnabled)
             {
-                _log.LogDebug($"Found bigger container {itemToLoot.Name.Localized()} versus {equipped.Name.Localized()}");
+                _log.LogDebug($"Found bigger container {itemToLoot.LocalizedName()} versus {equipped.LocalizedName()}");
             }
             return true;
         }
@@ -1107,7 +1107,7 @@ public class LootingInventoryController
         {
             if (_log.DebugEnabled)
             {
-                _log.LogDebug($"Found more valuable gear {itemToLoot.Name.Localized()} versus {equipped.Name.Localized()}");
+                _log.LogDebug($"Found more valuable gear {itemToLoot.LocalizedName()} versus {equipped.LocalizedName()}");
             }
             return true;
         }
@@ -1227,7 +1227,7 @@ public class LootingInventoryController
             if (_log.DebugEnabled)
             {
                 _log.LogDebug(
-                    $"Weapon {potentialWeapon.Name.Localized()} is better versus {equippedWeapon.Name.Localized()}. Difference: {powerDifference}, IsMoreValuable: {true}"
+                    $"Weapon {potentialWeapon.LocalizedName()} is better versus {equippedWeapon.LocalizedName()}. Difference: {powerDifference}, IsMoreValuable: {true}"
                 );
             }
             return true;
@@ -1330,7 +1330,7 @@ public class LootingInventoryController
 
         if (_log.DebugEnabled)
         {
-            _log.LogDebug($"Looting {items.Count} items from {parentItem.Name.Localized()}");
+            _log.LogDebug($"Looting {items.Count} items from {parentItem.LocalizedName()}");
         }
 
         await LootingTransactionController.SimulatePlayerDelayAsync(LootingBrain.LootingStartDelay, token);
@@ -1409,7 +1409,7 @@ public class LootingInventoryController
         if (_log.InfoEnabled)
         {
             _log.LogInfo(
-                $"Filled container [{item.LocalizedName()}] with items from backpack and picked up [place: {item.CurrentAddress.GetRootItem()?.Name.Localized()}]"
+                $"Filled container [{item.LocalizedName()}] with items from backpack and picked up [place: {item.Parent.LocalizedParentName()}]"
             );
         }
         return true;
@@ -1479,14 +1479,14 @@ public class LootingInventoryController
         {
             if (_log.DebugEnabled)
             {
-                _log.LogDebug($"No undervalued items found to throw in {container.Name.Localized()}");
+                _log.LogDebug($"No undervalued items found to throw in {container.LocalizedName()}");
             }
             return new ValueTask();
         }
 
         if (_log.InfoEnabled)
         {
-            _log.LogInfo($"Throwing {itemsToThrow.Count} undervalued items from {container.Name.Localized()}");
+            _log.LogInfo($"Throwing {itemsToThrow.Count} undervalued items from {container.LocalizedName()}");
         }
         return new ValueTask(TransferOrThrowItemsAsync(itemsToThrow, _lootingBrain.ActiveLoot.GetRootItem(), token));
     }
@@ -1511,14 +1511,14 @@ public class LootingInventoryController
         {
             if (_log.DebugEnabled)
             {
-                _log.LogDebug($"No attachments to strip for weapon: {weapon.Name.Localized()}");
+                _log.LogDebug($"No attachments to strip for weapon: {weapon.LocalizedName()}");
             }
             return new ValueTask<bool>(true);
         }
 
         if (_log.InfoEnabled)
         {
-            _log.LogInfo($"Trying to strip attachments of weapon: {weapon.Name.Localized()}");
+            _log.LogInfo($"Trying to strip attachments of weapon: {weapon.LocalizedName()}");
         }
 
         // TODO: Mod already looted but still trying to loot its child
@@ -1636,7 +1636,7 @@ public class LootingInventoryController
         {
             if (_log.DebugEnabled)
             {
-                _log.LogDebug($"GetGearAction: Trying to equip {lootItem.Name.Localized()} (₽{CurrentItemPrice:N0})");
+                _log.LogDebug($"GetGearAction: Trying to equip {lootItem.LocalizedName()} (₽{CurrentItemPrice:N0})");
             }
             lootingActions.Add(LootingMoveAction.Rent(lootItem, null, CurrentItemPrice + lootItem.GetAllContainedItemsValue(_log)));
             return;
@@ -1670,7 +1670,7 @@ public class LootingInventoryController
                     if (_log.DebugEnabled)
                     {
                         _log.LogDebug(
-                            $"Trying to drop chest armor [{chest.Name.Localized()}] then loot armored rig [{lootItem.Name.Localized()}]"
+                            $"Trying to drop chest armor [{chest.LocalizedName()}] then loot armored rig [{lootItem.LocalizedName()}]"
                         );
                     }
 
@@ -1683,7 +1683,7 @@ public class LootingInventoryController
                 {
                     if (_log.DebugEnabled)
                     {
-                        _log.LogDebug($"Equipped chest armor is better than or equal to found armored rig {lootItem.Name.Localized()}");
+                        _log.LogDebug($"Equipped chest armor is better than or equal to found armored rig {lootItem.LocalizedName()}");
                     }
                 }
             }
@@ -1734,7 +1734,7 @@ public class LootingInventoryController
             if (_log.DebugEnabled)
             {
                 _log.LogDebug(
-                    $"Trying to loot chest armor [{corpseChestArmor.Name.Localized()}] and tac vest [{lootItem.Name.Localized()}] and drop current armored rig [{equippedItem.Name.Localized()}]"
+                    $"Trying to loot chest armor [{corpseChestArmor.LocalizedName()}] and tac vest [{lootItem.LocalizedName()}] and drop current armored rig [{equippedItem.LocalizedName()}]"
                 );
             }
 
@@ -1757,7 +1757,7 @@ public class LootingInventoryController
         if (_log.DebugEnabled)
         {
             _log.LogDebug(
-                $"Trying to equip {lootItem.Name.Localized()} (₽{toEquipValue:N0}) and swap with {equippedItem.Name.Localized()} (₽{toSwapValue:N0}){(transferItems ? $" then loot {equippedItem.Name.Localized()}" : string.Empty)}"
+                $"Trying to equip {lootItem.LocalizedName()} (₽{toEquipValue:N0}) and swap with {equippedItem.LocalizedName()} (₽{toSwapValue:N0}){(transferItems ? $" then loot {equippedItem.LocalizedName()}" : string.Empty)}"
             );
         }
 

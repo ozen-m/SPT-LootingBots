@@ -1,9 +1,18 @@
-﻿using EFT.InventoryLogic;
+﻿using EFT;
+using EFT.InventoryLogic;
 
 namespace LootingBots.Utilities.Extensions;
 
 public static class LocationUtils
 {
+    /// <summary>
+    /// The localized name of an address' parent item.
+    /// </summary>
+    public static string LocalizedParentName(this ItemAddress parent)
+    {
+        return parent.Container.ParentItem.LocalizedName();
+    }
+
     /// <summary>
     /// Based on <see cref="InventoryExtension.FindGridToPickUp"/>
     /// </summary>

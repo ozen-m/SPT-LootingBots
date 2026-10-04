@@ -271,9 +271,9 @@ public static class LootUtils
     {
         return interactableObject switch
         {
-            LootableContainer container => container.ItemOwner?.RootItem.Name.Localized(),
+            LootableContainer container => container.ItemOwner?.RootItem.LocalizedName(),
             Corpse corpse => corpse.name,
-            LootItem lootItem => lootItem.ItemOwner?.RootItem.Name.Localized(),
+            LootItem lootItem => lootItem.ItemOwner?.RootItem.LocalizedName(),
             _ => "-",
         };
     }

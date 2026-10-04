@@ -46,7 +46,7 @@ public class LootingTransactionController
         {
             if (_log.WarningEnabled)
             {
-                _log.LogWarning($"Could not find secured container to check extra ammo for {weapon.Name.Localized()}");
+                _log.LogWarning($"Could not find secured container to check extra ammo for {weapon.LocalizedName()}");
             }
             return;
         }
@@ -68,7 +68,7 @@ public class LootingTransactionController
             {
                 if (_log.DebugEnabled)
                 {
-                    _log.LogDebug($"Already has ammo for {weapon.Name.Localized()}");
+                    _log.LogDebug($"Already has ammo for {weapon.LocalizedName()}");
                 }
                 return; // Early exit as soon as a match is found
             }
@@ -78,7 +78,7 @@ public class LootingTransactionController
         // attempt to add 10 max ammo stacks into the bot's secure container for use in the bot's internal reloading code
         if (_log.DebugEnabled)
         {
-            _log.LogDebug($"Trying to add extra ammo for new weapon {weapon.Name.Localized()}");
+            _log.LogDebug($"Trying to add extra ammo for new weapon {weapon.LocalizedName()}");
         }
 
         // Try to get the current ammo used by the weapon by checking the weapon's chamber.
@@ -110,20 +110,18 @@ public class LootingTransactionController
                 }
                 else if (_log.ErrorEnabled)
                 {
-                    _log.LogError($"Failed to add {ammo.Name.Localized()} to secure container: {result.Error}");
+                    _log.LogError($"Failed to add {ammo.LocalizedName()} to secure container: {result.Error}");
                 }
             }
             else if (_log.DebugEnabled)
             {
-                _log.LogDebug($"Cannot find location in secure container for {ammo.Name.Localized()}");
+                _log.LogDebug($"Cannot find location in secure container for {ammo.LocalizedName()}");
             }
         }
 
         if (ammoAdded > 0 && _log.DebugEnabled)
         {
-            _log.LogDebug(
-                $"Successfully added {ammoAdded} rounds of {ammoToAdd.Name.Localized()} for new weapon {weapon.Name.Localized()}"
-            );
+            _log.LogDebug($"Successfully added {ammoAdded} rounds of {ammoToAdd.LocalizedName()} for new weapon {weapon.LocalizedName()}");
         }
     }
 
@@ -140,14 +138,14 @@ public class LootingTransactionController
         {
             if (_log.DebugEnabled)
             {
-                _log.LogDebug($"Could not find a place to equip: {item.Name.Localized()}");
+                _log.LogDebug($"Could not find a place to equip: {item.LocalizedName()}");
             }
             return new ValueTask<bool>(false);
         }
 
         if (_log.DebugEnabled)
         {
-            _log.LogDebug($"Equipping: {item.Name.Localized()} [place: {slotAddress.Container.ID.Localized()}]");
+            _log.LogDebug($"Equipping: {item.LocalizedName()} [place: {slotAddress.Container.ID.Localized()}]");
         }
         return new ValueTask<bool>(MoveItemAsync(item, slotAddress, token));
     }
@@ -174,14 +172,14 @@ public class LootingTransactionController
         {
             if (_log.DebugEnabled)
             {
-                _log.LogDebug($"Could not find a place to pickup: {item.Name.Localized()}");
+                _log.LogDebug($"Could not find a place to pickup: {item.LocalizedName()}");
             }
             return new ValueTask<bool>(false);
         }
 
         if (_log.DebugEnabled)
         {
-            _log.LogDebug($"Picking up: {item.Name.Localized()} [place: {gridAddress.GetRootItem()?.Name.Localized()}]");
+            _log.LogDebug($"Picking up: {item.LocalizedName()} [place: {gridAddress.LocalizedParentName()}]");
         }
         return new ValueTask<bool>(MoveItemAsync(item, gridAddress, token));
     }
@@ -202,9 +200,7 @@ public class LootingTransactionController
 
         if (_log.DebugEnabled)
         {
-            _log.LogDebug(
-                $"Moving {item.Name.Localized()} to: {location.Container.ID.Localized()} [{location.GetRootItem()?.Name.Localized()}]..."
-            );
+            _log.LogDebug($"Moving {item.LocalizedName()} to: {location.Container.ID.Localized()} [{location.LocalizedParentName()}]...");
         }
 
         if (!IsItemReachable(item))
@@ -220,7 +216,7 @@ public class LootingTransactionController
             if (_log.WarningEnabled)
             {
                 _log.LogWarning(
-                    $"Cannot move {item.Name.Localized()} to {location.Container.ID.Localized()} [{location.GetRootItem()?.Name.Localized()}]. Error: {moveResult.Error}"
+                    $"Cannot move {item.LocalizedName()} to {location.Container.ID.Localized()} [{location.LocalizedParentName()}]. Error: {moveResult.Error}"
                 );
             }
             return false;
@@ -232,7 +228,7 @@ public class LootingTransactionController
             if (_log.ErrorEnabled)
             {
                 _log.LogError(
-                    $"Failed to move {item.Name.Localized()} to {location.Container.ID.Localized()} [{location.GetRootItem()?.Name.Localized()}]. Network Error: {moveNetworkResult.Error}"
+                    $"Failed to move {item.LocalizedName()} to {location.Container.ID.Localized()} [{location.LocalizedParentName()}]. Network Error: {moveNetworkResult.Error}"
                 );
             }
             return false;
@@ -241,7 +237,7 @@ public class LootingTransactionController
         if (_log.InfoEnabled)
         {
             _log.LogInfo(
-                $"Moving {item.Name.Localized()} to: {location.Container.ID.Localized()} [{location.GetRootItem()?.Name.Localized()}]...done"
+                $"Moving {item.LocalizedName()} to: {location.Container.ID.Localized()} [{location.LocalizedParentName()}]...done"
             );
         }
         return true;
@@ -263,7 +259,7 @@ public class LootingTransactionController
 
         if (_log.DebugEnabled)
         {
-            _log.LogDebug($"Swapping {item.Name.Localized()} with {toSwap.Name.Localized()}...");
+            _log.LogDebug($"Swapping {item.LocalizedName()} with {toSwap.LocalizedName()}...");
         }
 
         if (!IsItemReachable(item))
@@ -278,7 +274,7 @@ public class LootingTransactionController
         {
             if (_log.DebugEnabled && swapResult.Error is not (Slot.ConflictingItemError or Slot.ItemFiltersWontAllowError))
             {
-                _log.LogDebug($"Cannot swap {item.Name.Localized()} with {toSwap.Name.Localized()}. Error: {swapResult.Error}");
+                _log.LogDebug($"Cannot swap {item.LocalizedName()} with {toSwap.LocalizedName()}. Error: {swapResult.Error}");
             }
             return false;
         }
@@ -289,7 +285,7 @@ public class LootingTransactionController
             if (_log.ErrorEnabled)
             {
                 _log.LogError(
-                    $"Failed to swap {item.Name.Localized()} with {toSwap.Name.Localized()}. Network Error: {swapNetworkResult.Error}"
+                    $"Failed to swap {item.LocalizedName()} with {toSwap.LocalizedName()}. Network Error: {swapNetworkResult.Error}"
                 );
             }
             return false;
@@ -297,7 +293,7 @@ public class LootingTransactionController
 
         if (_log.InfoEnabled)
         {
-            _log.LogInfo($"Swapping {item.Name.Localized()} with {toSwap.Name.Localized()}...done");
+            _log.LogInfo($"Swapping {item.LocalizedName()} with {toSwap.LocalizedName()}...done");
         }
         return true;
     }
@@ -321,7 +317,7 @@ public class LootingTransactionController
         if (_log.DebugEnabled)
         {
             _log.LogDebug(
-                $"Merging {toMove.Name.Localized()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount})..."
+                $"Merging {toMove.LocalizedName()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.LocalizedName()} (Stack Size: {toItem.StackObjectsCount})..."
             );
         }
 
@@ -338,7 +334,7 @@ public class LootingTransactionController
             if (_log.ErrorEnabled)
             {
                 _log.LogError(
-                    $"Failed to merge {toMove.Name.Localized()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount}). Error: {mergeResult.Error}"
+                    $"Failed to merge {toMove.LocalizedName()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.LocalizedName()} (Stack Size: {toItem.StackObjectsCount}). Error: {mergeResult.Error}"
                 );
             }
             return Error.Skip;
@@ -350,7 +346,7 @@ public class LootingTransactionController
             if (_log.ErrorEnabled)
             {
                 _log.LogError(
-                    $"Failed to merge {toMove.Name.Localized()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount}). Network Error: {mergeNetworkResult.Error}"
+                    $"Failed to merge {toMove.LocalizedName()} (Stack Size: {toMove.StackObjectsCount}) with: {toItem.LocalizedName()} (Stack Size: {toItem.StackObjectsCount}). Network Error: {mergeNetworkResult.Error}"
                 );
             }
             return Error.Skip;
@@ -359,7 +355,7 @@ public class LootingTransactionController
         if (_log.InfoEnabled)
         {
             _log.LogInfo(
-                $"Merged {mergeResult.Value._transferResult.Count} with: {toItem.Name.Localized()} (Stack Size: {toItem.StackObjectsCount})...done"
+                $"Merged {mergeResult.Value._transferResult.Count} with: {toItem.LocalizedName()} (Stack Size: {toItem.StackObjectsCount})...done"
             );
         }
         return mergeResult;
@@ -374,7 +370,7 @@ public class LootingTransactionController
 
         if (_log.DebugEnabled)
         {
-            _log.LogDebug($"Throwing item: {toThrow.Name.Localized()}...");
+            _log.LogDebug($"Throwing item: {toThrow.LocalizedName()}...");
         }
 
         await SimulatePlayerDelayAsync(token: token);
@@ -387,14 +383,14 @@ public class LootingTransactionController
         {
             if (_log.WarningEnabled)
             {
-                _log.LogWarning($"Failed to throw item: {toThrow.Name.Localized()}. Error: {throwResult.Error}");
+                _log.LogWarning($"Failed to throw item: {toThrow.LocalizedName()}. Error: {throwResult.Error}");
             }
             return false;
         }
 
         if (_log.InfoEnabled)
         {
-            _log.LogInfo($"Throwing item: {toThrow.Name.Localized()}...done");
+            _log.LogInfo($"Throwing item: {toThrow.LocalizedName()}...done");
         }
         return true;
     }
@@ -412,7 +408,7 @@ public class LootingTransactionController
 
         if (_log.DebugEnabled)
         {
-            _log.LogDebug($"Transferring or throwing item: {toThrow.Name.Localized()}...");
+            _log.LogDebug($"Transferring or throwing item: {toThrow.LocalizedName()}...");
         }
 
         var gridAddress = transferTo.FindGridToPickUpLootNonAlloc(toThrow);
@@ -567,7 +563,7 @@ public class LootingTransactionController
 
         if (_log.DebugEnabled)
         {
-            _log.LogDebug($"Cannot reach {item.Name.Localized()} [with owner: {itemOwner}, location: {item.Parent}]");
+            _log.LogDebug($"Cannot reach {item.LocalizedName()} [with owner: {itemOwner}, location: {item.Parent}]");
         }
         return false;
     }
