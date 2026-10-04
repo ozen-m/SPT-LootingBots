@@ -171,7 +171,7 @@ public class LootFinder : MonoBehaviour
         OnAirdropLandedPatch.OnAirdropLanded -= OnAirdropLanded;
         _botOwner.BotPersonalStats.OnKillTarget -= OnKilledEnemyPlayer;
 
-        if (_debugSpheres != null)
+        if (_debugSpheres is not null)
         {
             foreach (var sphere in _debugSpheres)
             {

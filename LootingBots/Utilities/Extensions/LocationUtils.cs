@@ -34,7 +34,7 @@ public static class LocationUtils
                 continue;
             }
             var location = grid.FindLocationForItem(loot);
-            if (location == null)
+            if (location is null)
             {
                 continue;
             }

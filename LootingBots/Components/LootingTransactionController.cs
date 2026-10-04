@@ -100,7 +100,7 @@ public class LootingTransactionController
             ammo.StackObjectsCount = Mathf.Min(60, ammo.StackMaxSize);
 
             var location = container.FindFreeSpace(ammo);
-            if (location != null)
+            if (location is not null)
             {
                 var result = container.AddItemWithoutRestrictions(ammo, location);
                 if (result.Succeeded)
@@ -153,7 +153,7 @@ public class LootingTransactionController
     public ValueTask<OperationResult<MergeResult>> TryMergeItemAsync(Item item, CancellationToken token = default)
     {
         var mergeableItem = _inventoryController.FindItemToMerge(item);
-        return mergeableItem == null
+        return mergeableItem is null
             ? new ValueTask<OperationResult<MergeResult>>(Error.Skip)
             : new ValueTask<OperationResult<MergeResult>>(MergeItemAsync(item, mergeableItem, token));
     }
@@ -509,7 +509,7 @@ public class LootingTransactionController
                 return SuccessfulResult.New;
             }
             operation.Dispose();
-            return new FailedResult($"Timed out on network transaction, operation status: {operation.Status.ToString()}");
+            return new FailedResult($"Timed out on network transaction, operation status: {operation.Status}");
         }
         catch (Exception)
         {

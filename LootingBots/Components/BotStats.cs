@@ -222,34 +222,20 @@ public class ContainedItems
     {
         for (index = 0; index < _items.Count; index++)
         {
-            var replacedItem = _items[index];
+            var itemToReplace = _items[index];
 
-            if (potentialLoot.ValuePerSlot <= replacedItem.ValuePerSlot)
+            if (potentialLoot.ValuePerSlot <= itemToReplace.ValuePerSlot)
             {
                 break;
             }
-            if (potentialLoot.Value <= replacedItem.Value)
+            if (potentialLoot.Value <= itemToReplace.Value)
             {
                 continue;
             }
-            if (potentialLoot.Size > replacedItem.Size)
+            if (potentialLoot.Size <= itemToReplace.Size)
             {
-                continue;
+                return true;
             }
-            if (potentialLoot.Item.CurrentAddress == null)
-            {
-                // TODO: Check if still needed
-                if (LootingBots.LootLog.WarningEnabled)
-                {
-                    LootingBots.LootLog.LogWarning(
-                        $"Removing invalid contained item: has no valid parent, discarded? [{potentialLoot.Item.ToFullString()}]"
-                    );
-                }
-                _items.RemoveAt(index);
-                index--;
-                continue;
-            }
-            return true;
         }
 
         index = -1;

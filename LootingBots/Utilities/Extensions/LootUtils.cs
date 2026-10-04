@@ -79,7 +79,7 @@ public static class LootUtils
         if (worldInteractiveObject == null)
         {
             source.SetException(
-                new ArgumentNullException($"[{botOwner.Name()}] Interacting [{action.ToString()}] with WorldInteractiveObject but is NULL")
+                new ArgumentNullException($"[{botOwner.Name()}] Interacting [{action}] with WorldInteractiveObject but is NULL")
             );
         }
         else
@@ -195,8 +195,8 @@ public static class LootUtils
     {
         // Add slots in priority order
         if (
-            botEquipment.GetSlot(EquipmentSlot.Backpack).ContainedItem != null
-            || botEquipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem != null
+            botEquipment.GetSlot(EquipmentSlot.Backpack).ContainedItem is not null
+            || botEquipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem is not null
         )
         {
             GetItemInSlotsToLootNonAlloc(corpseEquipment, preallocatedList, WeaponSlots);
@@ -223,9 +223,8 @@ public static class LootUtils
             }
 
             // Check if item is unlootable
-            var unlootableComponent = item.GetItemComponent<UnlootableComponent>();
             if (
-                unlootableComponent != null
+                item.TryGetItemComponent(out UnlootableComponent unlootableComponent)
                 && unlootableComponent.IsUnlootableFrom(item.Parent.Container)
                 && item is not Pockets // Include pockets to loot list
             )

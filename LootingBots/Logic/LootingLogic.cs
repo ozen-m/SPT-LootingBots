@@ -32,7 +32,7 @@ internal class LootingLogic : CustomLogic
 
         if (botOwner.Profile.Nickname != _lootingBrain.BotOwner.Profile.Nickname)
         {
-            _log.LogError(botOwner.Profile.Nickname + " is using the LootingBrain for " + _lootingBrain.BotOwner.Profile.Nickname);
+            _log.LogError($"{botOwner.Profile.Nickname} is using the LootingBrain for {_lootingBrain.BotOwner.Profile.Nickname}");
         }
     }
 

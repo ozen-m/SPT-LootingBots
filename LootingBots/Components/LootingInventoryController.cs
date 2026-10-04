@@ -104,7 +104,7 @@ public class LootingInventoryController
         var secondary = equipment.GetSlot(EquipmentSlot.SecondPrimaryWeapon).ContainedItem;
         var holster = equipment.GetSlot(EquipmentSlot.Holster).ContainedItem;
 
-        if (primary != null)
+        if (primary is not null)
         {
             if (Stats.Gear.Primary.Id != primary.Id)
             {
@@ -120,7 +120,7 @@ public class LootingInventoryController
             }
         }
 
-        if (secondary != null)
+        if (secondary is not null)
         {
             if (Stats.Gear.Secondary.Id != secondary.Id)
             {
@@ -136,7 +136,7 @@ public class LootingInventoryController
             }
         }
 
-        if (holster != null)
+        if (holster is not null)
         {
             if (Stats.Gear.Holster.Id != holster.Id)
             {
@@ -333,7 +333,7 @@ public class LootingInventoryController
     {
         ShouldSort = false;
 
-        if (compoundItem != null)
+        if (compoundItem is not null)
         {
             var result = ItemManipulator.Sort(compoundItem, _botInventoryController, true);
             if (result.Failed)
@@ -593,8 +593,12 @@ public class LootingInventoryController
     /// </summary>
     private void RefillAndReload()
     {
-        _botOwner.WeaponManager.Reload?.TryFillMagazines();
-        _botOwner.WeaponManager.Reload?.TryReload();
+        var reload = _botOwner.WeaponManager.Reload;
+        if (reload is not null)
+        {
+            reload.TryFillMagazines();
+            reload.TryReload();
+        }
     }
 
     /// <summary>
@@ -973,7 +977,7 @@ public class LootingInventoryController
             var moveAction = LootingMoveAction.Rent(lootWeapon, null, lootValue);
             lootingActions.Add(moveAction);
 
-            if (secondary != null && IsWeaponBetter(secondary, lootWeapon, Stats.SecondaryValue > lootValue))
+            if (secondary is not null && IsWeaponBetter(secondary, lootWeapon, Stats.SecondaryValue > lootValue))
             {
                 if (_log.DebugEnabled)
                 {
@@ -1283,7 +1287,7 @@ public class LootingInventoryController
 
         var currentPower = 0;
         var magazine = weapon.GetCurrentMagazine();
-        if (magazine != null)
+        if (magazine is not null)
         {
             foreach (var item in magazine.Cartridges._items)
             {

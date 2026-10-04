@@ -74,16 +74,14 @@ internal class LootingLayer : CustomLayer
 
     public override bool IsCurrentActionEnding()
     {
-        var currentActionType = CurrentAction?.Type;
-
-        if (currentActionType == typeof(FindLootLogic))
+        if (CurrentAction == _findLootLogic)
         {
             return !_lootFinder.IsScanRunning;
         }
 
         var notLooting = !_lootingBrain.IsBotLooting;
 
-        if (currentActionType == typeof(LootingLogic) && notLooting)
+        if (CurrentAction == _lootingLogic && notLooting)
         {
             // Reset scan timer once looting has completed
             _lootFinder.ResetScanTimer();
@@ -102,12 +100,7 @@ internal class LootingLayer : CustomLayer
                 : string.Empty,
             Color.green
         );
-        debugPanel.AppendLabeledValue(
-            "Target Loot",
-            $" {lootName} ({_lootingBrain.ActiveLootType.ToString()})",
-            Color.yellow,
-            Color.yellow
-        );
+        debugPanel.AppendLabeledValue("Target Loot", $" {lootName} ({_lootingBrain.ActiveLootType})", Color.yellow, Color.yellow);
 
         debugPanel.AppendLabeledValue(
             "Distance to Loot",

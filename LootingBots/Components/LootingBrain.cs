@@ -273,7 +273,7 @@ public class LootingBrain : MonoBehaviour
 
         if (_log.InfoEnabled)
         {
-            _log.LogInfo($"Trying to loot {ActiveLoot.GetLootName()} [{ActiveLootType.ToString()}]. Looted: {Stats.Looted:N0}₽");
+            _log.LogInfo($"Trying to loot {ActiveLoot.GetLootName()} [{ActiveLootType}]. Looted: {Stats.Looted:N0}₽");
         }
 
         switch (ActiveLootType)

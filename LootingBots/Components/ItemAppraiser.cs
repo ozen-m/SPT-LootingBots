@@ -80,7 +80,7 @@ public class ItemAppraiser(Log _log)
             }
         }
 
-        if (LootingBots.UseMarketPrices.Value && MarketData != null)
+        if (LootingBots.UseMarketPrices.Value && MarketData is not null)
         {
             if (lootItem is Weapon weapon && LootingBots.ValueFromMods.Value)
             {
@@ -93,7 +93,7 @@ public class ItemAppraiser(Log _log)
             return GetItemMarketPrice(lootItem, log);
         }
 
-        if (HandbookData != null)
+        if (HandbookData is not null)
         {
             if (lootItem is Weapon weapon && LootingBots.ValueFromMods.Value)
             {
@@ -108,7 +108,7 @@ public class ItemAppraiser(Log _log)
 
         if (_log.DebugEnabled)
         {
-            if (log != null)
+            if (log is not null)
             {
                 log.LogDebug("ItemAppraiser data is null");
             }
@@ -128,7 +128,7 @@ public class ItemAppraiser(Log _log)
     {
         if (_log.DebugEnabled)
         {
-            if (log != null)
+            if (log is not null)
             {
                 log.LogDebug($"Getting value of attachments for {lootWeapon.LocalizedName()}");
             }
@@ -151,7 +151,7 @@ public class ItemAppraiser(Log _log)
 
         if (_log.DebugEnabled)
         {
-            if (log != null)
+            if (log is not null)
             {
                 log.LogDebug($"Final price of attachments: {finalPrice} compared to full item {GetItemHandbookPrice(lootWeapon, log)}");
             }
@@ -171,7 +171,7 @@ public class ItemAppraiser(Log _log)
     {
         if (_log.DebugEnabled)
         {
-            if (log != null)
+            if (log is not null)
             {
                 log.LogDebug($"Getting value of armor {lootArmor.LocalizedName()}");
             }
@@ -200,7 +200,7 @@ public class ItemAppraiser(Log _log)
 
         if (_log.DebugEnabled)
         {
-            if (log != null)
+            if (log is not null)
             {
                 log.LogDebug($"Final price of armor: {finalPrice} compared to item template {GetItemHandbookPrice(lootArmor, log)}");
             }
@@ -226,7 +226,7 @@ public class ItemAppraiser(Log _log)
 
         // if (_log.DebugEnabled)
         // {
-        //     if (log != null)
+        //     if (log is not null)
         //     {
         //         log.LogDebug($"Handbook price of {lootItem.LocalizedName()}: {price:N0}₽");
         //     }
@@ -246,7 +246,7 @@ public class ItemAppraiser(Log _log)
     {
         if (_log.DebugEnabled)
         {
-            if (log != null)
+            if (log is not null)
             {
                 log.LogDebug($"Getting value of attachments for {lootWeapon.LocalizedName()}");
             }
@@ -269,7 +269,7 @@ public class ItemAppraiser(Log _log)
 
         if (_log.DebugEnabled)
         {
-            if (log != null)
+            if (log is not null)
             {
                 log.LogDebug($"Final price of attachments: {finalPrice} compared to item template {GetItemMarketPrice(lootWeapon, log)}");
             }
@@ -289,7 +289,7 @@ public class ItemAppraiser(Log _log)
     {
         if (_log.DebugEnabled)
         {
-            if (log != null)
+            if (log is not null)
             {
                 log.LogDebug($"Getting value of armor {lootArmor.LocalizedName()}");
             }
@@ -318,7 +318,7 @@ public class ItemAppraiser(Log _log)
 
         if (_log.DebugEnabled)
         {
-            if (log != null)
+            if (log is not null)
             {
                 log.LogDebug($"Final price of armor: {finalPrice} compared to item template {GetItemMarketPrice(lootArmor, log)}");
             }
@@ -343,7 +343,7 @@ public class ItemAppraiser(Log _log)
 
             // if (_log.DebugEnabled)
             // {
-            //     if (log != null)
+            //     if (log is not null)
             //     {
             //         log.LogDebug($"Market price of {lootItem.LocalizedName()}: {price:N0}₽");
             //     }
