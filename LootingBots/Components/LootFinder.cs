@@ -613,11 +613,7 @@ public class LootFinder : MonoBehaviour
 
         if (LootingBots.DebugLootNavigation.Value)
         {
-            if (_debugSpheres is null)
-            {
-                InitializeDebugSpheres();
-            }
-
+            _debugSpheres ??= CreateDebugSpheres();
             _debugSpheres[0].transform.position = center;
             _debugSpheres[1].transform.position = pointNearbyContainer;
             _debugSpheres[2].transform.position = destination;
@@ -641,12 +637,13 @@ public class LootFinder : MonoBehaviour
         EnqueuePriorityCorpse(victimProfileId);
     }
 
-    private void InitializeDebugSpheres()
+    private static GameObject[] CreateDebugSpheres()
     {
-        _debugSpheres = new GameObject[3];
-        _debugSpheres[0] = GameObjectHelper.DrawSphere(Vector3.zero, 0.5f, Color.red);
-        _debugSpheres[1] = GameObjectHelper.DrawSphere(Vector3.zero, 0.5f, Color.green);
-        _debugSpheres[2] = GameObjectHelper.DrawSphere(Vector3.zero, 0.5f, Color.blue);
+        var debugSpheres = new GameObject[3];
+        debugSpheres[0] = GameObjectHelper.DrawSphere(Vector3.zero, 0.5f, Color.red); // center
+        debugSpheres[1] = GameObjectHelper.DrawSphere(Vector3.zero, 0.5f, Color.green); // pointNearbyContainer
+        debugSpheres[2] = GameObjectHelper.DrawSphere(Vector3.zero, 0.5f, Color.blue); // destination
+        return debugSpheres;
     }
 
     public enum LootType : byte
