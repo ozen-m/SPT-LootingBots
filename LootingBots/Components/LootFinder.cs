@@ -6,9 +6,11 @@ using EFT.Interactive;
 using EFT.InventoryLogic;
 using LootingBots.Patches;
 using LootingBots.Utilities;
+using LootingBots.Utilities.Comparers;
 using LootingBots.Utilities.Extensions;
 using UnityEngine;
 using UnityEngine.AI;
+using UnityEngine.Pool;
 
 namespace LootingBots.Components;
 
@@ -182,8 +184,8 @@ public class LootFinder : MonoBehaviour
 
     private async Task FindLootAsync(int queue, CancellationToken token)
     {
-        var colliders = _colliderPool.Rent(3000);
-
+        var colliders = _colliderPool.Rent(3072);
+        var seen = HashSetPool<InteractableObject>.Get();
         try
         {
             if (_botOwner == null)
@@ -246,13 +248,17 @@ public class LootFinder : MonoBehaviour
 
                 // Get InteractableObject once and check derived type
                 var interactableObject = collider.gameObject.GetComponentInParent<InteractableObject>();
+                if (interactableObject == null || !seen.Add(interactableObject))
+                {
+                    await Task.Yield();
+
+                    continue;
+                }
+
                 if (_corpseLootingEnabled && interactableObject is Corpse corpse)
                 {
-                    var player = collider.gameObject.GetComponentInParent<Player>();
-                    if (
-                        player != null // Corpse is a bot corpse and not a static "Dead scav"
-                        && corpse.ItemOwner?.RootItem is InventoryEquipment equipment
-                    )
+                    var player = collider.gameObject.GetComponentInParent<Player>(); // Corpse is a bot corpse and not a static "Dead scav"
+                    if (player != null && corpse.Item is InventoryEquipment equipment)
                     {
                         rootItem = equipment;
                         lootType = LootType.Corpse;
@@ -260,18 +266,15 @@ public class LootFinder : MonoBehaviour
                 }
                 else if (_containerLootingEnabled && interactableObject is LootableContainer container)
                 {
-                    rootItem = container.ItemOwner?.RootItem;
-                    if (
-                        container.isActiveAndEnabled // Container is marked as active and enabled
-                        && container.DoorState is not EDoorState.Locked // Container is not locked
-                    )
+                    rootItem = container.ItemOwner.RootItem; // Container is marked as active and enabled, and unlocked
+                    if (container.isActiveAndEnabled && container.DoorState is not EDoorState.Locked)
                     {
                         lootType = LootType.Container;
                     }
                 }
                 else if (_itemLootingEnabled && interactableObject is LootItem lootItem && lootItem is not Corpse)
                 {
-                    rootItem = lootItem.ItemOwner?.RootItem;
+                    rootItem = lootItem.Item;
                     if (
                         rootItem is not null
                         && !rootItem.QuestItem // Item is not a quest item
@@ -369,6 +372,11 @@ public class LootFinder : MonoBehaviour
                 _emptyAttempts = 0;
                 return;
             }
+
+            if (_log.DebugEnabled)
+            {
+                _log.LogDebug("No viable loot found");
+            }
         }
         catch (Exception e)
         {
@@ -389,13 +397,18 @@ public class LootFinder : MonoBehaviour
         }
         finally
         {
+            _colliderPool.Return(colliders, true);
+            HashSetPool<InteractableObject>.Release(seen);
+            ScanScheduler.Return(queue);
+            _lootingBrain.ForceBrainEnabled = false;
+
             if (
-                LootingBots.MaxEmptyAttempts.Value > 0
+                !token.IsCancellationRequested
+                && LootingBots.MaxEmptyAttempts.Value > 0
                 && !_lootingBrain.HasActiveLootable
                 && ++_emptyAttempts >= LootingBots.MaxEmptyAttempts.Value
             )
             {
-                // Note: Cancellations count towards emptyAttempts
                 if (_log.InfoEnabled)
                 {
                     _log.LogInfo($"Max empty attempts reached, preventing looting for {LootingBots.EmptyAttemptsCooldown.Value}s");
@@ -403,10 +416,6 @@ public class LootFinder : MonoBehaviour
                 OverrideNextScanTime(LootingBots.EmptyAttemptsCooldown.Value);
                 _emptyAttempts = 0;
             }
-
-            _colliderPool.Return(colliders, true);
-            ScanScheduler.Return(queue);
-            _lootingBrain.ForceBrainEnabled = false;
         }
     }
 

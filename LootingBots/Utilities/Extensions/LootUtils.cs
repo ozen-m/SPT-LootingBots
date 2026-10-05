@@ -244,8 +244,8 @@ public static class LootUtils
     {
         return interactableObject switch
         {
-            LootableContainer container => container.ItemOwner?.RootItem,
-            LootItem lootItem => lootItem.ItemOwner?.RootItem,
+            LootableContainer container => container.ItemOwner.RootItem,
+            LootItem lootItem => lootItem.Item,
             _ => null,
         };
     }

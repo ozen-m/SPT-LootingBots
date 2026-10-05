@@ -1,6 +1,6 @@
 ﻿using UnityEngine;
 
-namespace LootingBots.Utilities;
+namespace LootingBots.Utilities.Comparers;
 
 public sealed class ColliderDistanceComparer(Vector3 referencePosition) : IComparer<Collider>
 {
