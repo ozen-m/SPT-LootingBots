@@ -266,7 +266,7 @@ public class LootFinder : MonoBehaviour
                 }
                 else if (_containerLootingEnabled && interactableObject is LootableContainer container)
                 {
-                    rootItem = container.ItemOwner.RootItem; // Container is marked as active and enabled, and unlocked
+                    rootItem = container.ItemOwner.RootItem;
                     if (container.isActiveAndEnabled && container.DoorState is not EDoorState.Locked)
                     {
                         lootType = LootType.Container;
@@ -275,15 +275,7 @@ public class LootFinder : MonoBehaviour
                 else if (_itemLootingEnabled && interactableObject is LootItem lootItem && lootItem is not Corpse)
                 {
                     rootItem = lootItem.Item;
-                    if (
-                        rootItem is not null
-                        && !rootItem.QuestItem // Item is not a quest item
-                        && (
-                            rootItem is SearchableItem // If the item is something that can be searched, consider it lootable
-                            || (_lootingBrain.InventoryController.IsBetterArmorThanEquipped(rootItem))
-                            || (_lootingBrain.IsValuableEnough(rootItem))
-                        )
-                    )
+                    if (rootItem is not null && !rootItem.QuestItem)
                     {
                         lootType = LootType.Item;
                     }
