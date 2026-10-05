@@ -13,6 +13,7 @@ public static class LootUtils
     public const float VEST_GRID_CELL_MIN_RATIO = 4f / 3f;
     public static readonly int LowPolyMask = LayerMask.GetMask("LowPolyCollider");
     public static readonly int LootMask = LayerMask.GetMask("Interactive", "Loot", "Deadbody");
+    public static readonly int LootItemMask = LayerMask.GetMask("Loot");
     public static readonly AccessTools.FieldRef<Player, Corpse> PlayerCorpseField = AccessTools.FieldRefAccess<Player, Corpse>("Corpse");
 
     public static readonly EquipmentSlot[] WeaponSlots =

@@ -1,12 +1,17 @@
+using System.Buffers;
 using Comfort.Common;
 using Diz.LanguageExtensions;
 using EFT;
+using EFT.Interactive;
 using EFT.InventoryLogic;
 using LootingBots.Actions;
 using LootingBots.Utilities;
+using LootingBots.Utilities.Comparers;
 using LootingBots.Utilities.Extensions;
+using UnityEngine;
 using UnityEngine.Pool;
 using EquipmentType = LootingBots.Utilities.EquipmentType;
+using Random = UnityEngine.Random;
 
 namespace LootingBots.Components;
 
@@ -560,7 +565,7 @@ public class LootingInventoryController
 
         return item.Parent.Container is not ISearchableContainer // || _discoveredItems.Contains(item)
             ? Task.CompletedTask
-            : LootingTransactionController.SimulatePlayerDelayAsync(UnityEngine.Random.Range(1, 3) * 1000D, token);
+            : LootingTransactionController.SimulatePlayerDelayAsync(Random.Range(1, 3) * 1000D, token);
     }
 
     /// <summary>
@@ -684,6 +689,16 @@ public class LootingInventoryController
         return lootingActions.Count > 0;
     }
 
+    public static bool IsUsableItemForWeapon(Item item, Weapon weapon)
+    {
+        return item switch
+        {
+            Magazine mag => IsUsableMagForWeapon(weapon, mag),
+            Ammo ammo => IsUsableAmmoForWeapon(weapon, ammo),
+            _ => false,
+        };
+    }
+
     /// <summary>
     /// Check if this magazine can be used by any equipped weapon.
     /// </summary>
@@ -762,45 +777,87 @@ public class LootingInventoryController
 
     /// <summary>
     /// Check if a weapon can be equipped and give the weapon's magazines.
-    ///
     /// A bot can equip a weapon if:
+    ///   1. The weapon has magazines/loose ammo it can loot from a corpse and its surroundings.
     ///   2. We're looting a loose weapon on the world.
-    ///   1. The weapon has magazines/loose ammo it can loot from a corpse
-    ///
     /// </summary>
     /// <param name="weapon">Weapon to loot.</param>
-    /// <param name="corpseEquipment">Corpse inventory to check for magazines.</param>
+    /// <param name="lootContainer">Item to check for magazines.</param>
     /// <param name="usableMagazines">Pre-allocated list for looting found usable magazines.</param>
-    public bool IsAbleToEquip(Weapon weapon, Item corpseEquipment, List<Item> usableMagazines)
+    public bool IsAbleToEquip(Weapon weapon, Item lootContainer, List<Item> usableMagazines)
     {
-        if (corpseEquipment is not InventoryEquipment equipment)
+        GetMagsAmmoInWorld(weapon, usableMagazines);
+
+        if (lootContainer is InventoryEquipment equipment)
         {
-            // We're not looting a corpse, just allow to equip
-            return true;
+            equipment.GetAllGridItemsInStorageSlotsNonAlloc(usableMagazines, IsUsableItemForWeapon, weapon);
+
+            // Sort to prioritize looting mags with the highest count
+            usableMagazines.Sort(MagazineAmmoComparer.Instance);
+
+            return usableMagazines.Count > 0;
         }
 
-        equipment.GetAllGridItemsInStorageSlotsNonAlloc(
-            usableMagazines,
-            static (gridItem, weapon) =>
+        lootContainer.GetAllGridContainedItems(usableMagazines, IsUsableItemForWeapon, weapon);
+
+        // Sort to prioritize looting mags with the highest count
+        usableMagazines.Sort(MagazineAmmoComparer.Instance);
+
+        // We're not looting a corpse, just allow to equip
+        return true;
+    }
+
+    /// <summary>
+    /// Finds magazine and ammo LootItems in a 4m radius around the bot's position
+    /// and adds them to a preallocated list if usable for the weapon.
+    /// </summary>
+    /// <param name="weapon">Weapon to check compatibility for.</param>
+    /// <param name="usableForWeapon">Pre-allocated list for found usable mags and ammo.</param>
+    public void GetMagsAmmoInWorld(Weapon weapon, List<Item> usableForWeapon)
+    {
+        var colliders = ArrayPool<Collider>.Shared.Rent(1024);
+        var seen = HashSetPool<Item>.Get();
+        try
+        {
+            // Get all loot items in a 4m radius
+            var hits = Physics.OverlapSphereNonAlloc(
+                _botOwner.Position,
+                4f,
+                colliders,
+                LootUtils.LootItemMask,
+                QueryTriggerInteraction.Ignore
+            );
+            if (hits == 0)
             {
-                return gridItem switch
+                return;
+            }
+
+            for (var i = 0; i < hits; i++)
+            {
+                var collider = colliders[i];
+                var lootItem = collider.gameObject.GetComponentInParent<LootItem>();
+                if (lootItem == null)
                 {
-                    Magazine mag => IsUsableMagForWeapon(weapon, mag),
-                    Ammo ammo => IsUsableAmmoForWeapon(weapon, ammo),
-                    _ => false,
-                };
-            },
-            weapon
-        );
+                    continue;
+                }
 
-        /*
-        if (usableMagazines.Count == 0)
-        {
-            // TODO: Check surroundings if a magazine is dropped?
+                var item = lootItem.Item;
+                if (item is null || !seen.Add(item))
+                {
+                    continue;
+                }
+
+                if (IsUsableItemForWeapon(item, weapon))
+                {
+                    usableForWeapon.Add(item);
+                }
+            }
         }
-        */
-
-        return usableMagazines.Count > 0;
+        finally
+        {
+            ArrayPool<Collider>.Shared.Return(colliders, true);
+            HashSetPool<Item>.Release(seen);
+        }
     }
 
     /// <summary>
