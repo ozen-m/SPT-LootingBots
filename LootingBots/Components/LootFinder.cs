@@ -332,6 +332,14 @@ public class LootFinder : MonoBehaviour
                     return;
                 }
 
+                // Check if loot is in sight
+                if (!IsLootInSight(lootType, destination))
+                {
+                    await Task.Yield();
+
+                    continue;
+                }
+
                 // Check if loot is in range
                 if (!IsLootInRange(lootType, destination, out var dist))
                 {
@@ -345,14 +353,6 @@ public class LootFinder : MonoBehaviour
 
                         break;
                     }
-                    await Task.Yield();
-
-                    continue;
-                }
-
-                // Check if loot is in sight
-                if (!IsLootInSight(lootType, destination))
-                {
                     await Task.Yield();
 
                     continue;
