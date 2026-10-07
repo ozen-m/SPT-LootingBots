@@ -297,10 +297,20 @@ public class LootFinder : MonoBehaviour
                     continue;
                 }
 
-                var bounds = collider.bounds;
-                var center = bounds.center;
-                center.y -= bounds.extents.y + 0.4f;
-                var destination = GetDestination(center);
+                // Push the center point down by .4f to help container positions of jackets snap to a valid NavMesh.
+                var center = interactableObject.TrackableTransform.position;
+                center.y -= 0.4f;
+
+                // Check if we can navigate to the interactable object
+                if (!GetDestination(center, out var destination))
+                {
+                    // Ignore this loot since it's non-navigable
+                    _lootingBrain.IgnoreLoot(rootItemId);
+
+                    await Task.Yield();
+
+                    continue;
+                }
 
                 // Check if we can perform distance and LOS checks
                 if (_botOwner.Mover is null)
@@ -360,7 +370,7 @@ public class LootFinder : MonoBehaviour
                     continue;
                 }
 
-                _lootingBrain.SetLoot(interactableObject, lootType, interactableObject.transform.position, destination, rootItemId, dist);
+                _lootingBrain.SetLoot(interactableObject, lootType, center, destination, rootItemId, dist);
                 _emptyAttempts = 0;
                 return;
             }
@@ -420,7 +430,14 @@ public class LootFinder : MonoBehaviour
                 var lootableContainer = _priorityLootableContainers.Dequeue();
 
                 var position = lootableContainer.TrackableTransform.position;
-                var destination = GetDestination(position);
+                if (!GetDestination(position, out var destination))
+                {
+                    if (_log.DebugEnabled)
+                    {
+                        _log.LogDebug($"Could not get destination for container [{lootableContainer.GetLootName()}]");
+                    }
+                    continue;
+                }
 
                 if (!IsLootInRange(LootType.Container, destination, out var dist))
                 {
@@ -499,7 +516,14 @@ public class LootFinder : MonoBehaviour
                 }
 
                 var position = corpse.TrackableTransform.position;
-                var destination = GetDestination(position);
+                if (!GetDestination(position, out var destination))
+                {
+                    if (_log.DebugEnabled)
+                    {
+                        _log.LogDebug($"Could not get destination for corpse [{corpse.GetLootName()}]");
+                    }
+                    continue;
+                }
 
                 // Check if loot is in range
                 // No need to check LOS since technically it's their kill
@@ -594,33 +618,42 @@ public class LootFinder : MonoBehaviour
         return !sightBlocked;
     }
 
-    private Vector3 GetDestination(Vector3 center)
+    private bool GetDestination(Vector3 center, out Vector3 destination)
     {
         // Try to snap the desired destination point to the nearest NavMesh to ensure the bot can draw a navigable path to the point
-        var pointNearbyContainer = NavMesh.SamplePosition(center, out var navMeshAlignedPoint, 1f, NavMesh.AllAreas)
-            ? navMeshAlignedPoint.position
-            : Vector3.zero;
+        if (!NavMesh.SamplePosition(center, out var navMeshAlignedPoint, 1.5f, NavMesh.AllAreas))
+        {
+            destination = Vector3.zero;
+            return false;
+        }
 
-        // Since SamplePosition always snaps to the closest point on the NavMesh, sometimes this point is a little too close to the loot and causes the bot to shake violently while looting.
-        // Add a small amount of padding by pushing the point away from the nearbyPoint
-        var padding = center - pointNearbyContainer;
-        padding.y = 0;
-        padding.Normalize();
+        // Since SamplePosition always snaps to the closest point on the NavMesh,
+        // sometimes this point is a little too close to the loot and causes the bot to shake violently while looting.
+        // So add a small amount of padding by pushing the point away from the nearbyPoint.
+        var pointNearbyContainer = navMeshAlignedPoint.position;
+        var direction = center - pointNearbyContainer;
+        direction.y = 0;
+        if (direction.sqrMagnitude < 0.001f)
+        {
+            // pointNearbyContainer didn't move horizontally so we can't add padding, fallback to the bot's position
+            direction = center - _botOwner.Position;
+            direction.y = 0;
+        }
 
-        // Make sure the point is still snapped to the NavMesh after its been pushed
-        var destination = NavMesh.SamplePosition(center - (padding * 1.5f), out navMeshAlignedPoint, 1f, navMeshAlignedPoint.mask)
+        // Make sure the point is still snapped to the NavMesh after it's been pushed
+        destination = NavMesh.SamplePosition(center - (direction.normalized * 1f), out navMeshAlignedPoint, 1.5f, navMeshAlignedPoint.mask)
             ? navMeshAlignedPoint.position
             : pointNearbyContainer;
 
         if (LootingBots.DebugLootNavigation.Value)
         {
             _debugSpheres ??= CreateDebugSpheres();
-            _debugSpheres[0].transform.position = center;
-            _debugSpheres[1].transform.position = pointNearbyContainer;
-            _debugSpheres[2].transform.position = destination;
+            _debugSpheres[0].transform.position = center; // red
+            _debugSpheres[1].transform.position = pointNearbyContainer; // green
+            _debugSpheres[2].transform.position = destination; // blue
         }
 
-        return destination;
+        return true;
     }
 
     private void OnAirdropLanded(LootableContainer airdrop)
@@ -641,9 +674,9 @@ public class LootFinder : MonoBehaviour
     private static GameObject[] CreateDebugSpheres()
     {
         var debugSpheres = new GameObject[3];
-        debugSpheres[0] = GameObjectHelper.DrawSphere(Vector3.zero, 0.5f, Color.red); // center
-        debugSpheres[1] = GameObjectHelper.DrawSphere(Vector3.zero, 0.5f, Color.green); // pointNearbyContainer
-        debugSpheres[2] = GameObjectHelper.DrawSphere(Vector3.zero, 0.5f, Color.blue); // destination
+        debugSpheres[0] = GameObjectHelper.DrawSphere(Vector3.zero, 0.35f, Color.red); // center
+        debugSpheres[1] = GameObjectHelper.DrawSphere(Vector3.zero, 0.35f, Color.green); // pointNearbyContainer
+        debugSpheres[2] = GameObjectHelper.DrawSphere(Vector3.zero, 0.35f, Color.blue); // destination
         return debugSpheres;
     }
 

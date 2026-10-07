@@ -188,7 +188,7 @@ internal class LootingLogic : CustomLogic
                 _log.LogDebug($"[Attempt: {_navigationAttempts}] Navigating to {_lootingBrain.ActiveLoot.GetLootName()}");
             }
 
-            var pathStatus = BotOwner.GoToPoint(_destination, true, -1f, false, false);
+            var pathStatus = BotOwner.GoToPoint(_destination, true, 0.5f, false, false);
             if (pathStatus == NavMeshPathStatus.PathInvalid)
             {
                 if (_log.WarningEnabled)
@@ -221,8 +221,8 @@ internal class LootingLogic : CustomLogic
         vector.y = 0f;
         var sqrDistance = vector.sqrMagnitude;
 
-        // Within a radius of 0.92 (sqr 0.85), and ±0.5 vertically
-        var isCloseEnough = sqrDistance < 0.85f && Math.Abs(y) < 0.5f;
+        // Within a radius of 1 meter, and ±0.5 vertically
+        var isCloseEnough = sqrDistance < 1f && Math.Abs(y) < 0.5f;
 
         // Check to see if the bot is stuck every 2 seconds.
         if (_stuckTimer < Time.time && !IsBotStuck(sqrDistance))
