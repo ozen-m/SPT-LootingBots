@@ -57,14 +57,16 @@ This mod aims to add a bit more life to the bots by enhancing some of the base E
 - `Delay after spawn` - Amount of seconds a bot will wait to start their first loot scan after spawning into raid.
 - `Loot scan interval` - The amount of seconds the bot will wait until triggering another loot scan
 - `Delay after taking item (ms)` - Amount of milliseconds a bot will wait after taking an item into their inventory before attempting to loot another item. Simulates the amount of time it takes for a player to look through loot decide to take something.
-- `Enable examine time` - Adds a delay before looting an item to simulate the time it takes for a bot to \"uncover (examine)\" an item when searching containers, items and corpses. The delay is calculated using the ExamineTime of an object and the AttentionExamineTime of the bot.
+- `Enable search time` - Adds a delay before looting an item to simulate the time it takes for a bot to "search" an item in a searchable container. The delay is calculated using the AttentionLootSpeed and SearchBuffSpeed skills of the bot.
 
 **Loot Settings**
 - `Bots always close containers` - When enabled, bots will always try to close a container after they have finished looting. If the bot is inturrupted while looting, the container may remain open.
 - `Use flea market prices` - Bots will query more accurate ragfair prices to do item value checks. Will make a query to get ragfair prices when the client is first started. May affect initial client start times.
-- `Calculate value from attachments` - Calculate weapon value by looking up each attachement. More accurate than just looking at the base weapon template but a slightly more expensive check.
-- `Calculate value from slotted items` - Calculate armor value by looking up each slot containing plates/faceshields etc. More accurate than just looking at the base armor template but a slightly more expensive check.
+- `Calculate weapon value from attachments` - Calculate weapon value by looking up each attachment. More accurate than just looking at the base weapon template but a slightly more expensive check.
+- `Calculate armor value from slotted items` - Calculate armor value by looking up each slot containing plates/faceshields etc. More accurate than just looking at the base armor template but a slightly more expensive check.
 - `Allow weapon attachment stripping` - Allows bots to take the attachments off of a weapon if they are not able to pick the weapon up into their inventory
+- `Allow container nesting` - Allows bots to nest containers such as backpacks and vests. Slightly more expensive to calculate
+- `Use weight restriction` - Disallow bots from picking up an item if the item's weight will exceed their overweight limit. Takes effect next raid.
 - `PMC: Min loot value threshold` - PMC bots will only loot items that exceed the specified value in roubles. When set to 0, bots will ignore the minimum value threshold
 - `PMC: Max loot value threshold` - PMC bots will NOT loot items that exceed the specified value in roubles. When set to 0, bots will ignore the maximum value threshold
 - `PMC: Allowed gear to equip` - The equipment a PMC bot is able to equip during raid
