@@ -96,9 +96,9 @@ internal class LootingLogic : CustomLogic
         // Check if the bot is close enough to the destination to commence looting
         if (IsCloseEnough())
         {
-            // Crouch and look to item
-            BotOwner.SetPose(0f);
+            // Look to item and crouch
             BotOwner.Steering.LookToPoint(_lootingBrain.LootObjectPosition, 180f);
+            BotOwner.SetPose(0f);
             if (BotOwner.GetPlayer.MovementContext._isInPatrol)
             {
                 // SAIN sets bot in a patrol state if it has no enemy, or is not sprinting

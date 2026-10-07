@@ -330,16 +330,17 @@ public class LootingBrain : MonoBehaviour
                 return;
             }
 
-            // Get items to loot from the corpse in a priority order based off the slots
-            _itemsToLoot.Clear();
-            corpseInventoryEquipment.GetPriorityItems(BotOwner.InventoryController.Inventory.Equipment, _itemsToLoot);
-
-            // Do inventory opened animation
+            // Do inventory opened animation and block steering so the bot doesn't shake violently when it's too close to the corpse
             BotOwner.GetPlayer.SetInventoryOpened(true);
+            BotOwner.Steering._blockSteering = true;
 
             await LootingTransactionController.SimulatePlayerDelayAsync(LootingStartDelay, token);
 
+            // Get items to loot from the corpse in a priority order based off the slots
+            _itemsToLoot.Clear();
+            corpseInventoryEquipment.GetPriorityItems(BotOwner.InventoryController.Inventory.Equipment, _itemsToLoot);
             InventoryController.SetRootItemOwner(corpseInventoryEquipment.Owner);
+
             isSuccessful = await InventoryController.TryAddItemsToBotAsync(_itemsToLoot, true, token);
         }
         catch (Exception e)
@@ -348,6 +349,7 @@ public class LootingBrain : MonoBehaviour
         }
         finally
         {
+            BotOwner.Steering._blockSteering = false;
             BotOwner.GetPlayer.SetInventoryOpened(false);
             OnLootTaskEnd(isSuccessful);
 
@@ -385,12 +387,14 @@ public class LootingBrain : MonoBehaviour
                 didOpen = true;
             }
 
-            // Do inventory opened animation
+            // Do inventory opened animation and block steering so the bot doesn't shake violently when it's too close to the container
             BotOwner.GetPlayer.SetInventoryOpened(true);
+            BotOwner.Steering._blockSteering = true;
 
             await LootingTransactionController.SimulatePlayerDelayAsync(LootingStartDelay, token);
 
             InventoryController.SetRootItemOwner(item.Owner);
+
             isSuccessful = await InventoryController.LootNestedItemsAsync(item, token);
 
             // Close the container if the settings to close containers is checked or if the container was already opened when the bot tried to loot it
@@ -405,6 +409,7 @@ public class LootingBrain : MonoBehaviour
         }
         finally
         {
+            BotOwner.Steering._blockSteering = false;
             BotOwner.GetPlayer.SetInventoryOpened(false);
             OnLootTaskEnd(isSuccessful);
 
@@ -442,6 +447,7 @@ public class LootingBrain : MonoBehaviour
             _itemsToLoot.Clear();
             _itemsToLoot.Add(item);
             InventoryController.SetRootItemOwner(item.Owner);
+
             isSuccessful = await InventoryController.TryAddItemsToBotAsync(_itemsToLoot, true, token);
             if (isSuccessful)
             {
