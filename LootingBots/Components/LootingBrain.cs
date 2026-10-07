@@ -57,7 +57,7 @@ public class LootingBrain : MonoBehaviour
 
     public bool IsBrainEnabled
     {
-        get { return !_isDisabledForPerformance; }
+        get { return LootingEnabled && !_isDisabledForPerformance; }
     }
 
     public BotStats Stats
