@@ -1,4 +1,5 @@
 using Comfort.Common;
+using Cysharp.Threading.Tasks;
 using EFT;
 using EFT.HandBook;
 using EFT.InventoryLogic;
@@ -18,7 +19,7 @@ public class ItemAppraiser(Log _log)
 
     public bool IsUpdatingPrices { get; private set; }
 
-    public async Task UpdatePricesAsync(CancellationToken token = default)
+    public async UniTask UpdatePricesAsync(CancellationToken token = default)
     {
         IsUpdatingPrices = true;
         try

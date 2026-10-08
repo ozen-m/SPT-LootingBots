@@ -5,20 +5,30 @@
 // UniTask is licensed under the MIT License.
 // https://github.com/Cysharp/UniTask/blob/master/LICENSE
 
+using Cysharp.Threading.Tasks;
+
 namespace LootingBots.Utilities;
 
 /// <summary>
 /// This controller manages the creation and cancellation of a <see cref="CancellationTokenSource"/>.
 /// It reuses the <see cref="CancellationTokenSource"/> until a timeout occurs, a new source is then created when asked for a new timeout.
 /// </summary>
-public sealed class TimeoutController : IDisposable
+public sealed class ReusableTimeoutController(
+    DelayType delayType = DelayType.DeltaTime,
+    PlayerLoopTiming delayTiming = PlayerLoopTiming.Update
+) : IDisposable
 {
     private CancellationTokenSource _timeoutSource = new();
-    private float _remainingTime;
+    private PlayerLoopTimer _timer;
+    private TimeSpan _interval;
+
     private bool _isRunning;
     private bool _isCanceledExternally;
     private bool _isDisposed;
 
+    /// <summary>
+    /// <see cref="PlayerLoopTimer"/> does not expose <see cref="PlayerLoopTimer.isRunning"/>
+    /// </summary>
     public bool IsActive
     {
         get { return _isRunning; }
@@ -42,6 +52,11 @@ public sealed class TimeoutController : IDisposable
     /// <exception cref="InvalidOperationException">Thrown if a timeout is already running.</exception>
     public CancellationToken Timeout(int secondsTimeout)
     {
+        return Timeout(TimeSpan.FromSeconds(secondsTimeout));
+    }
+
+    public CancellationToken Timeout(TimeSpan timeout)
+    {
         if (_isDisposed)
         {
             throw new ObjectDisposedException(nameof(TimeoutController));
@@ -56,11 +71,24 @@ public sealed class TimeoutController : IDisposable
             _timeoutSource = new CancellationTokenSource();
         }
 
-        _remainingTime = secondsTimeout;
+        if (timeout != _interval)
+        {
+            _interval = timeout;
+            _timer?.Dispose();
+            _timer = PlayerLoopTimer.Create(
+                timeout,
+                false,
+                delayType,
+                delayTiming,
+                CancellationToken.None,
+                (obj) => ((ReusableTimeoutController)obj).SignalCancellation(),
+                this
+            );
+        }
+
         _isRunning = true;
         _isCanceledExternally = false;
-
-        TimeoutRunner.Instance.Add(this);
+        _timer.Restart();
         return _timeoutSource.Token;
     }
 
@@ -70,6 +98,7 @@ public sealed class TimeoutController : IDisposable
     public void ResetTimer()
     {
         _isRunning = false;
+        _timer.Stop();
     }
 
     /// <summary>
@@ -94,24 +123,7 @@ public sealed class TimeoutController : IDisposable
         _isDisposed = true;
         Cancel();
         _timeoutSource.Dispose();
-    }
-
-    internal bool Run(float deltaTime)
-    {
-        if (!_isRunning)
-        {
-            return false;
-        }
-
-        _remainingTime -= deltaTime;
-
-        if (_remainingTime <= 0f)
-        {
-            SignalCancellation();
-            return false;
-        }
-
-        return true;
+        _timer?.Dispose();
     }
 
     private void SignalCancellation()

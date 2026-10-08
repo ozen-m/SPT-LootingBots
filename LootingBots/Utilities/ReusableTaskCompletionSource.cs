@@ -5,22 +5,22 @@
 // UniTask is licensed under the MIT License.
 // https://github.com/Cysharp/UniTask/blob/master/LICENSE
 
-using System.Threading.Tasks.Sources;
 using Comfort.Common;
+using Cysharp.Threading.Tasks;
 
 namespace LootingBots.Utilities;
 
-public abstract class ReusableTaskCompletionSource<TResult> : IValueTaskSource<TResult>
+public abstract class ReusableTaskCompletionSource<TResult> : IUniTaskSource<TResult>
 {
-    private ManualResetValueTaskSourceCore<TResult> _core;
+    private UniTaskCompletionSourceCore<TResult> _core;
     private short _version;
 
     private CancellationToken _token;
     private CancellationTokenRegistration _registration;
 
-    public ValueTask<TResult> Task
+    public UniTask<TResult> Task
     {
-        get { return new ValueTask<TResult>(this, _core.Version); }
+        get { return new UniTask<TResult>(this, _core.Version); }
     }
 
     protected void StartInternal(CancellationToken token = default)
@@ -43,7 +43,7 @@ public abstract class ReusableTaskCompletionSource<TResult> : IValueTaskSource<T
             return;
         }
 
-        _core.SetException(new OperationCanceledException(_token));
+        _core.TrySetException(new OperationCanceledException(_token));
     }
 
     public void SetException(Exception exception)
@@ -53,7 +53,7 @@ public abstract class ReusableTaskCompletionSource<TResult> : IValueTaskSource<T
             return;
         }
 
-        _core.SetException(exception);
+        _core.TrySetException(exception);
     }
 
     public void SetResult(TResult result)
@@ -63,7 +63,7 @@ public abstract class ReusableTaskCompletionSource<TResult> : IValueTaskSource<T
             return;
         }
 
-        _core.SetResult(result);
+        _core.TrySetResult(result);
     }
 
     public TResult GetResult(short token)
@@ -79,14 +79,24 @@ public abstract class ReusableTaskCompletionSource<TResult> : IValueTaskSource<T
         }
     }
 
-    public ValueTaskSourceStatus GetStatus(short token)
+    public UniTaskStatus GetStatus(short token)
     {
         return _core.GetStatus(token);
     }
 
-    public void OnCompleted(Action<object> continuation, object state, short token, ValueTaskSourceOnCompletedFlags flags)
+    public void OnCompleted(Action<object> continuation, object state, short token)
     {
-        _core.OnCompleted(continuation, state, token, flags);
+        _core.OnCompleted(continuation, state, token);
+    }
+
+    void IUniTaskSource.GetResult(short token)
+    {
+        GetResult(token);
+    }
+
+    public UniTaskStatus UnsafeGetStatus()
+    {
+        return _core.UnsafeGetStatus();
     }
 
     private void Reset()

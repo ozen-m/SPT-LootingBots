@@ -13,6 +13,7 @@ namespace LootingBots;
 
 [BepInPlugin(MOD_GUID, MOD_NAME, MOD_VERSION)]
 [BepInDependency("xyz.drakia.bigbrain", "1.5.0")]
+[BepInDependency("com.arys.unitytoolkit", "2.0.2")]
 [BepInDependency("com.fika.core", BepInDependency.DependencyFlags.SoftDependency)]
 [BepInIncompatibility("com.chazut.orbit")]
 public class LootingBots : BaseUnityPlugin

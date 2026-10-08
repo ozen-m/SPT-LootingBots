@@ -1,4 +1,5 @@
-﻿using EFT.InventoryLogic;
+﻿using Cysharp.Threading.Tasks;
+using EFT.InventoryLogic;
 using LootingBots.Components;
 using LootingBots.Utilities;
 
@@ -53,14 +54,14 @@ public class LootingLootAction : LootingAction
 
     private LootingInventoryController LootingController { get; set; }
 
-    public override Task<bool> ExecuteAsync(LootingTransactionController controller, CancellationToken token = default)
+    public override UniTask<bool> ExecuteAsync(LootingTransactionController controller, CancellationToken token = default)
     {
         return LootingController.TryAddItemsToBotAsync(ItemsToLoot, false, token);
     }
 
-    public override Task PostActionsAsync(LootingInventoryController invController, CancellationToken token = default)
+    public override UniTask PostActionsAsync(LootingInventoryController invController, CancellationToken token = default)
     {
-        return Task.CompletedTask;
+        return UniTask.CompletedTask;
     }
 
     public override void Return()

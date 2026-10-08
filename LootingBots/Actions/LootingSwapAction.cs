@@ -1,4 +1,5 @@
-﻿using EFT.InventoryLogic;
+﻿using Cysharp.Threading.Tasks;
+using EFT.InventoryLogic;
 using LootingBots.Components;
 using LootingBots.Utilities;
 using UnityEngine.Pool;
@@ -42,7 +43,7 @@ public class LootingSwapAction : LootingAction
     /// </summary>
     public bool TransferItems { get; set; }
 
-    public override async Task<bool> ExecuteAsync(LootingTransactionController controller, CancellationToken token = default)
+    public override async UniTask<bool> ExecuteAsync(LootingTransactionController controller, CancellationToken token = default)
     {
         if (await controller.SwapItemsAsync(Item, ToSwap, token))
         {
@@ -69,7 +70,7 @@ public class LootingSwapAction : LootingAction
         return await controller.ThrowItemAsync(ToSwap, token) && await controller.TryEquipItemAsync(Item, token);
     }
 
-    public override async Task PostActionsAsync(LootingInventoryController invController, CancellationToken token = default)
+    public override async UniTask PostActionsAsync(LootingInventoryController invController, CancellationToken token = default)
     {
         if (!TransferItems)
         {

@@ -1,3 +1,4 @@
+using Cysharp.Threading.Tasks;
 using EFT;
 using EFT.Interactive;
 using EFT.InventoryLogic;
@@ -68,7 +69,7 @@ public static class LootUtils
     /// <summary>
     /// Triggers a container to open/close.
     /// </summary>
-    public static ValueTask<bool> InteractAsync(
+    public static UniTask<bool> InteractAsync(
         this BotOwner botOwner,
         WorldInteractiveObject worldInteractiveObject,
         EInteractionType action,

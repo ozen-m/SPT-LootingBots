@@ -1,4 +1,5 @@
 ﻿using Comfort.Common;
+using Cysharp.Threading.Tasks;
 using Diz.LanguageExtensions;
 using EFT.InventoryLogic;
 using LootingBots.Components;
@@ -29,7 +30,7 @@ public class MoveMultipleResult : IOperationResult
         NetWorthDelta = netWorthDelta;
     }
 
-    public async Task<IResult> ExecuteAsync()
+    public async UniTask<IResult> ExecuteAsync()
     {
         try
         {

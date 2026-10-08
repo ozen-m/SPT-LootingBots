@@ -1,5 +1,6 @@
 using System.Buffers;
 using Comfort.Common;
+using Cysharp.Threading.Tasks;
 using EFT;
 using EFT.Ballistics;
 using EFT.Interactive;
@@ -40,7 +41,7 @@ public class LootFinder : MonoBehaviour
 
     public bool IsScanRunning
     {
-        get { return _lootTask is not null && !_lootTask.IsCompleted; }
+        get { return _lootTask.Status == UniTaskStatus.Pending; }
     }
 
     private static float DetectCorpseDistance
@@ -61,7 +62,7 @@ public class LootFinder : MonoBehaviour
     private readonly Queue<LootableContainer> _priorityLootableContainers = [];
     private readonly Queue<Player> _priorityCorpses = [];
 
-    private Task _lootTask;
+    private UniTask _lootTask;
     private CancellationTokenSource _lootFinderCts;
     private GameObject[] _debugSpheres;
 
@@ -181,7 +182,7 @@ public class LootFinder : MonoBehaviour
         }
     }
 
-    private async Task FindLootAsync(int queue, CancellationToken token)
+    private async UniTask FindLootAsync(int queue, CancellationToken token)
     {
         var colliders = _colliderPool.Rent(3072);
         var seen = HashSetPool<InteractableObject>.Get();
@@ -210,7 +211,7 @@ public class LootFinder : MonoBehaviour
                 QueryTriggerInteraction.Ignore
             );
 
-            await Task.Yield();
+            await UniTask.Yield(token);
 
             if (hits == 0)
             {
@@ -230,7 +231,7 @@ public class LootFinder : MonoBehaviour
                 _log.LogDebug($"Scan results: {hits}");
             }
 
-            await Task.Yield();
+            await UniTask.Yield(token);
 
             const int maxRangeCalculations = 3;
             var rangeCalculations = 0;
@@ -249,7 +250,7 @@ public class LootFinder : MonoBehaviour
                 var interactableObject = collider.gameObject.GetComponentInParent<InteractableObject>();
                 if (interactableObject == null || !seen.Add(interactableObject))
                 {
-                    await Task.Yield();
+                    await UniTask.Yield(token);
 
                     continue;
                 }
@@ -282,7 +283,7 @@ public class LootFinder : MonoBehaviour
 
                 if (lootType is LootType.None || rootItem is null)
                 {
-                    await Task.Yield();
+                    await UniTask.Yield(token);
 
                     continue;
                 }
@@ -291,7 +292,7 @@ public class LootFinder : MonoBehaviour
                 var rootItemId = rootItem.Id;
                 if (_lootingBrain.IsLootIgnored(rootItemId) || ActiveLootCache.IsLootInUse(rootItemId, _botOwner))
                 {
-                    await Task.Yield();
+                    await UniTask.Yield(token);
 
                     continue;
                 }
@@ -306,7 +307,7 @@ public class LootFinder : MonoBehaviour
                     // Ignore this loot since it's non-navigable
                     _lootingBrain.IgnoreLoot(rootItemId);
 
-                    await Task.Yield();
+                    await UniTask.Yield(token);
 
                     continue;
                 }
@@ -334,7 +335,7 @@ public class LootFinder : MonoBehaviour
                 // Check if loot is in sight
                 if (!IsLootInSight(lootType, destination))
                 {
-                    await Task.Yield();
+                    await UniTask.Yield(token);
 
                     continue;
                 }
@@ -352,7 +353,7 @@ public class LootFinder : MonoBehaviour
 
                         break;
                     }
-                    await Task.Yield();
+                    await UniTask.Yield(token);
 
                     continue;
                 }
@@ -364,7 +365,7 @@ public class LootFinder : MonoBehaviour
                     {
                         _log.LogError("Failed to cache and set active loot, bot owner is null or id already in the cache?");
                     }
-                    await Task.Yield();
+                    await UniTask.Yield(token);
 
                     continue;
                 }

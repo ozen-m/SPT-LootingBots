@@ -1,4 +1,5 @@
-﻿using EFT.InventoryLogic;
+﻿using Cysharp.Threading.Tasks;
+using EFT.InventoryLogic;
 using LootingBots.Components;
 using LootingBots.Utilities;
 
@@ -34,27 +35,27 @@ public class LootingMoveAction : LootingAction
     /// </summary>
     public ItemAddress Place { get; set; }
 
-    public override Task<bool> ExecuteAsync(LootingTransactionController controller, CancellationToken token = default)
+    public override UniTask<bool> ExecuteAsync(LootingTransactionController controller, CancellationToken token = default)
     {
-        return Place is not null ? controller.MoveItemAsync(Item, Place, token) : controller.TryEquipItemAsync(Item, token).AsTask();
+        return Place is not null ? controller.MoveItemAsync(Item, Place, token) : controller.TryEquipItemAsync(Item, token);
     }
 
-    public override Task PostActionsAsync(LootingInventoryController invController, CancellationToken token = default)
+    public override UniTask PostActionsAsync(LootingInventoryController invController, CancellationToken token = default)
     {
         // Clean up vest of other items
         if (Item is Vest vest)
         {
-            return invController.TransferItemsToBackpackAsync(vest).AsTask();
+            return invController.TransferItemsToBackpackAsync(vest);
         }
 
         // Clean up the bot's tac vest, pockets and armband since the bot had just equipped a backpack,
         // which it wasn't able to do OnSpawnAsync.
         if (Item is Backpack)
         {
-            return invController.TransferItemsToBackpackAsync().AsTask();
+            return invController.TransferItemsToBackpackAsync();
         }
 
-        return Task.CompletedTask;
+        return UniTask.CompletedTask;
     }
 
     public override void Return()

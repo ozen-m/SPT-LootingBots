@@ -1,4 +1,5 @@
 using Comfort.Common;
+using Cysharp.Threading.Tasks;
 using Diz.LanguageExtensions;
 using EFT;
 using EFT.InventoryLogic;
@@ -11,7 +12,7 @@ namespace LootingBots.Components;
 public class LootingTransactionController(BotOwner owner, BotLog _log) : IDisposable
 {
     private const int NetworkTransactionTimeout = 5;
-    private readonly TimeoutController _networkTimeout = new();
+    private readonly ReusableTimeoutController _networkTimeout = new();
 
     private readonly Player _player = owner.GetPlayer;
     private readonly InventoryController _inventoryController = owner.GetPlayer.InventoryController;
@@ -117,7 +118,7 @@ public class LootingTransactionController(BotOwner owner, BotLog _log) : IDispos
     /// <summary>
     /// Tries to find an open Slot to equip the current item to. If a slot is found, issue a move action to equip the item.
     /// </summary>
-    public ValueTask<bool> TryEquipItemAsync(Item item, CancellationToken token = default)
+    public UniTask<bool> TryEquipItemAsync(Item item, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
 
@@ -129,29 +130,27 @@ public class LootingTransactionController(BotOwner owner, BotLog _log) : IDispos
             {
                 _log.LogDebug($"Could not find a place to equip: {item.LocalizedName()}");
             }
-            return new ValueTask<bool>(false);
+            return new UniTask<bool>(false);
         }
 
         if (_log.DebugEnabled)
         {
             _log.LogDebug($"Equipping: {item.LocalizedName()} [place: {slotAddress.Container.ID.Localized()}]");
         }
-        return new ValueTask<bool>(MoveItemAsync(item, slotAddress, token));
+        return MoveItemAsync(item, slotAddress, token);
     }
 
-    public ValueTask<OperationResult<MergeResult>> TryMergeItemAsync(Item item, CancellationToken token = default)
+    public UniTask<OperationResult<MergeResult>> TryMergeItemAsync(Item item, CancellationToken token = default)
     {
         var mergeableItem = _inventoryController.FindItemToMerge(item);
-        return mergeableItem is null
-            ? new ValueTask<OperationResult<MergeResult>>(Error.Skip)
-            : new ValueTask<OperationResult<MergeResult>>(MergeItemAsync(item, mergeableItem, token));
+        return mergeableItem is null ? new UniTask<OperationResult<MergeResult>>(Error.Skip) : MergeItemAsync(item, mergeableItem, token);
     }
 
     /// <summary>
     /// Tries to find a valid grid for the item being looted. Checks all containers currently equipped to the bot.
     /// If there is a valid grid to place the item inside, issue a merge/move action to pick up the item.
     /// </summary>
-    public ValueTask<bool> TryPickupItemAsync(Item item, CancellationToken token = default)
+    public UniTask<bool> TryPickupItemAsync(Item item, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
 
@@ -163,21 +162,21 @@ public class LootingTransactionController(BotOwner owner, BotLog _log) : IDispos
             {
                 _log.LogDebug($"Could not find a place to pickup: {item.LocalizedName()}");
             }
-            return new ValueTask<bool>(false);
+            return new UniTask<bool>(false);
         }
 
         if (_log.DebugEnabled)
         {
             _log.LogDebug($"Picking up: {item.LocalizedName()} [place: {gridAddress.LocalizedParentName()}]");
         }
-        return new ValueTask<bool>(MoveItemAsync(item, gridAddress, token));
+        return MoveItemAsync(item, gridAddress, token);
     }
 
     /// <summary>
     /// Moves an item to a specified item address
     /// </summary>
     /// <param name="location">If address is null, try to equip if a slot is available, or pickup if a grid is available</param>
-    public async Task<bool> MoveItemAsync(Item item, ItemAddress location, CancellationToken token = default)
+    public async UniTask<bool> MoveItemAsync(Item item, ItemAddress location, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
 
@@ -237,7 +236,7 @@ public class LootingTransactionController(BotOwner owner, BotLog _log) : IDispos
     /// </summary>
     /// <param name="item">Is almost always the incoming item</param>
     /// <param name="toSwap">Is almost always the swapped out/thrown out item</param>
-    public async Task<bool> SwapItemsAsync(Item item, Item toSwap, CancellationToken token = default)
+    public async UniTask<bool> SwapItemsAsync(Item item, Item toSwap, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
 
@@ -290,7 +289,7 @@ public class LootingTransactionController(BotOwner owner, BotLog _log) : IDispos
     /// <summary>
     /// Attempts to merge an item stack with another specified item stack.
     /// </summary>
-    public async Task<OperationResult<MergeResult>> MergeItemAsync(Item toMove, Item toItem, CancellationToken token = default)
+    public async UniTask<OperationResult<MergeResult>> MergeItemAsync(Item toMove, Item toItem, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
 
@@ -353,7 +352,7 @@ public class LootingTransactionController(BotOwner owner, BotLog _log) : IDispos
     /// <summary>
     /// Throw an item.
     /// </summary>
-    public async Task<bool> ThrowItemAsync(Item toThrow, CancellationToken token = default)
+    public async UniTask<bool> ThrowItemAsync(Item toThrow, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
 
@@ -388,7 +387,7 @@ public class LootingTransactionController(BotOwner owner, BotLog _log) : IDispos
     /// Try to transfer an item to another item's grid or throw
     /// </summary>
     /// <param name="transferTo">The brain's ActiveLoot Root Item</param>
-    public Task<bool> TransferOrThrowItemAsync(Item toThrow, Item transferTo = null, CancellationToken token = default)
+    public UniTask<bool> TransferOrThrowItemAsync(Item toThrow, Item transferTo = null, CancellationToken token = default)
     {
         if (transferTo is null)
         {
@@ -407,7 +406,7 @@ public class LootingTransactionController(BotOwner owner, BotLog _log) : IDispos
     /// <summary>
     /// Replace items by trying to swap the two items, or transfer to another item's grid, or throw
     /// </summary>
-    public async Task<bool> ReplaceItemAsync(Item toKeep, Item toThrow, Item transferTo = null, CancellationToken token = default)
+    public async UniTask<bool> ReplaceItemAsync(Item toKeep, Item toThrow, Item transferTo = null, CancellationToken token = default)
     {
         if (_log.DebugEnabled)
         {
@@ -461,23 +460,23 @@ public class LootingTransactionController(BotOwner owner, BotLog _log) : IDispos
     /// runs indefinitely when moving the bot's active weapon around.
     /// Circumvent it by checking if the operation was successful after a timeout.
     /// </summary>
-    public Task<IResult> TryRunNetworkTransactionWithTimeoutAsync(OperationResult operationResult)
+    public UniTask<IResult> TryRunNetworkTransactionWithTimeoutAsync(OperationResult operationResult)
     {
         if (operationResult.Failed)
         {
-            return Task.FromResult<IResult>(new FailedResult(operationResult.Error!.ToString()));
+            return new UniTask<IResult>(new FailedResult(operationResult.Error!.ToString()));
         }
         if (operationResult.Value.CanExecute(_inventoryController))
         {
             return RunNetworkTransactionWithTimeoutAsync(operationResult);
         }
-        return Task.FromResult<IResult>(new FailedResult("InventoryController cannot execute this operation"));
+        return new UniTask<IResult>(new FailedResult("InventoryController cannot execute this operation"));
     }
 
     /// <summary>
     /// A modified <see cref="InventoryController.RunNetworkTransaction"/> that includes a timeout
     /// </summary>
-    private async Task<IResult> RunNetworkTransactionWithTimeoutAsync(OperationResult operationResult)
+    private async UniTask<IResult> RunNetworkTransactionWithTimeoutAsync(OperationResult operationResult)
     {
         var timeoutToken = _networkTimeout.Timeout(NetworkTransactionTimeout);
         var callbackSource = CallbackTaskCompletionSource.Start(timeoutToken);
@@ -510,14 +509,14 @@ public class LootingTransactionController(BotOwner owner, BotLog _log) : IDispos
     /// <summary>
     /// Simulate decisions while looting by performing a delay.
     /// </summary>
-    public static Task SimulatePlayerDelayAsync(double delay = -1D, CancellationToken token = default)
+    public static UniTask SimulatePlayerDelayAsync(double delay = -1D, CancellationToken token = default)
     {
         if (delay < 0D)
         {
             delay = LootingBots.TransactionDelay.Value;
         }
 
-        return Task.Delay(TimeSpan.FromMilliseconds(delay), token);
+        return UniTask.Delay(TimeSpan.FromMilliseconds(delay), DelayType.DeltaTime, PlayerLoopTiming.Update, token);
     }
 
     /// <summary>

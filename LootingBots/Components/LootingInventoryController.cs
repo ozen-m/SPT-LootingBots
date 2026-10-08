@@ -1,5 +1,6 @@
 using System.Buffers;
 using Comfort.Common;
+using Cysharp.Threading.Tasks;
 using Diz.LanguageExtensions;
 using EFT;
 using EFT.Interactive;
@@ -245,7 +246,7 @@ public class LootingInventoryController : IDisposable
     /// Moves all non-vest items into the backpack, and throws any undervalued items from the backpack.
     /// Called on bot spawn.
     /// </summary>
-    public async Task CleanupInventoryAsync(CancellationToken token = default)
+    public async UniTask CleanupInventoryAsync(CancellationToken token = default)
     {
         var equipment = _botInventoryController.Inventory.Equipment;
         await TransferItemsToBackpackAsync(equipment);
@@ -262,12 +263,12 @@ public class LootingInventoryController : IDisposable
     /// Move items that are not placed in fast access slots to the bot's backpack.
     /// </summary>
     /// <param name="source">If null, defaults to the bot's equipment, which uses the tac vest, pockets, and armband slots.</param>
-    public ValueTask<IResult> TransferItemsToBackpackAsync(Item source = null)
+    public UniTask<IResult> TransferItemsToBackpackAsync(Item source = null)
     {
         var backpack = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Backpack).ContainedItem;
         if (backpack is null)
         {
-            return new ValueTask<IResult>(SuccessfulResult.New);
+            return new UniTask<IResult>(SuccessfulResult.New);
         }
 
         // If source was not given or is null, clean up the bot's equipment instead
@@ -287,7 +288,7 @@ public class LootingInventoryController : IDisposable
                 searchableItem.GetAllGridContainedItems(items);
                 break;
             default:
-                return new ValueTask<IResult>(SuccessfulResult.New);
+                return new UniTask<IResult>(SuccessfulResult.New);
         }
 
         foreach (var item in items)
@@ -317,7 +318,7 @@ public class LootingInventoryController : IDisposable
             {
                 _log.LogDebug($"No items to transfer from {source.LocalizedName()} to the backpack");
             }
-            return new ValueTask<IResult>(SuccessfulResult.New);
+            return new UniTask<IResult>(SuccessfulResult.New);
         }
 
         moveResults.SafeRollBack();
@@ -327,14 +328,14 @@ public class LootingInventoryController : IDisposable
         {
             _log.LogDebug($"Transferring {moveOperationsResults.Count} items from {source.LocalizedName()} to the backpack");
         }
-        return new ValueTask<IResult>(moveOperationsResults.ExecuteAsync());
+        return moveOperationsResults.ExecuteAsync();
     }
 
     /// <summary>
     /// Sorts the items in the tactical vest so that items prefer to be in slots that match their size.
     /// i.e a 1x1 item will be placed in a 1x1 slot instead of a 1x2 slot
     /// </summary>
-    public async Task SortCompoundItemAsync(CompoundItem compoundItem)
+    public async UniTask SortCompoundItemAsync(CompoundItem compoundItem)
     {
         ShouldSort = false;
 
@@ -366,7 +367,7 @@ public class LootingInventoryController : IDisposable
     /// If bots are looting something that is equippable, and they have nothing equipped in that slot, they will always equip it.
     /// If the bot decides not to equip the item then it will attempt to put in an available container slot.
     /// </summary>
-    public async Task<bool> TryAddItemsToBotAsync<TItem>(List<TItem> items, bool tryToEquip = true, CancellationToken token = default)
+    public async UniTask<bool> TryAddItemsToBotAsync<TItem>(List<TItem> items, bool tryToEquip = true, CancellationToken token = default)
         where TItem : Item
     {
         using var pooledList = ListActionPool.Get(out var lootingActions);
@@ -554,7 +555,7 @@ public class LootingInventoryController : IDisposable
     /// to calculate the delay for discovering an item while looting a searchable container.
     /// Taken from <see cref="EFT.InventoryLogic.Operations.ActiveSearchContentOperation.SearchContent"/>.
     /// </summary>
-    public Task SimulateSearchTimeAsync(Item item, CancellationToken token = default)
+    public UniTask SimulateSearchTimeAsync(Item item, CancellationToken token = default)
     {
         // Unfortunately SPT does not generate these values.
         /*
@@ -564,7 +565,7 @@ public class LootingInventoryController : IDisposable
         */
 
         return item.Parent.Container is not ISearchableContainer // || _discoveredItems.Contains(item)
-            ? Task.CompletedTask
+            ? UniTask.CompletedTask
             : LootingTransactionController.SimulatePlayerDelayAsync(Random.Range(1, 3) * 1000D, token);
     }
 
@@ -864,7 +865,7 @@ public class LootingInventoryController : IDisposable
     /// Throws all magazines from the rig that are not used by any of the weapons that the bot currently has equipped.
     /// Also records thrown mag value.
     /// </summary>
-    public ValueTask ThrowUselessMagsAsync(Weapon thrownWeapon, Dictionary<Item, float> uselessMagazines, CancellationToken token)
+    public UniTask ThrowUselessMagsAsync(Weapon thrownWeapon, Dictionary<Item, float> uselessMagazines, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
 
@@ -926,14 +927,14 @@ public class LootingInventoryController : IDisposable
             {
                 _log.LogDebug("No magazines to clean up");
             }
-            return new ValueTask();
+            return new UniTask();
         }
 
         if (_log.DebugEnabled)
         {
             _log.LogDebug($"Throwing {uselessMagazines.Count} useless magazines");
         }
-        return new ValueTask(TransferOrThrowItemsAsync(uselessMagazines, _lootingBrain.ActiveLoot.GetRootItem(), token));
+        return TransferOrThrowItemsAsync(uselessMagazines, _lootingBrain.ActiveLoot.GetRootItem(), token);
     }
 
     /// <summary>
@@ -943,7 +944,7 @@ public class LootingInventoryController : IDisposable
     /// <param name="itemsToThrow">A Dictionary of key: items, value: prices to throw.</param>
     /// <param name="previousOwner">The owner of items to throw.</param>
     /// <param name="transferTo">A container to transfer items to.</param>
-    public async Task TransferOrThrowItemsAsync<TItem>(
+    public async UniTask TransferOrThrowItemsAsync<TItem>(
         Dictionary<TItem, float> itemsToThrow,
         Item transferTo = null,
         CancellationToken token = default
@@ -1380,7 +1381,7 @@ public class LootingInventoryController : IDisposable
     /// <summary>
     /// Searches throughout the children of a compound item and attempts to loot them
     /// </summary>
-    public async Task<bool> LootNestedItemsAsync(Item item, CancellationToken token = default)
+    public async UniTask<bool> LootNestedItemsAsync(Item item, CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();
 
@@ -1426,7 +1427,7 @@ public class LootingInventoryController : IDisposable
         return await TryAddItemsToBotAsync(items, true, token);
     }
 
-    public async Task<bool> TryNestContainerAsync(SearchableItem item, int itemSize, CancellationToken token = default)
+    public async UniTask<bool> TryNestContainerAsync(SearchableItem item, int itemSize, CancellationToken token = default)
     {
         // BUG: Swapping out item then looting item can cause a ghost loot item in the world
         if (_log.DebugEnabled)
@@ -1557,11 +1558,11 @@ public class LootingInventoryController : IDisposable
     /// <param name="itemsToThrow">A Dictionary of key: items, value: prices to throw.</param>
     /// <param name="previousOwner">The owner of items to throw.</param>
     /// <param name="transferTo">A container to transfer items to.</param>
-    public ValueTask ThrowUndervaluedItemsAsync(Item container, Dictionary<Item, float> itemsToThrow, CancellationToken token = default)
+    public UniTask ThrowUndervaluedItemsAsync(Item container, Dictionary<Item, float> itemsToThrow, CancellationToken token = default)
     {
         if (container is null)
         {
-            return new ValueTask();
+            return new UniTask();
         }
 
         token.ThrowIfCancellationRequested();
@@ -1572,20 +1573,20 @@ public class LootingInventoryController : IDisposable
             {
                 _log.LogDebug($"No undervalued items found to throw in {container.LocalizedName()}");
             }
-            return new ValueTask();
+            return new UniTask();
         }
 
         if (_log.InfoEnabled)
         {
             _log.LogInfo($"Throwing {itemsToThrow.Count} undervalued items from {container.LocalizedName()}");
         }
-        return new ValueTask(TransferOrThrowItemsAsync(itemsToThrow, _lootingBrain.ActiveLoot.GetRootItem(), token));
+        return TransferOrThrowItemsAsync(itemsToThrow, _lootingBrain.ActiveLoot.GetRootItem(), token);
     }
 
     /// <summary>
     /// Strip and loot a weapon's attachments.
     /// </summary>
-    public ValueTask<bool> StripWeaponAsync(Weapon weapon, List<Mod> modsToLoot, CancellationToken token = default)
+    public UniTask<bool> StripWeaponAsync(Weapon weapon, List<Mod> modsToLoot, CancellationToken token = default)
     {
         // Get all mods where parent slot is not required, can be modded in raid, and is not a magazine
         weapon.GetAllSlotContainedItems(
@@ -1600,7 +1601,7 @@ public class LootingInventoryController : IDisposable
             {
                 _log.LogDebug($"No attachments to strip for weapon: {weapon.LocalizedName()}");
             }
-            return new ValueTask<bool>(true);
+            return new UniTask<bool>(true);
         }
 
         if (_log.InfoEnabled)
@@ -1608,7 +1609,7 @@ public class LootingInventoryController : IDisposable
             _log.LogInfo($"Trying to strip attachments of weapon: {weapon.LocalizedName()}");
         }
 
-        return new ValueTask<bool>(TryAddItemsToBotAsync(modsToLoot, false, token));
+        return TryAddItemsToBotAsync(modsToLoot, false, token);
     }
 
     /// <summary>
@@ -1866,6 +1867,7 @@ public class LootingInventoryController : IDisposable
 
     public void Dispose()
     {
+        _transactionController.Dispose();
         foreach (var action in _unsubActions)
         {
             action();

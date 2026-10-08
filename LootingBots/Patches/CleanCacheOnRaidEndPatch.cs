@@ -23,6 +23,5 @@ public class CleanCacheOnRaidEndPatch : ModulePatch
         ActiveLootCache.Reset();
         ActiveBotCache.Reset();
         ScanScheduler.Reset();
-        UnityEngine.Object.Destroy(TimeoutRunner.Instance.gameObject);
     }
 }

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Cysharp.Threading.Tasks;
 using EFT;
 using EFT.Interactive;
 using EFT.InventoryLogic;
@@ -116,13 +117,13 @@ public class LootingBrain : MonoBehaviour
     private bool _isDisabledForPerformance;
     private float _performanceTimer;
     private BotLog _log;
-    private TimeoutController _lootingSource;
+    private ReusableTimeoutController _lootingSource;
     private Action _exitPickupStateAction;
 
     public void Init(BotOwner botOwner)
     {
         _log = new BotLog(LootingBots.LootLog, botOwner);
-        _lootingSource = new TimeoutController();
+        _lootingSource = new ReusableTimeoutController();
         _exitPickupStateAction = ExitPickupState;
 
         BotOwner = botOwner;
@@ -140,7 +141,6 @@ public class LootingBrain : MonoBehaviour
         _performanceTimer = Time.time + PerformanceTimerInterval;
         ActiveLootCache.Init();
         ScanScheduler.Init();
-        TimeoutRunner.Init();
 
         if (ActiveBotCache.IsCacheActive)
         {
@@ -327,7 +327,7 @@ public class LootingBrain : MonoBehaviour
     /// <summary>
     /// Handles looting a corpse found on the map.
     /// </summary>
-    private async Task LootCorpseAsync(CancellationToken token)
+    private async UniTask LootCorpseAsync(CancellationToken token)
     {
         var isSuccessful = false;
         try
@@ -381,7 +381,7 @@ public class LootingBrain : MonoBehaviour
     /// <summary>
     /// Handles looting a container found on the map.
     /// </summary>
-    private async Task LootContainerAsync(CancellationToken token)
+    private async UniTask LootContainerAsync(CancellationToken token)
     {
         var isSuccessful = false;
         try
@@ -445,7 +445,7 @@ public class LootingBrain : MonoBehaviour
     /// <summary>
     /// Handles looting a loose item found on the map.
     /// </summary>
-    public async Task LootItemAsync(CancellationToken token)
+    public async UniTask LootItemAsync(CancellationToken token)
     {
         var isSuccessful = false;
         try
