@@ -127,32 +127,6 @@ public class LootingBrain : MonoBehaviour
 
         BotOwner = botOwner;
         InventoryController = new LootingInventoryController(BotOwner, this);
-
-        UpdateIsLootingEnabled();
-        _ = OnSpawnAsync();
-    }
-
-    /// <summary>
-    /// Clean up the bot's inventory on spawn, then initialize LootingInventoryController.
-    /// </summary>
-    public async Task OnSpawnAsync()
-    {
-        LootTaskRunning = true;
-        var token = _lootingSource.Timeout(180);
-        try
-        {
-            await InventoryController.CleanupInventoryAsync(token);
-        }
-        catch (Exception ex)
-        {
-            _log.LogError(ex.ToString());
-        }
-        finally
-        {
-            InventoryController.Init();
-            _lootingSource.ResetTimer();
-            LootTaskRunning = false;
-        }
     }
 
     /// <summary>
@@ -186,6 +160,9 @@ public class LootingBrain : MonoBehaviour
                 _isDisabledForPerformance = true;
             }
         }
+
+        UpdateIsLootingEnabled();
+        _ = OnSpawnAsync();
     }
 
     /// <summary>
@@ -256,6 +233,40 @@ public class LootingBrain : MonoBehaviour
         //
         //     _ = InventoryController.SortCompoundItemAsync(tacVest);
         // }
+    }
+
+    /// <summary>
+    /// Clean up the bot's inventory on spawn, then initialize LootingInventoryController.
+    /// </summary>
+    public async Task OnSpawnAsync()
+    {
+        LootTaskRunning = true;
+        var token = _lootingSource.Timeout(LootingBots.LootTimeout.Value);
+        try
+        {
+            await InventoryController.CleanupInventoryAsync(token);
+            _lootingSource.ResetTimer();
+        }
+        catch (OperationCanceledException)
+        {
+            if (_log.WarningEnabled)
+            {
+                _log.LogWarning("Timed out while cleaning up inventory");
+            }
+        }
+        catch (Exception ex)
+        {
+            _lootingSource.ResetTimer();
+            if (_log.ErrorEnabled)
+            {
+                _log.LogError(ex.ToString());
+            }
+        }
+        finally
+        {
+            InventoryController.Init();
+            LootTaskRunning = false;
+        }
     }
 
     /// <summary>
