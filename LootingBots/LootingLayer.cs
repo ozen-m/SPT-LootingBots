@@ -40,9 +40,11 @@ internal class LootingLayer : CustomLayer
 
     public override bool IsActive()
     {
-        var isBotActive = BotOwner.BotState == EBotState.Active;
-        var isNotHealing = !BotOwner.Medecine.FirstAid.Have2Do && !BotOwner.Medecine.SurgicalKit.HaveWork;
-        return isBotActive && isNotHealing && _lootingBrain.IsBrainEnabled && (_lootFinder.IsScheduledScan || _lootingBrain.IsBotLooting);
+        return BotOwner.BotState == EBotState.Active // Bot is active
+            && BotOwner.Memory.IsPeace // Bot does not have an enemy
+            && (!BotOwner.Medecine.FirstAid.Have2Do && !BotOwner.Medecine.SurgicalKit.HaveWork) // Bot is not healing
+            && _lootingBrain.IsBrainEnabled
+            && (_lootFinder.IsScheduledScan || _lootingBrain.IsBotLooting);
     }
 
     public override void Start()
