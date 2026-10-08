@@ -232,10 +232,19 @@ public class ContainedItems
             {
                 continue;
             }
-            if (potentialLoot.Size <= itemToReplace.Size)
+            if (potentialLoot.Size > itemToReplace.Size)
             {
-                return true;
+                continue;
             }
+            if (itemToReplace.Item.CurrentAddress == null)
+            {
+                // Somehow an item we recorded doesn't have a parent, maybe it was discarded.
+                // Remove it and continue.
+                _items.RemoveAt(index);
+                index--;
+                continue;
+            }
+            return true;
         }
 
         index = -1;
