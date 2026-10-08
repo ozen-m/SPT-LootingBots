@@ -153,7 +153,7 @@ public class LootingBrain : MonoBehaviour
                 if (_log.WarningEnabled)
                 {
                     _log.LogWarning(
-                        $"Looting disabled! Enabled bots: {ActiveBotCache.GetSize()}. Distance to player: {Math.Sqrt(DistanceToPlayer):N}. Able to loot: {LootingEnabled}."
+                        $"Looting disabled! Enabled bots: {ActiveBotCache.Count}. Distance to player: {Math.Sqrt(DistanceToPlayer):N}. Able to loot: {LootingEnabled}."
                     );
                 }
 
@@ -215,7 +215,7 @@ public class LootingBrain : MonoBehaviour
                 if (_log.WarningEnabled)
                 {
                     _log.LogWarning(
-                        $"Looting disabled! Enabled bots: {ActiveBotCache.GetSize()}. Distance to player: {Math.Sqrt(DistanceToPlayer):N}. Able to loot: {LootingEnabled}."
+                        $"Looting disabled! Enabled bots: {ActiveBotCache.Count}. Distance to player: {Math.Sqrt(DistanceToPlayer):N}. Able to loot: {LootingEnabled}."
                     );
                 }
             }

@@ -24,6 +24,11 @@ public static class ActiveBotCache
         get { return _activeBots.Count > LootingBots.MaxActiveLootingBots.Value; }
     }
 
+    public static int Count
+    {
+        get { return _activeBots.Count; }
+    }
+
     public static void Reset()
     {
         _activeBots.Clear();
@@ -52,10 +57,5 @@ public static class ActiveBotCache
         {
             LootingBots.LootLog.LogDebug($"{botOwner.name.Localized()} looting disabled (total: {_activeBots.Count})");
         }
-    }
-
-    public static int GetSize()
-    {
-        return _activeBots.Count;
     }
 }
