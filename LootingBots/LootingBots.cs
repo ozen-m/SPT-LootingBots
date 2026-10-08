@@ -42,59 +42,63 @@ public class LootingBots : BaseUnityPlugin
     public const LogLevel DefaultLogLevel = LogLevel.Error | LogLevel.Warning;
 
     // Loot Finder Settings
-    public static ConfigEntry<BotType> CorpseLootingEnabled;
     public static ConfigEntry<BotType> ContainerLootingEnabled;
-    public static ConfigEntry<BotType> LooseItemLootingEnabled;
-    public static ConfigEntry<float> InitialStartTimer;
-
-    public static ConfigEntry<float> LootScanInterval;
-    public static ConfigEntry<float> DetectItemDistance;
-    public static ConfigEntry<BotType> DetectItemNeedsSight;
-    public static ConfigEntry<float> DetectContainerDistance;
     public static ConfigEntry<BotType> DetectContainerNeedsSight;
-    public static ConfigEntry<float> DetectCorpseDistance;
+    public static ConfigEntry<float> DetectContainerDistance;
+
+    public static ConfigEntry<BotType> CorpseLootingEnabled;
     public static ConfigEntry<BotType> DetectCorpseNeedsSight;
+    public static ConfigEntry<float> DetectCorpseDistance;
 
-    public static ConfigEntry<bool> DebugLootNavigation;
-    public static ConfigEntry<LogLevel> LootingLogLevels;
-    public static ConfigEntry<LogLevel> InteropLogLevels;
+    public static ConfigEntry<BotType> LooseItemLootingEnabled;
+    public static ConfigEntry<BotType> DetectItemNeedsSight;
+    public static ConfigEntry<float> DetectItemDistance;
 
-    public static ConfigEntry<int> FilterLogsOnBot;
-    public static Log LootLog;
-    public static Log InteropLog;
+    // Loot Finder Settings (Timing)
+    public static ConfigEntry<float> InitialStartTimer;
+    public static ConfigEntry<float> LootScanInterval;
+    public static ConfigEntry<int> NoLootCooldown;
 
     // Loot Settings
     public static ConfigEntry<bool> BotsAlwaysCloseContainers;
     public static ConfigEntry<bool> UseMarketPrices;
-    public static ConfigEntry<double> TransactionDelay;
-    public static ConfigEntry<bool> UseSearchTime;
     public static ConfigEntry<bool> ValueFromMods;
     public static ConfigEntry<bool> ValueFromPlates;
     public static ConfigEntry<bool> CanStripAttachments;
     public static ConfigEntry<bool> AllowContainerNesting;
     public static ConfigEntry<bool> UseWeightRestriction;
-    public static ConfigEntry<int> LootTimeout;
 
     public static ConfigEntry<float> PMCMinLootThreshold;
     public static ConfigEntry<float> PMCMaxLootThreshold;
-    public static ConfigEntry<float> ScavMinLootThreshold;
-    public static ConfigEntry<float> ScavMaxLootThreshold;
-
     public static ConfigEntry<CanEquipEquipmentType> PMCGearToEquip;
     public static ConfigEntry<EquipmentType> PMCGearToPickup;
+
+    public static ConfigEntry<float> ScavMinLootThreshold;
+    public static ConfigEntry<float> ScavMaxLootThreshold;
     public static ConfigEntry<CanEquipEquipmentType> ScavGearToEquip;
     public static ConfigEntry<EquipmentType> ScavGearToPickup;
 
-    public static ConfigEntry<LogLevel> ItemAppraiserLogLevels;
-    public static Log ItemAppraiserLog;
-    public static ItemAppraiser ItemAppraiser { get; private set; }
+    // Loot Settings (Timing)
+    public static ConfigEntry<bool> UseSearchTime;
+    public static ConfigEntry<double> TransactionDelay;
+    public static ConfigEntry<int> LootTimeout;
 
     // Performance Settings
     public static ConfigEntry<int> MaxActiveLootingBots;
     public static ConfigEntry<int> LimitDistanceFromPlayer;
     public static ConfigEntry<int> MaxConcurrentScans;
-    public static ConfigEntry<int> MaxEmptyAttempts;
-    public static ConfigEntry<int> EmptyAttemptsCooldown;
+
+    // Debug Settings
+    public static ConfigEntry<LogLevel> LootingLogLevels;
+    public static ConfigEntry<LogLevel> InteropLogLevels;
+    public static ConfigEntry<LogLevel> ItemAppraiserLogLevels;
+    public static ConfigEntry<int> FilterLogsOnBot;
+    public static ConfigEntry<bool> DebugLootNavigation;
+
+    public static ItemAppraiser ItemAppraiser { get; private set; }
+    public static Log LootLog;
+    public static Log InteropLog;
+    public static Log ItemAppraiserLog;
 
     public void LootFinderSettings()
     {
@@ -191,54 +195,13 @@ public class LootingBots : BaseUnityPlugin
             )
         );
 
-        LootingLogLevels = Config.Bind(
-            "Loot Finder",
-            "Debug: Log Levels",
-            DefaultLogLevel,
-            new ConfigDescription(
-                "Enable different levels of log messages to show in the logs",
-                null,
-                new ConfigurationManagerAttributes { Order = 0, IsAdvanced = true }
-            )
-        );
-        InteropLogLevels = Config.Bind(
-            "Loot Finder",
-            "Debug: Interop Log Levels",
-            DefaultLogLevel,
-            new ConfigDescription(
-                "Enable different levels of log messages specific to the mod interop methods",
-                null,
-                new ConfigurationManagerAttributes { Order = -1, IsAdvanced = true }
-            )
-        );
-        FilterLogsOnBot = Config.Bind(
-            "Loot Finder",
-            "Debug: Filter logs on bot",
-            0,
-            new ConfigDescription(
-                "Filters new log entries only showing logs for the number of the bot specified. A value of 0 denotes no filter.",
-                null,
-                new ConfigurationManagerAttributes { Order = -2, IsAdvanced = true }
-            )
-        );
-        DebugLootNavigation = Config.Bind(
-            "Loot Finder",
-            "Debug: Show navigation points",
-            false,
-            new ConfigDescription(
-                "Renders spheres where bots are trying to navigate when container looting. (Red): Container position. (Black): 'Optimized' container position. (Green): Calculated bot destination. (Blue): NavMesh corrected destination (where the bot will move).",
-                null,
-                new ConfigurationManagerAttributes { Order = -3, IsAdvanced = true }
-            )
-        );
-
         // Loot Finder (Timing)
         InitialStartTimer = Config.Bind(
             "Loot Finder (Timing)",
             "Delay after spawn",
             6f,
             new ConfigDescription(
-                "Amount of seconds a bot will wait to start their first loot scan after spawning into raid",
+                "The amount of seconds a bot will wait before starting their first loot scan after spawning into raid",
                 null,
                 new ConfigurationManagerAttributes { Order = 3 }
             )
@@ -248,29 +211,19 @@ public class LootingBots : BaseUnityPlugin
             "Loot scan interval",
             5f,
             new ConfigDescription(
-                "The amount of seconds the bot will wait until triggering another loot scan",
+                "The amount of seconds a bot will wait until triggering another loot scan",
                 null,
                 new ConfigurationManagerAttributes { Order = 2 }
             )
         );
-        TransactionDelay = Config.Bind(
+        NoLootCooldown = Config.Bind(
             "Loot Finder (Timing)",
-            "Delay after taking item (ms)",
-            3000D,
+            "No loot cooldown",
+            180,
             new ConfigDescription(
-                "Amount of milliseconds a bot will wait after taking an item into their inventory before attempting to loot another item. Simulates the amount of time it takes for a player to look through loot decide to take something.",
+                "The amount of seconds a bot will wait until triggering another loot scan when a previous loot scan comes up empty",
                 null,
                 new ConfigurationManagerAttributes { Order = 1 }
-            )
-        );
-        UseSearchTime = Config.Bind(
-            "Loot Finder (Timing)",
-            "Enable search time",
-            true,
-            new ConfigDescription(
-                "Adds a delay before looting an item to simulate the time it takes for a bot to \"search\" an item in a searchable container. The delay is calculated using the AttentionLootSpeed and SearchBuffSpeed skills of the bot.",
-                null,
-                new ConfigurationManagerAttributes { Order = 0 }
             )
         );
     }
@@ -347,24 +300,15 @@ public class LootingBots : BaseUnityPlugin
                 new ConfigurationManagerAttributes { Order = 8 }
             )
         );
-        LootTimeout = Config.Bind(
-            "Loot Settings",
-            "Loot Timeout",
-            300,
-            new ConfigDescription(
-                "Time in seconds before a looting bot is timed out and stops looting",
-                null,
-                new ConfigurationManagerAttributes { Order = 7 }
-            )
-        );
+
         PMCMinLootThreshold = Config.Bind(
             "Loot Settings",
             "PMC: Min loot value threshold",
-            12000f,
+            15000f,
             new ConfigDescription(
                 "PMC bots will only loot items that exceed the specified value in roubles. When set to 0, bots will ignore the minimum value threshold.",
                 null,
-                new ConfigurationManagerAttributes { Order = 6 }
+                new ConfigurationManagerAttributes { Order = 7 }
             )
         );
         PMCMaxLootThreshold = Config.Bind(
@@ -374,7 +318,7 @@ public class LootingBots : BaseUnityPlugin
             new ConfigDescription(
                 "PMC bots will NOT loot items that exceed the specified value in roubles. When set to 0, bots will ignore the maximum value threshold.",
                 null,
-                new ConfigurationManagerAttributes { Order = 5 }
+                new ConfigurationManagerAttributes { Order = 6 }
             )
         );
         PMCGearToEquip = Config.Bind(
@@ -384,7 +328,7 @@ public class LootingBots : BaseUnityPlugin
             new ConfigDescription(
                 "The equipment a PMC bot is able to equip during raid",
                 null,
-                new ConfigurationManagerAttributes { Order = 4 }
+                new ConfigurationManagerAttributes { Order = 5 }
             )
         );
         PMCGearToPickup = Config.Bind(
@@ -394,9 +338,10 @@ public class LootingBots : BaseUnityPlugin
             new ConfigDescription(
                 "The equipment a PMC bot is able to place in their backpack/rig",
                 null,
-                new ConfigurationManagerAttributes { Order = 3 }
+                new ConfigurationManagerAttributes { Order = 4 }
             )
         );
+
         ScavMinLootThreshold = Config.Bind(
             "Loot Settings",
             "Scav: Min loot value threshold",
@@ -404,7 +349,7 @@ public class LootingBots : BaseUnityPlugin
             new ConfigDescription(
                 "All non-PMC bots will only loot items that exceed the specified value in roubles. When set to 0, bots will ignore the minimum value threshold.",
                 null,
-                new ConfigurationManagerAttributes { Order = 2 }
+                new ConfigurationManagerAttributes { Order = 3 }
             )
         );
         ScavMaxLootThreshold = Config.Bind(
@@ -414,7 +359,7 @@ public class LootingBots : BaseUnityPlugin
             new ConfigDescription(
                 "All non-PMC bots will NOT loot items that exceed the specified value in roubles. When set to 0, bots will ignore the maximum value threshold.",
                 null,
-                new ConfigurationManagerAttributes { Order = 1 }
+                new ConfigurationManagerAttributes { Order = 2 }
             )
         );
         ScavGearToEquip = Config.Bind(
@@ -424,7 +369,7 @@ public class LootingBots : BaseUnityPlugin
             new ConfigDescription(
                 "The equipment a non-PMC bot is able to equip during raid",
                 null,
-                new ConfigurationManagerAttributes { Order = 0 }
+                new ConfigurationManagerAttributes { Order = 1 }
             )
         );
         ScavGearToPickup = Config.Bind(
@@ -434,18 +379,38 @@ public class LootingBots : BaseUnityPlugin
             new ConfigDescription(
                 "The equipment a non-PMC bot is able to place in their backpack/rig",
                 null,
-                new ConfigurationManagerAttributes { Order = -1 }
+                new ConfigurationManagerAttributes { Order = 0 }
             )
         );
 
-        ItemAppraiserLogLevels = Config.Bind(
-            "Loot Settings",
-            "Debug: Item Appraiser Log Levels",
-            DefaultLogLevel,
+        UseSearchTime = Config.Bind(
+            "Loot Settings (Timing)",
+            "Enable search time",
+            true,
             new ConfigDescription(
-                "Enables logs for the item appraiser that calculates the weapon values",
+                "Adds a delay before looting an item to simulate the time it takes for a bot to \"search\" an item in a searchable container. The delay is calculated using the AttentionLootSpeed and SearchBuffSpeed skills of the bot.",
                 null,
-                new ConfigurationManagerAttributes { Order = -2, IsAdvanced = true }
+                new ConfigurationManagerAttributes { Order = 3 }
+            )
+        );
+        TransactionDelay = Config.Bind(
+            "Loot Settings (Timing)",
+            "Delay after taking item (ms)",
+            3000D,
+            new ConfigDescription(
+                "The amount of milliseconds a bot will wait after taking an item into their inventory before attempting to loot another item. Simulates the amount of time it takes for a player to look through loot decide to take something.",
+                null,
+                new ConfigurationManagerAttributes { Order = 2 }
+            )
+        );
+        LootTimeout = Config.Bind(
+            "Loot Settings (Timing)",
+            "Loot Timeout",
+            300,
+            new ConfigDescription(
+                "Time in seconds before a looting bot is timed out and stops looting",
+                null,
+                new ConfigurationManagerAttributes { Order = 1 }
             )
         );
     }
@@ -459,7 +424,7 @@ public class LootingBots : BaseUnityPlugin
             new ConfigDescription(
                 "Limits the amount of bots that are able to simultaneously run looting logic. A value of 0 represents no limit.",
                 null,
-                new ConfigurationManagerAttributes { Order = 11 }
+                new ConfigurationManagerAttributes { Order = 3 }
             )
         );
         LimitDistanceFromPlayer = Config.Bind(
@@ -469,7 +434,7 @@ public class LootingBots : BaseUnityPlugin
             new ConfigDescription(
                 "Any bot farther than the specified distance in meters will not run any looting logic. A value of 0 represents no limit.",
                 null,
-                new ConfigurationManagerAttributes { Order = 10 }
+                new ConfigurationManagerAttributes { Order = 2 }
             )
         );
         MaxConcurrentScans = Config.Bind(
@@ -479,27 +444,61 @@ public class LootingBots : BaseUnityPlugin
             new ConfigDescription(
                 "Max number of bots that can scan for loot at the same time. A value of 0 represents no limit. Takes effect next raid.",
                 new AcceptableValueRange<int>(0, 35),
-                new ConfigurationManagerAttributes { Order = 9 }
+                new ConfigurationManagerAttributes { Order = 1 }
             )
         );
-        MaxEmptyAttempts = Config.Bind(
-            "Performance",
-            "Maximum unsuccessful attempts",
-            2,
+    }
+
+    public void DebugSettings()
+    {
+        LootingLogLevels = Config.Bind(
+            "Debug",
+            "Log Levels",
+            DefaultLogLevel,
             new ConfigDescription(
-                "Max number of unsuccessful attempts a bot can try to find loot before taking a break. A value of 0 represents no limit.",
-                new AcceptableValueRange<int>(0, 10),
-                new ConfigurationManagerAttributes { Order = 8 }
-            )
-        );
-        EmptyAttemptsCooldown = Config.Bind(
-            "Performance",
-            "Empty attempts cooldown",
-            180,
-            new ConfigDescription(
-                "How long (in seconds) to wait before trying to find loot when max attempts is reached.",
+                "Enable different levels of log messages to show in the logs",
                 null,
-                new ConfigurationManagerAttributes { Order = 7 }
+                new ConfigurationManagerAttributes { Order = 5, IsAdvanced = true }
+            )
+        );
+        InteropLogLevels = Config.Bind(
+            "Debug",
+            "Interop Log Levels",
+            DefaultLogLevel,
+            new ConfigDescription(
+                "Enable different levels of log messages specific to the mod interop methods",
+                null,
+                new ConfigurationManagerAttributes { Order = 4, IsAdvanced = true }
+            )
+        );
+        ItemAppraiserLogLevels = Config.Bind(
+            "Debug",
+            "Item Appraiser Log Levels",
+            DefaultLogLevel,
+            new ConfigDescription(
+                "Enables logs for the item appraiser that calculates the weapon values",
+                null,
+                new ConfigurationManagerAttributes { Order = 3, IsAdvanced = true }
+            )
+        );
+        FilterLogsOnBot = Config.Bind(
+            "Debug",
+            "Filter logs on bot",
+            0,
+            new ConfigDescription(
+                "Filters new log entries only showing logs for the number of the bot specified. A value of 0 denotes no filter.",
+                null,
+                new ConfigurationManagerAttributes { Order = 2, IsAdvanced = true }
+            )
+        );
+        DebugLootNavigation = Config.Bind(
+            "Debug",
+            "Show navigation points",
+            false,
+            new ConfigDescription(
+                "Renders spheres where bots are trying to navigate when container looting.\n(Red): Container position\n(Green): NavMesh corrected container position\n(Blue): Calculated bot destination (where the bot will move to).",
+                null,
+                new ConfigurationManagerAttributes { Order = 1, IsAdvanced = true }
             )
         );
     }
@@ -511,6 +510,7 @@ public class LootingBots : BaseUnityPlugin
         LootFinderSettings();
         LootSettings();
         PerformanceSettings();
+        DebugSettings();
         Config.SettingChanged += OnSettingsChanged;
 
         LootLog = new Log(Logger, LootingLogLevels);

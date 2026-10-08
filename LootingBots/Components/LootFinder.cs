@@ -24,7 +24,6 @@ public class LootFinder : MonoBehaviour
 
     private float _scanTimer;
     private bool _lockUntilNextScan;
-    private int _emptyAttempts;
 
     // Bot specific config
     private bool _containerLootingEnabled;
@@ -371,14 +370,14 @@ public class LootFinder : MonoBehaviour
                 }
 
                 _lootingBrain.SetLoot(interactableObject, lootType, center, destination, rootItemId, dist);
-                _emptyAttempts = 0;
                 return;
             }
 
             if (_log.DebugEnabled)
             {
-                _log.LogDebug("No viable loot found");
+                _log.LogDebug($"No loot in range, preventing looting for {LootingBots.NoLootCooldown.Value}s");
             }
+            OverrideNextScanTime(Mathf.Max(LootingBots.NoLootCooldown.Value, LootingBots.LootScanInterval.Value));
         }
         catch (OperationCanceledException)
         {
@@ -401,21 +400,6 @@ public class LootFinder : MonoBehaviour
             HashSetPool<InteractableObject>.Release(seen);
             ScanScheduler.Return(queue);
             _lootingBrain.ForceBrainEnabled = false;
-
-            if (
-                !token.IsCancellationRequested
-                && LootingBots.MaxEmptyAttempts.Value > 0
-                && !_lootingBrain.HasActiveLootable
-                && ++_emptyAttempts >= LootingBots.MaxEmptyAttempts.Value
-            )
-            {
-                if (_log.InfoEnabled)
-                {
-                    _log.LogInfo($"Max empty attempts reached, preventing looting for {LootingBots.EmptyAttemptsCooldown.Value}s");
-                }
-                OverrideNextScanTime(LootingBots.EmptyAttemptsCooldown.Value);
-                _emptyAttempts = 0;
-            }
         }
     }
 
