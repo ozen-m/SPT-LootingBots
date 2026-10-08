@@ -254,12 +254,12 @@ public class LootingBrain : MonoBehaviour
                 _log.LogWarning("Timed out while cleaning up inventory");
             }
         }
-        catch (Exception ex)
+        catch (Exception e)
         {
             _lootingSource.ResetTimer();
             if (_log.ErrorEnabled)
             {
-                _log.LogError(ex.ToString());
+                _log.LogError(e.ToString());
             }
         }
         finally
@@ -354,9 +354,13 @@ public class LootingBrain : MonoBehaviour
 
             isSuccessful = await InventoryController.TryAddItemsToBotAsync(_itemsToLoot, true, token);
         }
+        catch (OperationCanceledException)
+        {
+            HandleCancellation();
+        }
         catch (Exception e)
         {
-            ExceptionHandler(e);
+            HandleException(e);
         }
         finally
         {
@@ -414,9 +418,13 @@ public class LootingBrain : MonoBehaviour
                 await BotOwner.InteractAsync(container, EInteractionType.Close, token);
             }
         }
+        catch (OperationCanceledException)
+        {
+            HandleCancellation();
+        }
         catch (Exception e)
         {
-            ExceptionHandler(e);
+            HandleException(e);
         }
         finally
         {
@@ -466,9 +474,13 @@ public class LootingBrain : MonoBehaviour
                 BotOwner.GetPlayer.CurrentManagedState.Pickup(true, _exitPickupStateAction);
             }
         }
+        catch (OperationCanceledException)
+        {
+            HandleCancellation();
+        }
         catch (Exception e)
         {
-            ExceptionHandler(e);
+            HandleException(e);
         }
         finally
         {
@@ -589,26 +601,25 @@ public class LootingBrain : MonoBehaviour
         }
     }
 
-    private void ExceptionHandler(Exception exception)
+    private void HandleCancellation()
     {
-        if (exception is OperationCanceledException)
+        if (_lootingSource.IsTimeout)
         {
-            if (_lootingSource.IsTimeout)
+            if (_log.WarningEnabled)
             {
-                if (_log.WarningEnabled)
-                {
-                    _log.LogWarning($"Looting interrupted due to timeout ({LootingBots.LootTimeout.Value}s)");
-                }
-                return;
-            }
-
-            if (_log.DebugEnabled)
-            {
-                _log.LogDebug("Looting interrupted");
+                _log.LogWarning($"Looting interrupted due to timeout ({LootingBots.LootTimeout.Value}s)");
             }
             return;
         }
 
+        if (_log.DebugEnabled)
+        {
+            _log.LogDebug("Looting interrupted");
+        }
+    }
+
+    private void HandleException(Exception exception)
+    {
         _log.LogError("Exception while trying to loot:");
         _log.LogError(exception.ToString());
     }

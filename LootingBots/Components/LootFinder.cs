@@ -380,17 +380,15 @@ public class LootFinder : MonoBehaviour
                 _log.LogDebug("No viable loot found");
             }
         }
+        catch (OperationCanceledException)
+        {
+            if (_log.DebugEnabled)
+            {
+                _log.LogDebug("Loot scan interrupted");
+            }
+        }
         catch (Exception e)
         {
-            if (e is OperationCanceledException)
-            {
-                if (_log.DebugEnabled)
-                {
-                    _log.LogDebug("Loot scan interrupted");
-                }
-                return;
-            }
-
             if (_log.ErrorEnabled)
             {
                 _log.LogError("Exception while trying to scan for loot:");

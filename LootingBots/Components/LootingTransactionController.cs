@@ -502,7 +502,7 @@ public class LootingTransactionController
             _networkTimeout.ResetTimer();
             return result;
         }
-        catch (OperationCanceledException) when (_networkTimeout.IsTimeout)
+        catch (OperationCanceledException)
         {
             if (operation.Status is EOperationStatus.Succeeded)
             {

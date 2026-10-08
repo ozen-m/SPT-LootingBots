@@ -51,9 +51,9 @@ public class ItemAppraiser(Log _log)
                 }
             }
         }
-        catch (Exception ex)
+        catch (Exception e)
         {
-            _log.LogError(ex.ToString());
+            _log.LogError(e.ToString());
             _log.LogError("Failed to get item prices");
         }
         finally
