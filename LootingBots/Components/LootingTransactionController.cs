@@ -512,7 +512,7 @@ public class LootingTransactionController(BotOwner owner, BotLog _log) : IDispos
     /// </summary>
     public static Task SimulatePlayerDelayAsync(double delay = -1D, CancellationToken token = default)
     {
-        if (delay == -1D)
+        if (delay < 0D)
         {
             delay = LootingBots.TransactionDelay.Value;
         }
