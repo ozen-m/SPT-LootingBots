@@ -15,7 +15,7 @@ using Random = UnityEngine.Random;
 
 namespace LootingBots.Components;
 
-public class LootingInventoryController
+public class LootingInventoryController : IDisposable
 {
     private readonly BotOwner _botOwner;
     private readonly InventoryController _botInventoryController;
@@ -76,7 +76,7 @@ public class LootingInventoryController
         // Initialize bot inventory controller
         _botInventoryController = botOwner.GetPlayer.InventoryController;
         _botOwner = botOwner;
-        _transactionController = new LootingTransactionController(botOwner, _botInventoryController, _log);
+        _transactionController = new LootingTransactionController(botOwner, _log);
         _isPMC = _botOwner.Profile.Info.Settings.Role.IsPMC();
 
         Stats = new BotStats(botOwner.GetPlayer);
@@ -1864,12 +1864,13 @@ public class LootingInventoryController
         _transactionController.SetRootItemOwner(owner);
     }
 
-    public void Unsubscribe()
+    public void Dispose()
     {
         foreach (var action in _unsubActions)
         {
             action();
         }
+        _transactionController.Dispose();
     }
 
     /// <summary>

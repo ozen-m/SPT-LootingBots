@@ -122,7 +122,7 @@ public class LootingBrain : MonoBehaviour
     public void Init(BotOwner botOwner)
     {
         _log = new BotLog(LootingBots.LootLog, botOwner);
-        _lootingSource = gameObject.AddComponent<TimeoutController>();
+        _lootingSource = new TimeoutController();
         _exitPickupStateAction = ExitPickupState;
 
         BotOwner = botOwner;
@@ -140,6 +140,7 @@ public class LootingBrain : MonoBehaviour
         _performanceTimer = Time.time + PerformanceTimerInterval;
         ActiveLootCache.Init();
         ScanScheduler.Init();
+        TimeoutRunner.Init();
 
         if (ActiveBotCache.IsCacheActive)
         {
@@ -316,8 +317,8 @@ public class LootingBrain : MonoBehaviour
 
     public void OnDestroy()
     {
-        Destroy(_lootingSource);
-        InventoryController.Unsubscribe();
+        _lootingSource.Dispose();
+        InventoryController.Dispose();
     }
 
     private readonly Stopwatch _lootTimer = new();

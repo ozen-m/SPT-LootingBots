@@ -5,29 +5,18 @@ using EFT.InventoryLogic;
 using LootingBots.Utilities;
 using LootingBots.Utilities.Extensions;
 using UnityEngine;
-using Object = UnityEngine.Object;
 
 namespace LootingBots.Components;
 
-public class LootingTransactionController
+public class LootingTransactionController(BotOwner owner, BotLog _log) : IDisposable
 {
     private const int NetworkTransactionTimeout = 5;
-    private readonly TimeoutController _networkTimeout;
+    private readonly TimeoutController _networkTimeout = new();
 
-    private readonly InventoryController _inventoryController;
-    private readonly Player _player;
-    private readonly BotLog _log;
+    private readonly Player _player = owner.GetPlayer;
+    private readonly InventoryController _inventoryController = owner.GetPlayer.InventoryController;
 
     private IItemOwner _rootItemOwner;
-
-    public LootingTransactionController(BotOwner owner, InventoryController inventoryController, BotLog log)
-    {
-        _inventoryController = inventoryController;
-        _player = owner.GetPlayer;
-        _log = log;
-        _networkTimeout = _player.gameObject.AddComponent<TimeoutController>();
-        _player.OnIPlayerDeadOrUnspawn += DestroyNetworkTimeoutController;
-    }
 
     /// <summary>
     /// Tries to add extra spare ammo for the weapon being looted into the bot's secure container,
@@ -568,9 +557,8 @@ public class LootingTransactionController
         return false;
     }
 
-    private void DestroyNetworkTimeoutController(IPlayer player)
+    public void Dispose()
     {
-        player.OnIPlayerDeadOrUnspawn -= DestroyNetworkTimeoutController;
-        Object.Destroy(_networkTimeout);
+        _networkTimeout.Dispose();
     }
 }
