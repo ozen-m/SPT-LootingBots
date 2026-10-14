@@ -18,4 +18,13 @@ public static class GameObjectHelper
 
         return sphere;
     }
+
+    public static GameObject[] CreateDebugSpheres()
+    {
+        var debugSpheres = new GameObject[3];
+        debugSpheres[0] = DrawSphere(Vector3.zero, 0.35f, Color.red); // center
+        debugSpheres[1] = DrawSphere(Vector3.zero, 0.35f, Color.green); // pointNearbyContainer
+        debugSpheres[2] = DrawSphere(Vector3.zero, 0.35f, Color.blue); // destination
+        return debugSpheres;
+    }
 }

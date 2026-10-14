@@ -199,7 +199,6 @@ public class LootFinder : MonoBehaviour
             // Use the largest detection radius specified in the settings as the main Sphere radius
             var detectionRadius = Mathf.Max(DetectItemDistance, DetectContainerDistance);
             detectionRadius = Mathf.Max(detectionRadius, DetectCorpseDistance);
-            var botPosition = _botOwner.Position;
 
             // Cast a sphere on the bot, detecting any Interactive world objects that collide with the sphere
             var hits = Physics.OverlapSphereNonAlloc(
@@ -222,7 +221,7 @@ public class LootFinder : MonoBehaviour
             }
 
             // Sort colliders by distance
-            ColliderDistanceComparer.Instance.SetReferencePosition(botPosition);
+            ColliderDistanceComparer.Instance.SetReferencePosition(_botOwner.Position);
             Array.Sort(colliders, 0, hits, ColliderDistanceComparer.Instance);
 
             if (_log.DebugEnabled)
@@ -629,7 +628,7 @@ public class LootFinder : MonoBehaviour
 
         if (LootingBots.DebugLootNavigation.Value)
         {
-            _debugSpheres ??= CreateDebugSpheres();
+            _debugSpheres ??= GameObjectHelper.CreateDebugSpheres();
             _debugSpheres[0].transform.position = center; // red
             _debugSpheres[1].transform.position = pointNearbyContainer; // green
             _debugSpheres[2].transform.position = destination; // blue
@@ -651,15 +650,6 @@ public class LootFinder : MonoBehaviour
     private void OnKilledEnemyPlayer(string victimProfileId, DamageInfo damageInfo)
     {
         EnqueuePriorityCorpse(victimProfileId);
-    }
-
-    private static GameObject[] CreateDebugSpheres()
-    {
-        var debugSpheres = new GameObject[3];
-        debugSpheres[0] = GameObjectHelper.DrawSphere(Vector3.zero, 0.35f, Color.red); // center
-        debugSpheres[1] = GameObjectHelper.DrawSphere(Vector3.zero, 0.35f, Color.green); // pointNearbyContainer
-        debugSpheres[2] = GameObjectHelper.DrawSphere(Vector3.zero, 0.35f, Color.blue); // destination
-        return debugSpheres;
     }
 
     public enum LootType : byte
