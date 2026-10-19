@@ -245,7 +245,11 @@ public class LootingBrain : MonoBehaviour
         var token = _lootingSource.Timeout(LootingBots.LootTimeout.Value);
         try
         {
-            await InventoryController.CleanupInventoryAsync(token);
+            if (LootingEnabled)
+            {
+                await InventoryController.CleanupInventoryAsync(token);
+            }
+
             _lootingSource.ResetTimer();
         }
         catch (OperationCanceledException)
