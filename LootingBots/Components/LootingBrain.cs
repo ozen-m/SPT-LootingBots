@@ -3,6 +3,7 @@ using EFT;
 using EFT.Interactive;
 using EFT.InventoryLogic;
 using LootingBots.Utilities;
+using LootingBots.Utilities.Extensions;
 using UnityEngine;
 
 namespace LootingBots.Components;
@@ -56,7 +57,7 @@ public class LootingBrain : MonoBehaviour
 
     public bool IsBrainEnabled
     {
-        get { return !_isDisabledForPerformance; }
+        get { return LootingEnabled && !_isDisabledForPerformance; }
     }
 
     public BotStats Stats
@@ -121,13 +122,11 @@ public class LootingBrain : MonoBehaviour
     public void Init(BotOwner botOwner)
     {
         _log = new BotLog(LootingBots.LootLog, botOwner);
-        _lootingSource = gameObject.AddComponent<TimeoutController>();
+        _lootingSource = new TimeoutController();
         _exitPickupStateAction = ExitPickupState;
 
         BotOwner = botOwner;
         InventoryController = new LootingInventoryController(BotOwner, this);
-
-        UpdateIsLootingEnabled();
     }
 
     /// <summary>
@@ -141,6 +140,7 @@ public class LootingBrain : MonoBehaviour
         _performanceTimer = Time.time + PerformanceTimerInterval;
         ActiveLootCache.Init();
         ScanScheduler.Init();
+        TimeoutRunner.Init();
 
         if (ActiveBotCache.IsCacheActive)
         {
@@ -154,13 +154,16 @@ public class LootingBrain : MonoBehaviour
                 if (_log.WarningEnabled)
                 {
                     _log.LogWarning(
-                        $"Looting disabled! Enabled bots: {ActiveBotCache.GetSize()}. Distance to player: {Math.Sqrt(DistanceToPlayer):N}. Able to loot: {LootingEnabled}."
+                        $"Looting disabled! Enabled bots: {ActiveBotCache.Count}. Distance to player: {Math.Sqrt(DistanceToPlayer):N}. Able to loot: {LootingEnabled}."
                     );
                 }
 
                 _isDisabledForPerformance = true;
             }
         }
+
+        UpdateIsLootingEnabled();
+        _ = OnSpawnAsync();
     }
 
     /// <summary>
@@ -213,7 +216,7 @@ public class LootingBrain : MonoBehaviour
                 if (_log.WarningEnabled)
                 {
                     _log.LogWarning(
-                        $"Looting disabled! Enabled bots: {ActiveBotCache.GetSize()}. Distance to player: {Math.Sqrt(DistanceToPlayer):N}. Able to loot: {LootingEnabled}."
+                        $"Looting disabled! Enabled bots: {ActiveBotCache.Count}. Distance to player: {Math.Sqrt(DistanceToPlayer):N}. Able to loot: {LootingEnabled}."
                     );
                 }
             }
@@ -234,6 +237,44 @@ public class LootingBrain : MonoBehaviour
     }
 
     /// <summary>
+    /// Clean up the bot's inventory on spawn, then initialize LootingInventoryController.
+    /// </summary>
+    public async Task OnSpawnAsync()
+    {
+        LootTaskRunning = true;
+        var token = _lootingSource.Timeout(LootingBots.LootTimeout.Value);
+        try
+        {
+            if (LootingEnabled)
+            {
+                await InventoryController.CleanupInventoryAsync(token);
+            }
+
+            _lootingSource.ResetTimer();
+        }
+        catch (OperationCanceledException)
+        {
+            if (_log.WarningEnabled)
+            {
+                _log.LogWarning("Timed out while cleaning up inventory");
+            }
+        }
+        catch (Exception e)
+        {
+            _lootingSource.ResetTimer();
+            if (_log.ErrorEnabled)
+            {
+                _log.LogError(e.ToString());
+            }
+        }
+        finally
+        {
+            InventoryController.Init();
+            LootTaskRunning = false;
+        }
+    }
+
+    /// <summary>
     /// Determines the looting action to take depending on the current loot type.
     /// </summary>
     public void StartLooting()
@@ -248,7 +289,7 @@ public class LootingBrain : MonoBehaviour
 
         if (_log.InfoEnabled)
         {
-            _log.LogInfo($"Trying to loot {ActiveLoot.GetLootName()} [{ActiveLootType.ToString()}]. Looted: {Stats.Looted:N0}₽");
+            _log.LogInfo($"Trying to loot {ActiveLoot.GetLootName()} [{ActiveLootType}]. Looted: {Stats.Looted:N0}₽");
         }
 
         switch (ActiveLootType)
@@ -280,11 +321,12 @@ public class LootingBrain : MonoBehaviour
 
     public void OnDestroy()
     {
-        Destroy(_lootingSource);
+        _lootingSource.Dispose();
+        InventoryController.Dispose();
     }
 
     private readonly Stopwatch _lootTimer = new();
-    private readonly List<Item> _itemsToLoot = new(13);
+    private readonly List<Item> _itemsToLoot = [with(13)];
 
     /// <summary>
     /// Handles looting a corpse found on the map.
@@ -304,24 +346,30 @@ public class LootingBrain : MonoBehaviour
                 return;
             }
 
-            // Get items to loot from the corpse in a priority order based off the slots
-            _itemsToLoot.Clear();
-            corpseInventoryEquipment.GetPriorityItems(BotOwner.InventoryController.Inventory.Equipment, _itemsToLoot);
-
-            // Do inventory opened animation
+            // Do inventory opened animation and block steering so the bot doesn't shake violently when it's too close to the corpse
             BotOwner.GetPlayer.SetInventoryOpened(true);
+            BotOwner.Steering._blockSteering = true;
 
             await LootingTransactionController.SimulatePlayerDelayAsync(LootingStartDelay, token);
 
+            // Get items to loot from the corpse in a priority order based off the slots
+            _itemsToLoot.Clear();
+            corpseInventoryEquipment.GetPriorityItems(BotOwner.InventoryController.Inventory.Equipment, _itemsToLoot);
             InventoryController.SetRootItemOwner(corpseInventoryEquipment.Owner);
-            isSuccessful = await InventoryController.TryAddItemsToBotAsync(_itemsToLoot, token);
+
+            isSuccessful = await InventoryController.TryAddItemsToBotAsync(_itemsToLoot, true, token);
+        }
+        catch (OperationCanceledException)
+        {
+            HandleCancellation();
         }
         catch (Exception e)
         {
-            ExceptionHandler(e);
+            HandleException(e);
         }
         finally
         {
+            BotOwner.Steering._blockSteering = false;
             BotOwner.GetPlayer.SetInventoryOpened(false);
             OnLootTaskEnd(isSuccessful);
 
@@ -359,12 +407,14 @@ public class LootingBrain : MonoBehaviour
                 didOpen = true;
             }
 
-            // Do inventory opened animation
+            // Do inventory opened animation and block steering so the bot doesn't shake violently when it's too close to the container
             BotOwner.GetPlayer.SetInventoryOpened(true);
+            BotOwner.Steering._blockSteering = true;
 
             await LootingTransactionController.SimulatePlayerDelayAsync(LootingStartDelay, token);
 
             InventoryController.SetRootItemOwner(item.Owner);
+
             isSuccessful = await InventoryController.LootNestedItemsAsync(item, token);
 
             // Close the container if the settings to close containers is checked or if the container was already opened when the bot tried to loot it
@@ -373,12 +423,17 @@ public class LootingBrain : MonoBehaviour
                 await BotOwner.InteractAsync(container, EInteractionType.Close, token);
             }
         }
+        catch (OperationCanceledException)
+        {
+            HandleCancellation();
+        }
         catch (Exception e)
         {
-            ExceptionHandler(e);
+            HandleException(e);
         }
         finally
         {
+            BotOwner.Steering._blockSteering = false;
             BotOwner.GetPlayer.SetInventoryOpened(false);
             OnLootTaskEnd(isSuccessful);
 
@@ -416,16 +471,21 @@ public class LootingBrain : MonoBehaviour
             _itemsToLoot.Clear();
             _itemsToLoot.Add(item);
             InventoryController.SetRootItemOwner(item.Owner);
-            isSuccessful = await InventoryController.TryAddItemsToBotAsync(_itemsToLoot, token);
+
+            isSuccessful = await InventoryController.TryAddItemsToBotAsync(_itemsToLoot, true, token);
             if (isSuccessful)
             {
                 // Do pick up animation if we successfully looted the item
                 BotOwner.GetPlayer.CurrentManagedState.Pickup(true, _exitPickupStateAction);
             }
         }
+        catch (OperationCanceledException)
+        {
+            HandleCancellation();
+        }
         catch (Exception e)
         {
-            ExceptionHandler(e);
+            HandleException(e);
         }
         finally
         {
@@ -450,7 +510,6 @@ public class LootingBrain : MonoBehaviour
         CleanupLoot(lootingSuccessful);
 
         InventoryController.UpdateActiveWeapon();
-        InventoryController.UpdateGridStats();
         InventoryController.SetRootItemOwner(null);
         BotOwner.AIData.CalcPower();
         LootTaskRunning = false;
@@ -462,11 +521,6 @@ public class LootingBrain : MonoBehaviour
             LootingBots.ContainerLootingEnabled.Value.IsBotEnabled(this)
             || LootingBots.LooseItemLootingEnabled.Value.IsBotEnabled(this)
             || LootingBots.CorpseLootingEnabled.Value.IsBotEnabled(this);
-    }
-
-    public void UpdateGridStats()
-    {
-        InventoryController.UpdateGridStats();
     }
 
     /// <summary>
@@ -552,26 +606,25 @@ public class LootingBrain : MonoBehaviour
         }
     }
 
-    private void ExceptionHandler(Exception exception)
+    private void HandleCancellation()
     {
-        if (exception is OperationCanceledException)
+        if (_lootingSource.IsTimeout)
         {
-            if (_lootingSource.IsTimeout)
+            if (_log.WarningEnabled)
             {
-                if (_log.WarningEnabled)
-                {
-                    _log.LogWarning($"Looting interrupted due to timeout ({LootingBots.LootTimeout.Value}s)");
-                }
-                return;
-            }
-
-            if (_log.DebugEnabled)
-            {
-                _log.LogDebug("Looting interrupted");
+                _log.LogWarning($"Looting interrupted due to timeout ({LootingBots.LootTimeout.Value}s)");
             }
             return;
         }
 
+        if (_log.DebugEnabled)
+        {
+            _log.LogDebug("Looting interrupted");
+        }
+    }
+
+    private void HandleException(Exception exception)
+    {
         _log.LogError("Exception while trying to loot:");
         _log.LogError(exception.ToString());
     }

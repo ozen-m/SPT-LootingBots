@@ -28,14 +28,7 @@ public static class External
                 return true;
             }
 
-            if (!lootingBrain.HasFreeSpace)
-            {
-                if (log.WarningEnabled)
-                {
-                    log.LogWarning("Forcing a loot scan despite the bot not having enough free space");
-                }
-            }
-            else if (log.DebugEnabled)
+            if (log.DebugEnabled)
             {
                 log.LogDebug("Forcing a loot scan");
             }
@@ -116,7 +109,7 @@ public static class External
     /// </summary>
     public static float GetItemPrice(Item item)
     {
-        return LootingBots.ItemAppraiser != null ? LootingBots.ItemAppraiser.GetItemPrice(item, null) : 0;
+        return LootingBots.ItemAppraiser is not null ? LootingBots.ItemAppraiser.GetItemPrice(item, null) : 0;
     }
 
     private static bool GetAllComponents(BotOwner bot, out LootingBrain lootingBrain, out LootFinder lootFinder)

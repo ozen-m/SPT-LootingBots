@@ -5,13 +5,15 @@ using HarmonyLib;
 using UnityEngine;
 using Grid = EFT.InventoryLogic.Grid;
 
-namespace LootingBots.Utilities;
+namespace LootingBots.Utilities.Extensions;
 
 public static class LootUtils
 {
     public const int RESERVED_SLOT_COUNT = 2;
+    public const float VEST_GRID_CELL_MIN_RATIO = 4f / 3f;
     public static readonly int LowPolyMask = LayerMask.GetMask("LowPolyCollider");
     public static readonly int LootMask = LayerMask.GetMask("Interactive", "Loot", "Deadbody");
+    public static readonly int LootItemMask = LayerMask.GetMask("Loot");
     public static readonly AccessTools.FieldRef<Player, Corpse> PlayerCorpseField = AccessTools.FieldRefAccess<Player, Corpse>("Corpse");
 
     public static readonly EquipmentSlot[] WeaponSlots =
@@ -27,11 +29,11 @@ public static class LootUtils
         EquipmentSlot.TacticalVest,
         EquipmentSlot.ArmorVest,
         EquipmentSlot.Pockets,
+        EquipmentSlot.ArmBand, // Pack 'n' Strap
     ];
 
     public static readonly EquipmentSlot[] OtherSlots =
     [
-        EquipmentSlot.ArmBand,
         EquipmentSlot.Headwear,
         EquipmentSlot.Earpiece,
         EquipmentSlot.Dogtag,
@@ -39,6 +41,8 @@ public static class LootUtils
         EquipmentSlot.FaceCover,
         EquipmentSlot.Eyewear,
     ];
+
+    public static readonly EquipmentSlot[] AllSlots = [.. WeaponSlots, .. StorageSlots, .. OtherSlots];
 
     /// <summary>
     /// Calculate the size of a container
@@ -62,17 +66,6 @@ public static class LootUtils
     }
 
     /// <summary>
-    /// Checks if a key is a Single Use Item like the "Unknown Key"
-    /// </summary>
-    /// <param name="item">The item to check</param>
-    /// <returns>returns true if it's single use, false otherwise</returns>
-    public static bool IsSingleUseKey(this Item item)
-    {
-        var key = item.GetItemComponent<KeyComponent>();
-        return key != null && key.Template.MaximumNumberOfUsage == 1;
-    }
-
-    /// <summary>
     /// Triggers a container to open/close.
     /// </summary>
     public static ValueTask<bool> InteractAsync(
@@ -87,7 +80,7 @@ public static class LootUtils
         if (worldInteractiveObject == null)
         {
             source.SetException(
-                new ArgumentNullException($"[{botOwner.Name()}] Interacting [{action.ToString()}] with WorldInteractiveObject but is NULL")
+                new ArgumentNullException($"[{botOwner.Name()}] Interacting [{action}] with WorldInteractiveObject but is NULL")
             );
         }
         else
@@ -101,10 +94,11 @@ public static class LootUtils
     }
 
     /// <summary>
-    /// Calculates the amount of total and available grid slots in a container
+    /// Calculates the amount of total and available grid slots in a container.
+    /// Available grid slots is computed with the total grid slots less the amount of space taken up by all the items in a grid.
     /// </summary>
     /// <returns>(Total Size Grid Slots, Available Grid Slots)</returns>
-    public static (int total, int available) GetTotalAndAvailableGridSlots(Grid[] grids)
+    public static (int total, int available) GetTotalAndAvailableGridSlots(this Grid[] grids)
     {
         if (grids is null)
         {
@@ -118,28 +112,43 @@ public static class LootUtils
         foreach (var grid in grids)
         {
             gridSize += grid.GridHeight * grid.GridWidth;
-            containedSize += grid.GetSizeOfContainedItems();
+
+            foreach (var item in grid.ItemCollection.ItemsList)
+            {
+                containedSize += item.GetItemSize();
+
+                if (item is SearchableItem nestedContainer)
+                {
+                    var (nestedTotal, nestedAvailable) = nestedContainer.Grids.GetTotalAndAvailableGridSlots();
+                    gridSize += nestedTotal;
+                    containedSize += nestedTotal - nestedAvailable; // Compute containedSize from nested containers
+                }
+            }
         }
 
         return (gridSize, gridSize - containedSize);
     }
 
     /// <summary>
-    /// returns the amount of space taken up by all the items in a given grid slot
+    /// Calculates the amount of total and available grid slots in a container.
     /// </summary>
-    /// <param name="grid">The grid to calculate the amount of space taken up for</param>
-    /// <returns>Returns the item size as an integer</returns>
-    public static int GetSizeOfContainedItems(this Grid grid)
+    /// <returns>(Total Size Grid Slots, Available Grid Slots)</returns>
+    public static int GetTotalGridSlots(this Grid[] grids)
     {
-        var containedItemSize = 0;
-
-        // Loop through each item in grid.Items (same as grid.ItemCollection.ItemsList) and accumulate the item size
-        foreach (var item in grid.ItemCollection.ItemsList)
+        if (grids is null)
         {
-            containedItemSize += item.GetItemSize();
+            return 0;
         }
 
-        return containedItemSize;
+        var gridSize = 0;
+
+        // Loop through each grid and calculate the total and contained spaces
+        foreach (var grid in grids)
+        {
+            gridSize += grid.GridHeight * grid.GridWidth;
+        }
+
+        return gridSize;
     }
 
     /// <summary>
@@ -164,34 +173,14 @@ public static class LootUtils
             return null;
         }
 
-        // Use the item's template id to search for the same item in the inventory
-        foreach (var foundItem in controller.Inventory.GetAllItemByTemplate(item.TemplateId))
-        {
-            if (foundItem is null)
-            {
-                continue;
-            }
-
-            var rootItem = foundItem.GetRootItem();
-
-            // Do not try to merge with cartridges or weapon chambers
-            if (foundItem.Parent.Container is StackSlot or Slot)
-            {
-                continue;
-            }
-
-            if (rootItem.Parent.Container.ID.Equals("securedcontainer", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            if (item.StackObjectsCount + foundItem.StackObjectsCount <= foundItem.StackMaxSize)
-            {
-                return foundItem;
-            }
-        }
-
-        return null;
+        // Use the item's template id to search for the same item in the inventory.
+        // Do not try to merge with cartridges or weapon chambers, so get only grid items.
+        // And do not include items from the secured container.
+        return controller.GetFirstGridItemInStorageSlotsNonAlloc(
+            static (gridItem, item) =>
+                item.TemplateId == gridItem.TemplateId && item.StackObjectsCount + gridItem.StackObjectsCount <= gridItem.StackMaxSize,
+            item
+        );
     }
 
     /// <summary>
@@ -207,8 +196,8 @@ public static class LootUtils
     {
         // Add slots in priority order
         if (
-            botEquipment.GetSlot(EquipmentSlot.Backpack).ContainedItem != null
-            || botEquipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem != null
+            botEquipment.GetSlot(EquipmentSlot.Backpack).ContainedItem is not null
+            || botEquipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem is not null
         )
         {
             GetItemInSlotsToLootNonAlloc(corpseEquipment, preallocatedList, WeaponSlots);
@@ -235,9 +224,8 @@ public static class LootUtils
             }
 
             // Check if item is unlootable
-            var unlootableComponent = item.GetItemComponent<UnlootableComponent>();
             if (
-                unlootableComponent != null
+                item.TryGetItemComponent(out UnlootableComponent unlootableComponent)
                 && unlootableComponent.IsUnlootableFrom(item.Parent.Container)
                 && item is not Pockets // Include pockets to loot list
             )
@@ -256,8 +244,8 @@ public static class LootUtils
     {
         return interactableObject switch
         {
-            LootableContainer container => container.ItemOwner?.RootItem,
-            LootItem lootItem => lootItem.ItemOwner?.RootItem,
+            LootableContainer container => container.ItemOwner.RootItem,
+            LootItem lootItem => lootItem.Item,
             _ => null,
         };
     }
@@ -277,9 +265,9 @@ public static class LootUtils
     {
         return interactableObject switch
         {
-            LootableContainer container => container.ItemOwner?.RootItem.Name.Localized(),
+            LootableContainer container => container.ItemOwner?.RootItem.LocalizedName(),
             Corpse corpse => corpse.name,
-            LootItem lootItem => lootItem.ItemOwner?.RootItem.Name.Localized(),
+            LootItem lootItem => lootItem.ItemOwner?.RootItem.LocalizedName(),
             _ => "-",
         };
     }
@@ -319,52 +307,5 @@ public static class LootUtils
         }
 
         return false;
-    }
-
-    public static Item GetFirstItem(this IEnumerable<Item> items)
-    {
-        switch (items)
-        {
-            case null:
-                return null;
-            case List<Item> list:
-                return list.Count > 0 ? list[0] : null;
-            default:
-            {
-                using var enumerator = items.GetEnumerator();
-                return enumerator.MoveNext() ? enumerator.Current : null;
-            }
-        }
-    }
-
-    /// <summary>
-    /// Gets all contained items (grid) of an item and its children
-    /// </summary>
-    /// <remarks>Does not get items in its Slots</remarks>
-    public static void GetAllContainedItems(this Item item, List<Item> preAllocatedList)
-    {
-        if (item is not CompoundItem compoundItem)
-        {
-            return;
-        }
-
-        foreach (var grid in compoundItem.Grids)
-        {
-            foreach (var containedItem in grid.ItemCollection.ItemsList)
-            {
-                preAllocatedList.Add(containedItem);
-                containedItem.GetAllContainedItems(preAllocatedList);
-            }
-        }
-    }
-
-    public static void GetAcceptableItemsInStorageSlotsNonAlloc<TItem>(
-        this InventoryController inventoryController,
-        IList<TItem> preAllocatedList,
-        Predicate<TItem> predicate = null
-    )
-        where TItem : Item
-    {
-        inventoryController.GetAcceptableItemsNonAlloc(StorageSlots, preAllocatedList, predicate);
     }
 }

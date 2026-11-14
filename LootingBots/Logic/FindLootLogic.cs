@@ -31,12 +31,6 @@ internal class FindLootLogic : CustomLogic
             return;
         }
 
-        // Do not scan if we don't have free space for loot, unless the bot is forced
-        if (!_lootingBrain.HasFreeSpace && !_lootingBrain.ForceBrainEnabled)
-        {
-            return;
-        }
-
         // Trigger a scan if one is not running already
         if (ScanScheduler.CanStartScan(out var ticket))
         {
@@ -49,11 +43,6 @@ internal class FindLootLogic : CustomLogic
 
             _lootFinder.BeginSearch(ticket);
         }
-    }
-
-    public override void Start()
-    {
-        _lootingBrain.UpdateGridStats();
     }
 
     public override void Stop()

@@ -2,6 +2,7 @@ using DrakiaXYZ.BigBrain.Brains;
 using EFT;
 using LootingBots.Components;
 using LootingBots.Utilities;
+using LootingBots.Utilities.Extensions;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -31,7 +32,7 @@ internal class LootingLogic : CustomLogic
 
         if (botOwner.Profile.Nickname != _lootingBrain.BotOwner.Profile.Nickname)
         {
-            _log.LogError(botOwner.Profile.Nickname + " is using the LootingBrain for " + _lootingBrain.BotOwner.Profile.Nickname);
+            _log.LogError($"{botOwner.Profile.Nickname} is using the LootingBrain for {_lootingBrain.BotOwner.Profile.Nickname}");
         }
     }
 
@@ -62,6 +63,11 @@ internal class LootingLogic : CustomLogic
         // If the bot is interacting with a door, let it complete first
         if (BotOwner.DoorOpener.Interacting || BotOwner.Mover.CurrentState == EBotMoverState.NearDoor)
         {
+            // Stop sprinting so we don't drain the bot's stamina while opening a door
+            if (BotOwner.Mover.Sprinting)
+            {
+                BotOwner.Sprint(false);
+            }
             return;
         }
 
@@ -90,9 +96,9 @@ internal class LootingLogic : CustomLogic
         // Check if the bot is close enough to the destination to commence looting
         if (IsCloseEnough())
         {
-            // Crouch and look to item
-            BotOwner.SetPose(0f);
+            // Look to item and crouch
             BotOwner.Steering.LookToPoint(_lootingBrain.LootObjectPosition, 180f);
+            BotOwner.SetPose(0f);
             if (BotOwner.GetPlayer.MovementContext._isInPatrol)
             {
                 // SAIN sets bot in a patrol state if it has no enemy, or is not sprinting
@@ -117,7 +123,14 @@ internal class LootingLogic : CustomLogic
         BotOwner.Steering.LookToMovingDirection();
 
         // If the bot is closer than 5m (sqr 25f) from the loot, they should slow down to prevent power-sliding, otherwise sprint
-        var canSprint = _lootingBrain.DistanceToLoot > 25f;
+        // Stop sprinting if stamina is below 10%, or start sprinting if stamina has more than 80%
+        var canSprint =
+            _lootingBrain.DistanceToLoot > 25f
+            && BotOwner.GetPlayer.Physical.CanSprint
+            && (
+                (BotOwner.Mover.Sprinting && BotOwner.GetPlayer.Physical.Stamina.NormalValue >= 0.10f)
+                || (!BotOwner.Mover.Sprinting && BotOwner.GetPlayer.Physical.Stamina.NormalValue > 0.80f)
+            );
         BotOwner.Sprint(canSprint);
     }
 
@@ -175,7 +188,7 @@ internal class LootingLogic : CustomLogic
                 _log.LogDebug($"[Attempt: {_navigationAttempts}] Navigating to {_lootingBrain.ActiveLoot.GetLootName()}");
             }
 
-            var pathStatus = BotOwner.GoToPoint(_destination, true, -1f, false, false);
+            var pathStatus = BotOwner.GoToPoint(_destination, true, 0.5f, false, false);
             if (pathStatus == NavMeshPathStatus.PathInvalid)
             {
                 if (_log.WarningEnabled)
@@ -208,8 +221,8 @@ internal class LootingLogic : CustomLogic
         vector.y = 0f;
         var sqrDistance = vector.sqrMagnitude;
 
-        // Within a radius of 0.92 (sqr 0.85), and ±0.5 vertically
-        var isCloseEnough = sqrDistance < 0.85f && Math.Abs(y) < 0.5f;
+        // Within a radius of 1 meter, and ±0.5 vertically
+        var isCloseEnough = sqrDistance < 1f && Math.Abs(y) < 0.5f;
 
         // Check to see if the bot is stuck every 2 seconds.
         if (_stuckTimer < Time.time && !IsBotStuck(sqrDistance))

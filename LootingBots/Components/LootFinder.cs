@@ -6,8 +6,11 @@ using EFT.Interactive;
 using EFT.InventoryLogic;
 using LootingBots.Patches;
 using LootingBots.Utilities;
+using LootingBots.Utilities.Comparers;
+using LootingBots.Utilities.Extensions;
 using UnityEngine;
 using UnityEngine.AI;
+using UnityEngine.Pool;
 
 namespace LootingBots.Components;
 
@@ -21,7 +24,6 @@ public class LootFinder : MonoBehaviour
 
     private float _scanTimer;
     private bool _lockUntilNextScan;
-    private int _emptyAttempts;
 
     // Bot specific config
     private bool _containerLootingEnabled;
@@ -170,7 +172,7 @@ public class LootFinder : MonoBehaviour
         OnAirdropLandedPatch.OnAirdropLanded -= OnAirdropLanded;
         _botOwner.BotPersonalStats.OnKillTarget -= OnKilledEnemyPlayer;
 
-        if (_debugSpheres != null)
+        if (_debugSpheres is not null)
         {
             foreach (var sphere in _debugSpheres)
             {
@@ -181,8 +183,8 @@ public class LootFinder : MonoBehaviour
 
     private async Task FindLootAsync(int queue, CancellationToken token)
     {
-        var colliders = _colliderPool.Rent(3000);
-
+        var colliders = _colliderPool.Rent(3072);
+        var seen = HashSetPool<InteractableObject>.Get();
         try
         {
             if (_botOwner == null)
@@ -197,7 +199,6 @@ public class LootFinder : MonoBehaviour
             // Use the largest detection radius specified in the settings as the main Sphere radius
             var detectionRadius = Mathf.Max(DetectItemDistance, DetectContainerDistance);
             detectionRadius = Mathf.Max(detectionRadius, DetectCorpseDistance);
-            var botPosition = _botOwner.Position;
 
             // Cast a sphere on the bot, detecting any Interactive world objects that collide with the sphere
             var hits = Physics.OverlapSphereNonAlloc(
@@ -220,7 +221,7 @@ public class LootFinder : MonoBehaviour
             }
 
             // Sort colliders by distance
-            ColliderDistanceComparer.Instance.SetReferencePosition(botPosition);
+            ColliderDistanceComparer.Instance.SetReferencePosition(_botOwner.Position);
             Array.Sort(colliders, 0, hits, ColliderDistanceComparer.Instance);
 
             if (_log.DebugEnabled)
@@ -232,7 +233,6 @@ public class LootFinder : MonoBehaviour
 
             const int maxRangeCalculations = 3;
             var rangeCalculations = 0;
-            var availableGridSpaces = _lootingBrain.Stats.AvailableGridSpaces;
 
             // Process sorted colliders
             for (var i = 0; i < hits; i++)
@@ -246,13 +246,17 @@ public class LootFinder : MonoBehaviour
 
                 // Get InteractableObject once and check derived type
                 var interactableObject = collider.gameObject.GetComponentInParent<InteractableObject>();
+                if (interactableObject == null || !seen.Add(interactableObject))
+                {
+                    await Task.Yield();
+
+                    continue;
+                }
+
                 if (_corpseLootingEnabled && interactableObject is Corpse corpse)
                 {
-                    var player = collider.gameObject.GetComponentInParent<Player>();
-                    if (
-                        player != null // Corpse is a bot corpse and not a static "Dead scav"
-                        && corpse.ItemOwner?.RootItem is InventoryEquipment equipment
-                    )
+                    var player = collider.gameObject.GetComponentInParent<Player>(); // Corpse is a bot corpse and not a static "Dead scav"
+                    if (player != null && corpse.Item is InventoryEquipment equipment)
                     {
                         rootItem = equipment;
                         lootType = LootType.Corpse;
@@ -260,27 +264,16 @@ public class LootFinder : MonoBehaviour
                 }
                 else if (_containerLootingEnabled && interactableObject is LootableContainer container)
                 {
-                    rootItem = container.ItemOwner?.RootItem;
-                    if (
-                        container.isActiveAndEnabled // Container is marked as active and enabled
-                        && container.DoorState is not EDoorState.Locked // Container is not locked
-                    )
+                    rootItem = container.ItemOwner.RootItem;
+                    if (container.isActiveAndEnabled && container.DoorState is not EDoorState.Locked)
                     {
                         lootType = LootType.Container;
                     }
                 }
                 else if (_itemLootingEnabled && interactableObject is LootItem lootItem && lootItem is not Corpse)
                 {
-                    rootItem = lootItem.ItemOwner?.RootItem;
-                    if (
-                        rootItem is not null
-                        && !rootItem.QuestItem // Item is not a quest item
-                        && (
-                            rootItem is SearchableItem // If the item is something that can be searched, consider it lootable
-                            || (_lootingBrain.InventoryController.IsBetterArmorThanEquipped(rootItem))
-                            || (_lootingBrain.IsValuableEnough(rootItem) && availableGridSpaces > rootItem.GetItemSize())
-                        )
-                    )
+                    rootItem = lootItem.Item;
+                    if (rootItem is not null && !rootItem.QuestItem)
                     {
                         lootType = LootType.Item;
                     }
@@ -302,10 +295,20 @@ public class LootFinder : MonoBehaviour
                     continue;
                 }
 
-                var bounds = collider.bounds;
-                var center = bounds.center;
-                center.y -= bounds.extents.y + 0.4f;
-                var destination = GetDestination(center);
+                // Push the center point down by .4f to help container positions of jackets snap to a valid NavMesh.
+                var center = interactableObject.TrackableTransform.position;
+                center.y -= 0.4f;
+
+                // Check if we can navigate to the interactable object
+                if (!GetDestination(center, out var destination))
+                {
+                    // Ignore this loot since it's non-navigable
+                    _lootingBrain.IgnoreLoot(rootItemId);
+
+                    await Task.Yield();
+
+                    continue;
+                }
 
                 // Check if we can perform distance and LOS checks
                 if (_botOwner.Mover is null)
@@ -327,6 +330,14 @@ public class LootFinder : MonoBehaviour
                     return;
                 }
 
+                // Check if loot is in sight
+                if (!IsLootInSight(lootType, destination))
+                {
+                    await Task.Yield();
+
+                    continue;
+                }
+
                 // Check if loot is in range
                 if (!IsLootInRange(lootType, destination, out var dist))
                 {
@@ -345,14 +356,6 @@ public class LootFinder : MonoBehaviour
                     continue;
                 }
 
-                // Check if loot is in sight
-                if (!IsLootInSight(lootType, destination))
-                {
-                    await Task.Yield();
-
-                    continue;
-                }
-
                 // Cache the loot and set active target
                 if (!ActiveLootCache.CacheActiveLootId(rootItemId, _botOwner))
                 {
@@ -365,22 +368,25 @@ public class LootFinder : MonoBehaviour
                     continue;
                 }
 
-                _lootingBrain.SetLoot(interactableObject, lootType, interactableObject.transform.position, destination, rootItemId, dist);
-                _emptyAttempts = 0;
+                _lootingBrain.SetLoot(interactableObject, lootType, center, destination, rootItemId, dist);
                 return;
+            }
+
+            if (_log.DebugEnabled)
+            {
+                _log.LogDebug($"No loot in range, preventing looting for {LootingBots.NoLootCooldown.Value}s");
+            }
+            OverrideNextScanTime(Mathf.Max(LootingBots.NoLootCooldown.Value, LootingBots.LootScanInterval.Value));
+        }
+        catch (OperationCanceledException)
+        {
+            if (_log.DebugEnabled)
+            {
+                _log.LogDebug("Loot scan interrupted");
             }
         }
         catch (Exception e)
         {
-            if (e is OperationCanceledException)
-            {
-                if (_log.DebugEnabled)
-                {
-                    _log.LogDebug("Loot scan interrupted");
-                }
-                return;
-            }
-
             if (_log.ErrorEnabled)
             {
                 _log.LogError("Exception while trying to scan for loot:");
@@ -389,22 +395,8 @@ public class LootFinder : MonoBehaviour
         }
         finally
         {
-            if (
-                LootingBots.MaxEmptyAttempts.Value > 0
-                && !_lootingBrain.HasActiveLootable
-                && ++_emptyAttempts >= LootingBots.MaxEmptyAttempts.Value
-            )
-            {
-                // Note: Cancellations count towards emptyAttempts
-                if (_log.InfoEnabled)
-                {
-                    _log.LogInfo($"Max empty attempts reached, preventing looting for {LootingBots.EmptyAttemptsCooldown.Value}s");
-                }
-                OverrideNextScanTime(LootingBots.EmptyAttemptsCooldown.Value);
-                _emptyAttempts = 0;
-            }
-
             _colliderPool.Return(colliders, true);
+            HashSetPool<InteractableObject>.Release(seen);
             ScanScheduler.Return(queue);
             _lootingBrain.ForceBrainEnabled = false;
         }
@@ -419,7 +411,14 @@ public class LootFinder : MonoBehaviour
                 var lootableContainer = _priorityLootableContainers.Dequeue();
 
                 var position = lootableContainer.TrackableTransform.position;
-                var destination = GetDestination(position);
+                if (!GetDestination(position, out var destination))
+                {
+                    if (_log.DebugEnabled)
+                    {
+                        _log.LogDebug($"Could not get destination for container [{lootableContainer.GetLootName()}]");
+                    }
+                    continue;
+                }
 
                 if (!IsLootInRange(LootType.Container, destination, out var dist))
                 {
@@ -498,7 +497,14 @@ public class LootFinder : MonoBehaviour
                 }
 
                 var position = corpse.TrackableTransform.position;
-                var destination = GetDestination(position);
+                if (!GetDestination(position, out var destination))
+                {
+                    if (_log.DebugEnabled)
+                    {
+                        _log.LogDebug($"Could not get destination for corpse [{corpse.GetLootName()}]");
+                    }
+                    continue;
+                }
 
                 // Check if loot is in range
                 // No need to check LOS since technically it's their kill
@@ -593,37 +599,42 @@ public class LootFinder : MonoBehaviour
         return !sightBlocked;
     }
 
-    private Vector3 GetDestination(Vector3 center)
+    private bool GetDestination(Vector3 center, out Vector3 destination)
     {
         // Try to snap the desired destination point to the nearest NavMesh to ensure the bot can draw a navigable path to the point
-        var pointNearbyContainer = NavMesh.SamplePosition(center, out var navMeshAlignedPoint, 1f, NavMesh.AllAreas)
-            ? navMeshAlignedPoint.position
-            : Vector3.zero;
+        if (!NavMesh.SamplePosition(center, out var navMeshAlignedPoint, 1.5f, NavMesh.AllAreas))
+        {
+            destination = Vector3.zero;
+            return false;
+        }
 
-        // Since SamplePosition always snaps to the closest point on the NavMesh, sometimes this point is a little too close to the loot and causes the bot to shake violently while looting.
-        // Add a small amount of padding by pushing the point away from the nearbyPoint
-        var padding = center - pointNearbyContainer;
-        padding.y = 0;
-        padding.Normalize();
+        // Since SamplePosition always snaps to the closest point on the NavMesh,
+        // sometimes this point is a little too close to the loot and causes the bot to shake violently while looting.
+        // So add a small amount of padding by pushing the point away from the nearbyPoint.
+        var pointNearbyContainer = navMeshAlignedPoint.position;
+        var direction = center - pointNearbyContainer;
+        direction.y = 0;
+        if (direction.sqrMagnitude < 0.001f)
+        {
+            // pointNearbyContainer didn't move horizontally so we can't add padding, fallback to the bot's position
+            direction = center - _botOwner.Position;
+            direction.y = 0;
+        }
 
-        // Make sure the point is still snapped to the NavMesh after its been pushed
-        var destination = NavMesh.SamplePosition(center - (padding * 1.5f), out navMeshAlignedPoint, 1f, navMeshAlignedPoint.mask)
+        // Make sure the point is still snapped to the NavMesh after it's been pushed
+        destination = NavMesh.SamplePosition(center - (direction.normalized * 1f), out navMeshAlignedPoint, 1.5f, navMeshAlignedPoint.mask)
             ? navMeshAlignedPoint.position
             : pointNearbyContainer;
 
         if (LootingBots.DebugLootNavigation.Value)
         {
-            if (_debugSpheres is null)
-            {
-                InitializeDebugSpheres();
-            }
-
-            _debugSpheres[0].transform.position = center;
-            _debugSpheres[1].transform.position = pointNearbyContainer;
-            _debugSpheres[2].transform.position = destination;
+            _debugSpheres ??= GameObjectHelper.CreateDebugSpheres();
+            _debugSpheres[0].transform.position = center; // red
+            _debugSpheres[1].transform.position = pointNearbyContainer; // green
+            _debugSpheres[2].transform.position = destination; // blue
         }
 
-        return destination;
+        return true;
     }
 
     private void OnAirdropLanded(LootableContainer airdrop)
@@ -639,14 +650,6 @@ public class LootFinder : MonoBehaviour
     private void OnKilledEnemyPlayer(string victimProfileId, DamageInfo damageInfo)
     {
         EnqueuePriorityCorpse(victimProfileId);
-    }
-
-    private void InitializeDebugSpheres()
-    {
-        _debugSpheres = new GameObject[3];
-        _debugSpheres[0] = GameObjectHelper.DrawSphere(Vector3.zero, 0.5f, Color.red);
-        _debugSpheres[1] = GameObjectHelper.DrawSphere(Vector3.zero, 0.5f, Color.green);
-        _debugSpheres[2] = GameObjectHelper.DrawSphere(Vector3.zero, 0.5f, Color.blue);
     }
 
     public enum LootType : byte

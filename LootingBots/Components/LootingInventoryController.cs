@@ -1,96 +1,21 @@
-using System.Text;
+using System.Buffers;
 using Comfort.Common;
+using Diz.LanguageExtensions;
 using EFT;
+using EFT.Interactive;
 using EFT.InventoryLogic;
 using LootingBots.Actions;
 using LootingBots.Utilities;
+using LootingBots.Utilities.Comparers;
+using LootingBots.Utilities.Extensions;
 using UnityEngine;
 using UnityEngine.Pool;
 using EquipmentType = LootingBots.Utilities.EquipmentType;
+using Random = UnityEngine.Random;
 
 namespace LootingBots.Components;
 
-public class GearValue
-{
-    public readonly ValuePair Primary = new(string.Empty, 0f);
-    public readonly ValuePair Secondary = new(string.Empty, 0f);
-    public readonly ValuePair Holster = new(string.Empty, 0f);
-}
-
-public class ValuePair(string id, float value)
-{
-    public string Id = id;
-    public float Value = value;
-
-    public void UpdatePair(string id, float value)
-    {
-        Id = id;
-        Value = value;
-    }
-
-    public static void SwapPair(ValuePair pair1, ValuePair pair2)
-    {
-        (pair1.Id, pair2.Id) = (pair2.Id, pair1.Id);
-        (pair1.Value, pair2.Value) = (pair2.Value, pair1.Value);
-    }
-}
-
-public class BotStats
-{
-    public readonly GearValue WeaponValues = new();
-
-    public float NetWorth;
-    public float InitialNetWorth;
-    public int AvailableGridSpaces;
-    public int TotalGridSpaces;
-
-    public float Looted
-    {
-        get { return NetWorth - InitialNetWorth; }
-    }
-
-    public float PrimaryValue
-    {
-        get { return WeaponValues.Primary.Value; }
-    }
-
-    public float SecondaryValue
-    {
-        get { return WeaponValues.Secondary.Value; }
-    }
-
-    public float HolsterValue
-    {
-        get { return WeaponValues.Holster.Value; }
-    }
-
-    public void AddNetValue(float itemPrice)
-    {
-        NetWorth += itemPrice;
-    }
-
-    public void SubtractNetValue(float itemPrice)
-    {
-        NetWorth -= itemPrice;
-    }
-
-    public void StatsDebugPanel(StringBuilder debugPanel)
-    {
-        var freeSpaceColor =
-            AvailableGridSpaces <= 2 ? Color.red
-            : AvailableGridSpaces < TotalGridSpaces / 2 ? Color.yellow
-            : Color.green;
-
-        debugPanel.AppendLabeledValue("Total Looted Value", $" {Looted:n0}₽", Color.white, Color.white);
-        debugPanel.AppendLabeledValue("Total Net Worth", $" {NetWorth:n0}₽", Color.white, Color.white);
-        debugPanel.AppendLabeledValue("Available Space", $" {AvailableGridSpaces} slots", Color.white, freeSpaceColor);
-        debugPanel.AppendLabeledValue("Primary Value", $" {WeaponValues.Primary.Value:n0}₽", Color.white, Color.white);
-        debugPanel.AppendLabeledValue("Secondary Value", $" {WeaponValues.Secondary.Value:n0}₽", Color.white, Color.white);
-        debugPanel.AppendLabeledValue("Holster Value", $" {WeaponValues.Holster.Value:n0}₽", Color.white, Color.white);
-    }
-}
-
-public class LootingInventoryController
+public class LootingInventoryController : IDisposable
 {
     private readonly BotOwner _botOwner;
     private readonly InventoryController _botInventoryController;
@@ -100,11 +25,11 @@ public class LootingInventoryController
     private readonly ItemAppraiser _itemAppraiser;
     private readonly bool _isPMC;
 
-    public readonly BotStats Stats = new();
+    public readonly BotStats Stats;
 
     private readonly Action _updateActiveWeaponAction;
     private readonly Callback<IHandsController> _onWeaponTakenCallback;
-    private readonly List<Item> _itemsScratch = [];
+    private readonly List<Action> _unsubActions = [];
 
     // Represents the value in roubles of the current item
     public float CurrentItemPrice;
@@ -151,12 +76,22 @@ public class LootingInventoryController
         // Initialize bot inventory controller
         _botInventoryController = botOwner.GetPlayer.InventoryController;
         _botOwner = botOwner;
-        _transactionController = new LootingTransactionController(botOwner, _botInventoryController, _log);
+        _transactionController = new LootingTransactionController(botOwner, _log);
         _isPMC = _botOwner.Profile.Info.Settings.Role.IsPMC();
 
+        Stats = new BotStats(botOwner.GetPlayer);
+    }
+
+    public void Init()
+    {
         CalculateGearValue();
         CalculateInitialNetWorth();
+        SubscribeToGearSlots();
         UpdateGridStats();
+        if (LootingBots.UseWeightRestriction.Value)
+        {
+            SubscribeToWeightChange();
+        }
     }
 
     /// <summary>
@@ -169,55 +104,56 @@ public class LootingInventoryController
             _log.LogDebug("Calculating gear value...");
         }
 
-        var primary = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.FirstPrimaryWeapon).ContainedItem;
-        var secondary = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.SecondPrimaryWeapon).ContainedItem;
-        var holster = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Holster).ContainedItem;
+        var equipment = _botInventoryController.Inventory.Equipment;
+        var primary = equipment.GetSlot(EquipmentSlot.FirstPrimaryWeapon).ContainedItem;
+        var secondary = equipment.GetSlot(EquipmentSlot.SecondPrimaryWeapon).ContainedItem;
+        var holster = equipment.GetSlot(EquipmentSlot.Holster).ContainedItem;
 
-        if (primary != null)
+        if (primary is not null)
         {
-            if (Stats.WeaponValues.Primary.Id != primary.Id)
+            if (Stats.Gear.Primary.Id != primary.Id)
             {
                 var value = _itemAppraiser.GetItemPrice(primary, _log);
-                Stats.WeaponValues.Primary.UpdatePair(primary.Id, value);
+                Stats.Gear.Primary.UpdatePair(primary.Id, value);
             }
         }
         else
         {
-            if (!string.IsNullOrEmpty(Stats.WeaponValues.Primary.Id))
+            if (!string.IsNullOrEmpty(Stats.Gear.Primary.Id))
             {
-                Stats.WeaponValues.Primary.UpdatePair(string.Empty, 0f);
+                Stats.Gear.Primary.UpdatePair(string.Empty, 0f);
             }
         }
 
-        if (secondary != null)
+        if (secondary is not null)
         {
-            if (Stats.WeaponValues.Secondary.Id != secondary.Id)
+            if (Stats.Gear.Secondary.Id != secondary.Id)
             {
                 var value = _itemAppraiser.GetItemPrice(secondary, _log);
-                Stats.WeaponValues.Secondary.UpdatePair(secondary.Id, value);
+                Stats.Gear.Secondary.UpdatePair(secondary.Id, value);
             }
         }
         else
         {
-            if (!string.IsNullOrEmpty(Stats.WeaponValues.Secondary.Id))
+            if (!string.IsNullOrEmpty(Stats.Gear.Secondary.Id))
             {
-                Stats.WeaponValues.Secondary.UpdatePair(string.Empty, 0f);
+                Stats.Gear.Secondary.UpdatePair(string.Empty, 0f);
             }
         }
 
-        if (holster != null)
+        if (holster is not null)
         {
-            if (Stats.WeaponValues.Holster.Id != holster.Id)
+            if (Stats.Gear.Holster.Id != holster.Id)
             {
                 var value = _itemAppraiser.GetItemPrice(holster, _log);
-                Stats.WeaponValues.Holster.UpdatePair(holster.Id, value);
+                Stats.Gear.Holster.UpdatePair(holster.Id, value);
             }
         }
         else
         {
-            if (!string.IsNullOrEmpty(Stats.WeaponValues.Holster.Id))
+            if (!string.IsNullOrEmpty(Stats.Gear.Holster.Id))
             {
-                Stats.WeaponValues.Holster.UpdatePair(string.Empty, 0f);
+                Stats.Gear.Holster.UpdatePair(string.Empty, 0f);
             }
         }
     }
@@ -229,31 +165,52 @@ public class LootingInventoryController
             _log.LogDebug("Calculating initial net worth...");
         }
 
-        Stats.NetWorth = 0f;
+        var netWorth = 0f;
+        netWorth += Stats.PrimaryValue;
+        netWorth += Stats.SecondaryValue;
+        netWorth += Stats.HolsterValue;
         foreach (var slot in _botInventoryController.Inventory.Equipment._cachedSlots)
         {
-            if (string.Equals(slot.Name, "securedcontainer", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
             var containedItem = slot.ContainedItem;
             switch (containedItem)
             {
-                case null:
+                case null or MobContainer or Weapon:
                     continue;
                 case SearchableItem searchableItem:
                 {
                     // Get the price of the searchable item and its contained items
-                    Stats.NetWorth += _itemAppraiser.GetItemPrice(searchableItem, _log) + GetAllContainedItemsValue(searchableItem);
+                    netWorth += _itemAppraiser.GetItemPrice(searchableItem, _log) + searchableItem.GetAllGridContainedItemsValue(_log);
                     continue;
                 }
                 default:
-                    Stats.NetWorth += _itemAppraiser.GetItemPrice(containedItem, _log);
+                    netWorth += _itemAppraiser.GetItemPrice(containedItem, _log);
                     continue;
             }
         }
-        Stats.InitialNetWorth = Stats.NetWorth;
+
+        Stats.InitialNetWorth = netWorth;
+        Stats.NetWorth = netWorth;
+    }
+
+    /// <summary>
+    /// Subscribe to gear slots so when its ContainedItem is changed, grid stats is updated.
+    /// </summary>
+    public void SubscribeToGearSlots()
+    {
+        Action<Item> updateGridStatsAction = UpdateGridStats;
+
+        var equipment = _botInventoryController.Inventory.Equipment;
+
+        var tacVestSlot = equipment.GetSlot(EquipmentSlot.TacticalVest);
+        _unsubActions.Add(tacVestSlot.ReactiveContainedItem.Subscribe(updateGridStatsAction));
+        _unsubActions.Add(tacVestSlot.ReactiveContainedItem.Bind(Stats.Gear.Vest.OnChangeContainer));
+
+        var backpackSlot = equipment.GetSlot(EquipmentSlot.Backpack);
+        _unsubActions.Add(backpackSlot.ReactiveContainedItem.Subscribe(updateGridStatsAction));
+        _unsubActions.Add(backpackSlot.ReactiveContainedItem.Bind(Stats.Gear.Backpack.OnChangeContainer));
+
+        var pockets = equipment.GetSlot(EquipmentSlot.Pockets).ContainedItem;
+        Stats.Gear.Pockets.OnChangeContainer(pockets);
     }
 
     /// <summary>
@@ -261,16 +218,116 @@ public class LootingInventoryController
     /// </summary>
     public void UpdateGridStats()
     {
-        var tacVest = (SearchableItem)_botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem;
-        var pockets = (SearchableItem)_botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Pockets).ContainedItem;
-        var backpack = (SearchableItem)_botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Backpack).ContainedItem;
+        var equipment = _botInventoryController.Inventory.Equipment;
+        var tacVest = (SearchableItem)equipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem;
+        var pockets = (SearchableItem)equipment.GetSlot(EquipmentSlot.Pockets).ContainedItem;
+        var backpack = (SearchableItem)equipment.GetSlot(EquipmentSlot.Backpack).ContainedItem;
 
-        var tacVestGrids = LootUtils.GetTotalAndAvailableGridSlots(tacVest?.Grids);
-        var pocketsGrids = LootUtils.GetTotalAndAvailableGridSlots(pockets?.Grids);
-        var backpackGrids = LootUtils.GetTotalAndAvailableGridSlots(backpack?.Grids);
+        var tacVestGrids = (tacVest?.Grids).GetTotalAndAvailableGridSlots();
+        var pocketsGrids = (pockets?.Grids).GetTotalAndAvailableGridSlots();
+        var backpackGrids = (backpack?.Grids).GetTotalAndAvailableGridSlots();
 
         Stats.AvailableGridSpaces = tacVestGrids.available + pocketsGrids.available + backpackGrids.available;
         Stats.TotalGridSpaces = tacVestGrids.total + pocketsGrids.total + backpackGrids.total;
+    }
+
+    private void UpdateGridStats(Item _)
+    {
+        UpdateGridStats();
+    }
+
+    private void SubscribeToWeightChange()
+    {
+        _unsubActions.Add(_botOwner.GetPlayer.Inventory.OnWeightUpdated.Bind(Stats.TotalWeight.SetDirty));
+    }
+
+    /// <summary>
+    /// Moves all non-vest items into the backpack, and throws any undervalued items from the backpack.
+    /// Called on bot spawn.
+    /// </summary>
+    public async Task CleanupInventoryAsync(CancellationToken token = default)
+    {
+        var equipment = _botInventoryController.Inventory.Equipment;
+        await TransferItemsToBackpackAsync(equipment);
+
+        var backpack = equipment.GetSlot(EquipmentSlot.Backpack).ContainedItem;
+        using (DictionaryPool<Item, float>.Get(out var itemsToThrow))
+        {
+            GetUndervaluedItems(backpack, itemsToThrow);
+            await ThrowUndervaluedItemsAsync(equipment, itemsToThrow, token);
+        }
+    }
+
+    /// <summary>
+    /// Move items that are not placed in fast access slots to the bot's backpack.
+    /// </summary>
+    /// <param name="source">If null, defaults to the bot's equipment, which uses the tac vest, pockets, and armband slots.</param>
+    public ValueTask<IResult> TransferItemsToBackpackAsync(Item source = null)
+    {
+        var backpack = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Backpack).ContainedItem;
+        if (backpack is null)
+        {
+            return new ValueTask<IResult>(SuccessfulResult.New);
+        }
+
+        // If source was not given or is null, clean up the bot's equipment instead
+        source ??= _botInventoryController.Inventory.Equipment;
+
+        using var pooledItems = UnityEngine.Pool.ListPool<Item>.Get(out var items);
+        using var pooledMove = UnityEngine.Pool.ListPool<OperationResult<MoveResult>>.Get(out var moveResults);
+
+        switch (source)
+        {
+            case InventoryEquipment equipment:
+                equipment.GetSlot(EquipmentSlot.Pockets).ContainedItem.GetAllGridContainedItems(items);
+                equipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem.GetAllGridContainedItems(items);
+                equipment.GetSlot(EquipmentSlot.ArmBand).ContainedItem.GetAllGridContainedItems(items);
+                break;
+            case SearchableItem searchableItem:
+                searchableItem.GetAllGridContainedItems(items);
+                break;
+            default:
+                return new ValueTask<IResult>(SuccessfulResult.New);
+        }
+
+        foreach (var item in items)
+        {
+            // Keep these items
+            if (item.IsPlacedInFastAccessSlots())
+            {
+                continue;
+            }
+            var location = backpack.FindGridToPickUpLootNonAlloc(item);
+            if (location is null)
+            {
+                continue;
+            }
+            var moveResult = ItemManipulator.Move(item, location, _botInventoryController, false);
+            if (moveResult.Failed)
+            {
+                continue;
+            }
+
+            moveResults.Add(moveResult);
+        }
+
+        if (moveResults.Count == 0)
+        {
+            if (_log.DebugEnabled)
+            {
+                _log.LogDebug($"No items to transfer from {source.LocalizedName()} to the backpack");
+            }
+            return new ValueTask<IResult>(SuccessfulResult.New);
+        }
+
+        moveResults.SafeRollBack();
+
+        var moveOperationsResults = new MoveMultipleResult(moveResults, _transactionController, 0f);
+        if (_log.DebugEnabled)
+        {
+            _log.LogDebug($"Transferring {moveOperationsResults.Count} items from {source.LocalizedName()} to the backpack");
+        }
+        return new ValueTask<IResult>(moveOperationsResults.ExecuteAsync());
     }
 
     /// <summary>
@@ -281,7 +338,7 @@ public class LootingInventoryController
     {
         ShouldSort = false;
 
-        if (compoundItem != null)
+        if (compoundItem is not null)
         {
             var result = ItemManipulator.Sort(compoundItem, _botInventoryController, true);
             if (result.Failed)
@@ -309,204 +366,206 @@ public class LootingInventoryController
     /// If bots are looting something that is equippable, and they have nothing equipped in that slot, they will always equip it.
     /// If the bot decides not to equip the item then it will attempt to put in an available container slot.
     /// </summary>
-    public async Task<bool> TryAddItemsToBotAsync(List<Item> items, CancellationToken token = default)
+    public async Task<bool> TryAddItemsToBotAsync<TItem>(List<TItem> items, bool tryToEquip = true, CancellationToken token = default)
+        where TItem : Item
     {
-        var lootingActions = ListActionPool.Rent();
-        try
+        using var pooledList = ListActionPool.Get(out var lootingActions);
+
+        foreach (var item in items)
         {
-            foreach (var item in items)
+            token.ThrowIfCancellationRequested();
+
+            if (item.Owner == _botInventoryController)
             {
-                token.ThrowIfCancellationRequested();
-
-                if (string.IsNullOrEmpty(item.Name))
+                if (_log.DebugEnabled)
                 {
-                    if (_log.DebugEnabled)
+                    _log.LogDebug($"Already owns item [{item.LocalizedName()}]. Skipping");
+                }
+                continue;
+            }
+
+            if (LootingBots.UseSearchTime.Value)
+            {
+                await SimulateSearchTimeAsync(item, token);
+            }
+
+            // Item info, such as: name, size, price
+            var itemName = item.LocalizedName();
+            var itemSize = item.GetItemSize();
+            CurrentItemPrice = _itemAppraiser.GetItemPrice(item, _log);
+
+            if (_log.DebugEnabled)
+            {
+                var itemValue = itemSize > 1 ? $"{CurrentItemPrice:N0}₽ {CurrentItemPrice / itemSize:N0}₽/slot" : $"{CurrentItemPrice:N0}₽";
+                _log.LogDebug($"Loot found: {itemName} ({itemValue})");
+            }
+
+            // Ignore magazines or ammo that a bot cannot actively use
+            if ((item is Magazine mag && !IsUsableMag(mag)) || (item is Ammo ammo && !IsUsableAmmo(ammo)))
+            {
+                if (_log.DebugEnabled)
+                {
+                    _log.LogDebug($"Cannot use mag/ammo: {itemName}. Skipping");
+                }
+                continue;
+            }
+
+            // Check to see if we need to swap gear
+            lootingActions.Reset();
+            var canEquipGear = tryToEquip && GetEquipAction(item, lootingActions);
+            if (canEquipGear)
+            {
+                if (_log.DebugEnabled)
+                {
+                    _log.LogDebug($"Found equip action for: {itemName}");
+                }
+
+                foreach (var action in lootingActions)
+                {
+                    var actionResult = await action.ExecuteAsync(_transactionController, token);
+                    if (!actionResult)
                     {
-                        _log.LogDebug("Item is NULL");
+                        // Break the chain if the action fails
+                        break;
                     }
-                    continue;
+
+                    Stats.AddNetValue(action.NetWorthDelta);
+                    await action.PostActionsAsync(this, token);
                 }
 
-                if (LootingBots.UseExamineTime.Value)
+                // Do post-equip actions
+                // We looted a weapon, calculate gear value
+                if (item is Weapon weapon)
                 {
-                    await SimulateExamineTimeAsync(item, token);
+                    _transactionController.AddExtraAmmo(weapon);
+                    CalculateGearValue();
                 }
-
-                // Item info, such as: name, size, price
-                var itemName = item.Name.Localized();
-                var itemSize = item.GetItemSize();
-                CurrentItemPrice = _itemAppraiser.GetItemPrice(item, _log);
 
                 if (_log.DebugEnabled)
                 {
-                    var itemValue =
-                        itemSize > 1 ? $"{CurrentItemPrice:N0}₽ {CurrentItemPrice / itemSize:N0}₽/slot" : $"{CurrentItemPrice:N0}₽";
-                    _log.LogDebug($"Loot found: {itemName} ({itemValue})");
+                    _log.LogDebug($"Finished equip action for: {itemName}");
                 }
+                continue;
+            }
 
-                // Ignore magazines that a bot cannot actively use
-                if (item is Magazine mag && !IsUsableMag(mag))
+            // Get the prices of items in its slots, we're now comparing the price of the item with its value per slot.
+            if (item is CompoundItem)
+            {
+                CurrentItemPrice += item.GetAllSlotContainedItemsValue(_log);
+            }
+
+            // Check to see if we can pick up the item
+            if (AllowedToPickup(item, itemSize))
+            {
+                // Check to see if this is an item that we can merge with another item in the inventory
+                var mergeResult = await _transactionController.TryMergeItemAsync(item, token);
+                if (mergeResult.Succeeded)
                 {
-                    if (_log.DebugEnabled)
-                    {
-                        _log.LogDebug($"Cannot use mag: {itemName}. Skipping");
-                    }
-
+                    // Divide the item price with the item's original stack count then multiply with the merged count
+                    var mergedCount = mergeResult.Value._transferResult.Count;
+                    Stats.AddNetValue(
+                        (CurrentItemPrice / (mergeResult.Value._transferResult.Item.StackObjectsCount + mergedCount)) * mergedCount
+                    );
                     continue;
                 }
 
-                // Check to see if we need to swap gear
-                ListActionPool.Reset(lootingActions);
-                var canEquipGear = GetEquipAction(item, lootingActions);
-                if (canEquipGear)
+                // Try nest the container if we're allowed
+                if (item is SearchableItem searchableItem && LootingBots.AllowContainerNesting.Value)
                 {
-                    if (_log.DebugEnabled)
+                    if (await TryNestContainerAsync(searchableItem, itemSize, token))
                     {
-                        _log.LogDebug($"Found equip action for: {itemName}");
+                        continue;
                     }
-
-                    foreach (var action in lootingActions)
-                    {
-                        var actionResult = await action.ExecuteAsync(_transactionController, token);
-                        if (actionResult)
-                        {
-                            Stats.AddNetValue(action.NetWorthDelta);
-                        }
-                        else
-                        {
-                            // Break the chain if the action fails
-                            break;
-                        }
-
-                        // Do post actions
-                        if (action is LootingSwapAction swapAction)
-                        {
-                            if (swapAction.TransferItems)
-                            {
-                                if (swapAction.ToSwap is Weapon thrownWeapon)
-                                {
-                                    // If we swapped away our previous weapon, throw away its mags and strip the attachments
-                                    await ThrowUselessMagsAsync(thrownWeapon, token);
-                                    if (LootingBots.CanStripAttachments.Value)
-                                    {
-                                        await StripWeaponAsync(thrownWeapon, token);
-                                    }
-                                }
-                                else
-                                {
-                                    // To make space we throw undervalued items in our newly equipped item
-                                    // Then loot the thrown item
-                                    await ThrowUndervaluedItemsAsync(swapAction.Item, token);
-                                    await LootNestedItemsAsync(swapAction.ToSwap, token);
-                                }
-                            }
-                        }
-                        else if (action is LootingThrowAction throwAction)
-                        {
-                            if (throwAction.TransferItems)
-                            {
-                                var thrownItem = throwAction.Item;
-
-                                // Ignore thrown loot
-                                _lootingBrain.IgnoreLoot(thrownItem.Id);
-
-                                if (thrownItem is Weapon thrownWeapon)
-                                {
-                                    // Throw mags of thrown weapon and strip attachments
-                                    await ThrowUselessMagsAsync(thrownWeapon, token);
-                                    if (LootingBots.CanStripAttachments.Value)
-                                    {
-                                        await StripWeaponAsync(thrownWeapon, token);
-                                    }
-                                }
-                                else
-                                {
-                                    // Loot thrown item's children
-                                    await LootNestedItemsAsync(thrownItem, token);
-                                }
-                            }
-                        }
-                    }
-
-                    // Do post-equip actions
-                    // We looted a weapon, calculate gear value
-                    if (item is Weapon weapon)
-                    {
-                        _transactionController.AddExtraAmmo(weapon);
-                        CalculateGearValue();
-                    }
-                    if (item is SearchableItem)
-                    {
-                        UpdateGridStats();
-                    }
-
-                    if (_log.DebugEnabled)
-                    {
-                        _log.LogDebug($"Finished equip action for: {itemName}");
-                    }
-
-                    continue;
                 }
 
-                // Check to see if we can equip the item
-                if (AllowedToEquip(item) && await _transactionController.TryEquipItemAsync(item, token))
+                // Try to pick this item up if we have the space and weight
+                if (_lootingBrain.HasFreeSpace && HasExcessWeightFor(item) && await _transactionController.TryPickupItemAsync(item, token))
                 {
                     Stats.AddNetValue(CurrentItemPrice);
-                    if (item is SearchableItem)
+                    Stats.AvailableGridSpaces -= itemSize;
+                    Stats.Gear.TryAddContainedItem(item, itemSize, CurrentItemPrice);
+
+                    if (item is SearchableItem pickedUpContainer)
                     {
-                        Stats.AddNetValue(GetAllContainedItemsValue(item));
-                        UpdateGridStats();
+                        Stats.AddNetValue(pickedUpContainer.GetAllGridContainedItemsValue(_log));
+                        var (total, available) = pickedUpContainer.Grids.GetTotalAndAvailableGridSlots();
+                        Stats.TotalGridSpaces += total;
+                        Stats.AvailableGridSpaces += available;
                     }
+
                     continue;
                 }
 
-                // Try to pick up any nested items before trying to pick up the item.
-                // This helps when looting rigs to transfer ammo to the bots active rig
-                if (item is SearchableItem searchableItem)
+                // We don't have space, weight, or we can't pick the item up,
+                // try to find an item to replace it with
+                if (
+                    HasReplacement(item, itemSize, out var source, out var index, out var loot)
+                    && await _transactionController.ReplaceItemAsync(
+                        item,
+                        source[index].Item,
+                        _lootingBrain.ActiveLoot.GetRootItem(),
+                        token
+                    )
+                )
                 {
-                    var success = await LootNestedItemsAsync(searchableItem, token);
+                    var replaced = source[index];
+                    source.Replace(index, loot);
+                    Stats.AddNetValue(CurrentItemPrice - replaced.Value);
+                    Stats.AvailableGridSpaces -= itemSize - replaced.Size;
 
-                    if (!success)
+                    if (_log.DebugEnabled)
                     {
-                        return false;
+                        _log.LogDebug(
+                            $"Replaced {replaced.Item.LocalizedName()} with {item.LocalizedName()} (Net: {CurrentItemPrice - replaced.Value:N0}₽)"
+                        );
                     }
+                    continue;
+                }
+            }
+
+            // We cannot equip or pick up this item,
+            // so strip its mods if it's a weapon, or loot nested items if it's a compound item.
+            if (item is Weapon weaponToStrip)
+            {
+                if (!LootingBots.CanStripAttachments.Value)
+                {
+                    continue;
                 }
 
-                // Check to see if we can pick up the item
-                if (AllowedToPickup(item, itemSize) && await _transactionController.TryPickupItemAsync(item, token))
+                using (UnityEngine.Pool.ListPool<Mod>.Get(out var modsToLoot))
                 {
-                    Stats.AddNetValue(CurrentItemPrice + GetAllContainedItemsValue(item));
-                    Stats.AvailableGridSpaces -= itemSize;
-                }
-                else if (item is Weapon weapon && LootingBots.CanStripAttachments.Value)
-                {
-                    // Strip the weapon of its mods if we cannot pick up the weapon
-                    var successful = await StripWeaponAsync(weapon, token);
-                    if (!successful)
+                    if (!await StripWeaponAsync(weaponToStrip, modsToLoot, token))
                     {
                         return false;
                     }
                 }
             }
-        }
-        finally
-        {
-            ListActionPool.Return(lootingActions);
+            else if (!await LootNestedItemsAsync(item, token))
+            {
+                return false;
+            }
         }
 
         return true;
     }
 
     /// <summary>
-    /// Use the ExamineTime of an object and the AttentionExamineValue of the bot to calculate the delay for discovering an item while looting.
-    /// Taken from ExamineOperationClass constructor
+    /// Use the AttentionLootSpeedValue and SearchBuffSpeedValue of the bot
+    /// to calculate the delay for discovering an item while looting a searchable container.
+    /// Taken from <see cref="EFT.InventoryLogic.Operations.ActiveSearchContentOperation.SearchContent"/>.
     /// </summary>
-    public Task SimulateExamineTimeAsync(Item item, CancellationToken token = default)
+    public Task SimulateSearchTimeAsync(Item item, CancellationToken token = default)
     {
-        return LootingTransactionController.SimulatePlayerDelayAsync(
-            item.ExamineTime * 1000f / (1f + _botOwner.Profile.Skills.AttentionExamineValue),
-            token
-        );
+        // Unfortunately SPT does not generate these values.
+        /*
+         var skillsInfo = _botOwner.GetPlayer.Profile.SkillsInfo;
+        var lootSpeed = 1f + skillsInfo.AttentionLootSpeedValue + skillsInfo.SearchBuffSpeedValue;
+        var delay = UnityEngine.Random.Range(1, 3) / lootSpeed * 1000D;
+        */
+
+        return item.Parent.Container is not ISearchableContainer // || _discoveredItems.Contains(item)
+            ? Task.CompletedTask
+            : LootingTransactionController.SimulatePlayerDelayAsync(Random.Range(1, 3) * 1000D, token);
     }
 
     /// <summary>
@@ -539,8 +598,12 @@ public class LootingInventoryController
     /// </summary>
     private void RefillAndReload()
     {
-        _botOwner.WeaponManager.Reload?.TryFillMagazines();
-        _botOwner.WeaponManager.Reload?.TryReload();
+        var reload = _botOwner.WeaponManager.Reload;
+        if (reload is not null)
+        {
+            reload.TryFillMagazines();
+            reload.TryReload();
+        }
     }
 
     /// <summary>
@@ -560,122 +623,92 @@ public class LootingInventoryController
         // Bosses cannot swap gear as many bosses have custom logic tailored to their loadouts
         if (lootItem is Weapon lootWeapon && !BotTypeUtils.IsBoss(_botOwner.Profile.Info.Settings.Role))
         {
-            GetWeaponEquipAction(lootWeapon, lootingActions);
-            return lootingActions.Count > 0;
-        }
-
-        var helmet = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Headwear).ContainedItem;
-        var earpiece = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Earpiece).ContainedItem;
-        var faceCover = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.FaceCover).ContainedItem;
-        var eyewear = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Eyewear).ContainedItem;
-        var chest = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.ArmorVest).ContainedItem;
-        var armBand = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.ArmBand).ContainedItem;
-        var tacVest = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.TacticalVest).ContainedItem;
-        var backpack = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Backpack).ContainedItem;
-
-        if (EquipmentTypeUtils.IsBackpack(lootItem) && ShouldSwapGear(backpack, lootItem))
-        {
-            GetSwapAction(lootItem, backpack, lootingActions, true);
-        }
-        else if (EquipmentTypeUtils.IsHelmet(lootItem) && ShouldSwapGear(helmet, lootItem))
-        {
-            GetSwapAction(lootItem, helmet, lootingActions, true);
-        }
-        else if (EquipmentTypeUtils.IsEarpiece(lootItem) && ShouldSwapGear(earpiece, lootItem))
-        {
-            GetSwapAction(lootItem, earpiece, lootingActions, false);
-        }
-        else if (EquipmentTypeUtils.IsFaceCover(lootItem) && ShouldSwapGear(faceCover, lootItem))
-        {
-            GetSwapAction(lootItem, faceCover, lootingActions, false);
-        }
-        else if (EquipmentTypeUtils.IsEyewear(lootItem) && ShouldSwapGear(eyewear, lootItem))
-        {
-            GetSwapAction(lootItem, eyewear, lootingActions, false);
-        }
-        else if (EquipmentTypeUtils.IsArmband(lootItem) && ShouldSwapGear(armBand, lootItem))
-        {
-            // Pack n' strap?
-            GetSwapAction(lootItem, armBand, lootingActions, true);
-        }
-        else if (EquipmentTypeUtils.IsChestArmor(lootItem) && ShouldSwapGear(chest, lootItem))
-        {
-            GetSwapAction(lootItem, chest, lootingActions, true);
-        }
-        else if (EquipmentTypeUtils.IsTacticalRig(lootItem))
-        {
-            if (ShouldSwapGear(tacVest, lootItem))
+            using var pooledObject = UnityEngine.Pool.ListPool<Item>.Get(out var usableMagazines);
+            if (IsAbleToEquip(lootWeapon, _lootingBrain.ActiveLoot.GetRootItem(), usableMagazines))
             {
-                // If we have a chest armor equipped and the tac vest we are looting is armored,
-                // check if the armored rig is higher armor class than the chest,
-                // then make sure to drop the chest and pick up the armored rig
-                if (chest is not null && EquipmentTypeUtils.IsArmoredRig(lootItem))
-                {
-                    if (ShouldSwapGear(chest, lootItem))
-                    {
-                        if (_log.DebugEnabled)
-                        {
-                            _log.LogDebug(
-                                $"Trying to drop chest armor [{chest.Name.Localized()}] then loot armored rig [{lootItem.Name.Localized()}]"
-                            );
-                        }
+                GetWeaponEquipAction(lootWeapon, lootingActions);
 
-                        var chestValue = _itemAppraiser.GetItemPrice(chest, _log);
-                        var throwAction = LootingThrowAction.Rent(chest, -chestValue);
-                        lootingActions.Add(throwAction);
-                        GetSwapAction(lootItem, tacVest, lootingActions, true);
-                    }
-                    else
-                    {
-                        if (_log.DebugEnabled)
-                        {
-                            _log.LogDebug($"Equipped chest armor is better than or equal to found armored rig {lootItem.Name.Localized()}");
-                        }
-                    }
-                }
-                else
-                {
-                    GetSwapAction(lootItem, tacVest, lootingActions, true);
-                }
-            }
-            else if (
-                EquipmentTypeUtils.IsArmoredRig(tacVest) && _lootingBrain.ActiveLoot.GetRootItem() is InventoryEquipment corpseEquipment
-            )
-            {
-                // The bot has an equipped armored rig, check if the corpse's chest has better armor
-                // If it has better armor OR same armor but larger container,
-                // drop the current armored rig then loot the armor and tac vest
-                var corpseChestArmor = corpseEquipment.GetSlot(EquipmentSlot.ArmorVest).ContainedItem;
-                var armorDifference = GetArmorDifference(corpseChestArmor, tacVest);
-                if (
-                    (armorDifference > 0 || armorDifference == 0 && LootHasLargerContainer(lootItem, tacVest))
-                    && AllowedToEquip(corpseChestArmor)
-                )
+                if (lootingActions.Count > 0 && usableMagazines.Count > 0)
                 {
                     if (_log.DebugEnabled)
                     {
-                        _log.LogDebug(
-                            $"Trying to loot chest armor [{corpseChestArmor.Name.Localized()}] and tac vest [{lootItem.Name.Localized()}] and drop current armored rig [{tacVest.Name.Localized()}]. Armor difference: {armorDifference}"
-                        );
+                        _log.LogDebug($"Trying to loot {usableMagazines.Count} magazines for {lootWeapon.LocalizedName()}");
                     }
-
-                    // Throw the corpse's chest armor so we can swap the vests
-                    lootingActions.Add(LootingThrowAction.Rent(corpseChestArmor, 0f, false));
-                    GetSwapAction(lootItem, tacVest, lootingActions, true);
-
-                    // No need to equip the chest armor here, it will be looted next. Hopefully the bot does not get interrupted...
+                    lootingActions.Add(LootingLootAction.Rent(usableMagazines, this));
                 }
             }
+            else if (_log.DebugEnabled)
+            {
+                _log.LogDebug($"Unable to equip {lootWeapon.LocalizedName()}, cannot find any magazines for it");
+            }
+
+            return lootingActions.Count > 0;
+        }
+
+        EquipmentSlot? gearToReplace = null;
+        var toTransfer = true;
+        switch (lootItem)
+        {
+            case Backpack:
+                gearToReplace = EquipmentSlot.Backpack;
+                break;
+            case Headwear:
+                gearToReplace = EquipmentSlot.Headwear;
+                break;
+            case Headphones:
+                gearToReplace = EquipmentSlot.Earpiece;
+                toTransfer = false;
+                break;
+            case FaceCover:
+                gearToReplace = EquipmentSlot.FaceCover;
+                toTransfer = false;
+                break;
+            case Visors:
+                gearToReplace = EquipmentSlot.Eyewear;
+                toTransfer = false;
+                break;
+            case ArmBand:
+                gearToReplace = EquipmentSlot.ArmBand;
+                break;
+            case Armor:
+                gearToReplace = EquipmentSlot.ArmorVest;
+                break;
+            case Vest:
+                gearToReplace = EquipmentSlot.TacticalVest;
+                break;
+            case SearchableItem:
+                gearToReplace = EquipmentSlot.ArmBand; // Pack 'n' strap
+                break;
+        }
+
+        if (gearToReplace is not null)
+        {
+            GetGearAction(lootItem, gearToReplace.Value, lootingActions, toTransfer);
         }
 
         return lootingActions.Count > 0;
     }
 
+    public static bool IsUsableItemForWeapon(Item item, Weapon weapon)
+    {
+        return item switch
+        {
+            Magazine mag => IsUsableMagForWeapon(weapon, mag),
+            Ammo ammo => IsUsableAmmoForWeapon(weapon, ammo),
+            _ => false,
+        };
+    }
+
     /// <summary>
-    /// Check if this magazine can be used by any equipped weapon
+    /// Check if this magazine can be used by any equipped weapon.
     /// </summary>
     public bool IsUsableMag(Magazine mag)
     {
+        if (mag.FirstRealAmmo() is not Ammo ammoInMag)
+        {
+            return false;
+        }
+
         var equipment = _botInventoryController.Inventory.Equipment;
         foreach (var weaponSlot in LootUtils.WeaponSlots)
         {
@@ -683,9 +716,7 @@ public class LootingInventoryController
             {
                 continue;
             }
-
-            var magazineSlot = weapon.GetMagazineSlot();
-            if (magazineSlot != null && magazineSlot.CanAccept(mag))
+            if (IsUsableAmmoForWeapon(weapon, ammoInMag) && weapon.GetMagazineSlot() is { } slot && slot.CanAccept(mag))
             {
                 return true;
             }
@@ -695,7 +726,20 @@ public class LootingInventoryController
     }
 
     /// <summary>
-    /// Check if this ammo can be used by any equipped weapon
+    /// Check if this magazine can be used by <paramref name="weapon"/>.
+    /// We need to check if the ammo inside the magazine is compatible with the weapon
+    /// since some magazines can support multiple calibers.
+    /// </summary>
+    public static bool IsUsableMagForWeapon(Weapon weapon, Magazine mag)
+    {
+        return mag.FirstRealAmmo() is Ammo ammoInMag
+            && IsUsableAmmoForWeapon(weapon, ammoInMag)
+            && weapon.GetMagazineSlot() is { } slot
+            && slot.CanAccept(mag);
+    }
+
+    /// <summary>
+    /// Check if this ammo can be used by any equipped weapon.
     /// </summary>
     public bool IsUsableAmmo(Ammo ammo)
     {
@@ -706,93 +750,228 @@ public class LootingInventoryController
             {
                 continue;
             }
-
-            foreach (var chamber in weapon.Chambers)
+            if (IsUsableAmmoForWeapon(weapon, ammo))
             {
-                if (chamber.CanAccept(ammo))
-                {
-                    return true;
-                }
+                return true;
             }
         }
 
         return false;
     }
 
-    private readonly List<Magazine> _throwUselessMagsScratch = [];
+    /// <summary>
+    /// Check if this magazine can be used by <paramref name="weapon"/>.
+    /// </summary>
+    public static bool IsUsableAmmoForWeapon(Weapon weapon, Ammo ammo)
+    {
+        foreach (var chamber in weapon.Chambers)
+        {
+            if (chamber.CanAccept(ammo))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Check if a weapon can be equipped and give the weapon's magazines.
+    /// A bot can equip a weapon if:
+    ///   1. The weapon has magazines/loose ammo it can loot from a corpse and its surroundings.
+    ///   2. We're looting a loose weapon on the world.
+    /// </summary>
+    /// <param name="weapon">Weapon to loot.</param>
+    /// <param name="lootContainer">Item to check for magazines.</param>
+    /// <param name="usableMagazines">Pre-allocated list for looting found usable magazines.</param>
+    public bool IsAbleToEquip(Weapon weapon, Item lootContainer, List<Item> usableMagazines)
+    {
+        GetMagsAmmoInWorld(weapon, usableMagazines);
+
+        if (lootContainer is InventoryEquipment equipment)
+        {
+            equipment.GetAllGridItemsInStorageSlotsNonAlloc(usableMagazines, IsUsableItemForWeapon, weapon);
+
+            // Sort to prioritize looting mags with the highest count
+            usableMagazines.Sort(MagazineAmmoComparer.Instance);
+
+            return usableMagazines.Count > 0;
+        }
+
+        lootContainer.GetAllGridContainedItems(usableMagazines, IsUsableItemForWeapon, weapon);
+
+        // Sort to prioritize looting mags with the highest count
+        usableMagazines.Sort(MagazineAmmoComparer.Instance);
+
+        // We're not looting a corpse, just allow to equip
+        return true;
+    }
+
+    /// <summary>
+    /// Finds magazine and ammo LootItems in a 4m radius around the bot's position
+    /// and adds them to a preallocated list if usable for the weapon.
+    /// </summary>
+    /// <param name="weapon">Weapon to check compatibility for.</param>
+    /// <param name="usableForWeapon">Pre-allocated list for found usable mags and ammo.</param>
+    public void GetMagsAmmoInWorld(Weapon weapon, List<Item> usableForWeapon)
+    {
+        var colliders = ArrayPool<Collider>.Shared.Rent(1024);
+        var seen = HashSetPool<Item>.Get();
+        try
+        {
+            // Get all loot items in a 4m radius
+            var hits = Physics.OverlapSphereNonAlloc(
+                _botOwner.Position,
+                4f,
+                colliders,
+                LootUtils.LootItemMask,
+                QueryTriggerInteraction.Ignore
+            );
+            if (hits == 0)
+            {
+                return;
+            }
+
+            for (var i = 0; i < hits; i++)
+            {
+                var collider = colliders[i];
+                var lootItem = collider.gameObject.GetComponentInParent<LootItem>();
+                if (lootItem == null)
+                {
+                    continue;
+                }
+
+                var item = lootItem.Item;
+                if (item is null || !seen.Add(item))
+                {
+                    continue;
+                }
+
+                if (IsUsableItemForWeapon(item, weapon))
+                {
+                    usableForWeapon.Add(item);
+                }
+            }
+        }
+        finally
+        {
+            ArrayPool<Collider>.Shared.Return(colliders, true);
+            HashSetPool<Item>.Release(seen);
+        }
+    }
 
     /// <summary>
     /// Throws all magazines from the rig that are not used by any of the weapons that the bot currently has equipped.
     /// Also records thrown mag value.
     /// </summary>
-    public async Task ThrowUselessMagsAsync(Weapon thrownWeapon, CancellationToken token)
+    public ValueTask ThrowUselessMagsAsync(Weapon thrownWeapon, Dictionary<Item, float> uselessMagazines, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
 
-        var corpseEquipment = _lootingBrain.ActiveLoot.GetRootItem() as InventoryEquipment;
-        var primary = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.FirstPrimaryWeapon).ContainedItem as Weapon;
-        var secondary = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.SecondPrimaryWeapon).ContainedItem as Weapon;
-        var holster = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Holster).ContainedItem as Weapon;
-        var thrownMagSlot = thrownWeapon?.GetMagazineSlot();
-        var primaryMagSlot = primary?.GetMagazineSlot();
-        var secondaryMagSlot = secondary?.GetMagazineSlot();
-        var holsterMagSlot = holster?.GetMagazineSlot();
+        var equipment = _botInventoryController.Inventory.Equipment;
+        var primary = equipment.GetSlot(EquipmentSlot.FirstPrimaryWeapon).ContainedItem as Weapon;
+        var hasPrimary = primary is not null;
+        var secondary = equipment.GetSlot(EquipmentSlot.SecondPrimaryWeapon).ContainedItem as Weapon;
+        var hasSecondary = secondary is not null;
+        var holster = equipment.GetSlot(EquipmentSlot.Holster).ContainedItem as Weapon;
+        var hasHolster = holster is not null;
 
-        _throwUselessMagsScratch.Clear();
-        _botInventoryController.GetAcceptableItemsInStorageSlotsNonAlloc(_throwUselessMagsScratch);
+        using var pooledList = UnityEngine.Pool.ListPool<Item>.Get(out var items);
+        _botInventoryController.GetAllGridItemsInStorageSlotsNonAlloc(items, static (gridItem, _) => gridItem is Magazine or Ammo, this);
 
         if (_log.DebugEnabled)
         {
-            _log.LogDebug("Cleaning up old mags...");
+            _log.LogDebug("Cleaning up old magazines...");
         }
 
         var reservedCount = 0;
-        foreach (var mag in _throwUselessMagsScratch)
+        foreach (var item in items)
         {
-            var fitsInThrown = thrownMagSlot?.CanAccept(mag) == true;
-            var fitsInPrimary = primaryMagSlot?.CanAccept(mag) == true;
-            var fitsInSecondary = secondaryMagSlot?.CanAccept(mag) == true;
-            var fitsInHolster = holsterMagSlot?.CanAccept(mag) == true;
+            var fitsInEquipped = false;
+            var isSharedMag = false;
+            if (item is Magazine mag)
+            {
+                fitsInEquipped =
+                    hasPrimary && IsUsableMagForWeapon(primary, mag)
+                    || hasSecondary && IsUsableMagForWeapon(secondary, mag)
+                    || hasHolster && IsUsableMagForWeapon(holster, mag);
+                isSharedMag = fitsInEquipped && IsUsableMagForWeapon(thrownWeapon, mag);
+            }
+            else if (item is Ammo ammo)
+            {
+                fitsInEquipped =
+                    hasPrimary && IsUsableAmmoForWeapon(primary, ammo)
+                    || hasSecondary && IsUsableAmmoForWeapon(secondary, ammo)
+                    || hasHolster && IsUsableAmmoForWeapon(holster, ammo);
+            }
 
-            var fitsInEquipped = fitsInPrimary || fitsInSecondary || fitsInHolster;
-            var isSharedMag = fitsInThrown && fitsInEquipped;
             if (isSharedMag && reservedCount < 2)
             {
                 if (_log.DebugEnabled)
                 {
-                    _log.LogDebug($"Reserving shared mag {mag.Name.Localized()}");
+                    _log.LogDebug($"Reserving shared mag [{item.LocalizedName()}]");
                 }
 
                 reservedCount++;
             }
             else if (!fitsInEquipped || reservedCount >= 2)
             {
-                if (_log.DebugEnabled)
-                {
-                    _log.LogDebug($"Removing useless mag {mag.Name.Localized()}");
-                }
-
-                await LootingTransactionController.SimulatePlayerDelayAsync(token: token);
-
-                if (!await _transactionController.TransferOrThrowItemAsync(mag, corpseEquipment, token))
-                {
-                    continue;
-                }
-
-                var magPrice = _itemAppraiser.GetItemPrice(mag, _log);
-                if (_log.DebugEnabled)
-                {
-                    _log.LogDebug($"Thrown {mag.ShortName.Localized()} (-{magPrice:N0}₽)");
-                }
-                Stats.SubtractNetValue(magPrice);
-                Stats.AvailableGridSpaces += mag.GetItemSize();
-                _lootingBrain.IgnoreLoot(mag.Id);
+                uselessMagazines.Add(item, _itemAppraiser.GetItemPrice(item, _log));
             }
+        }
+
+        if (uselessMagazines.Count == 0)
+        {
+            if (_log.DebugEnabled)
+            {
+                _log.LogDebug("No magazines to clean up");
+            }
+            return new ValueTask();
         }
 
         if (_log.DebugEnabled)
         {
-            _log.LogDebug("Cleaning up old mags...done");
+            _log.LogDebug($"Throwing {uselessMagazines.Count} useless magazines");
+        }
+        return new ValueTask(TransferOrThrowItemsAsync(uselessMagazines, _lootingBrain.ActiveLoot.GetRootItem(), token));
+    }
+
+    /// <summary>
+    /// Try to transfer items to another item's grid, or throw.
+    /// Overload that supports taking in a Dictionary with the item's value.
+    /// </summary>
+    /// <param name="itemsToThrow">A Dictionary of key: items, value: prices to throw.</param>
+    /// <param name="previousOwner">The owner of items to throw.</param>
+    /// <param name="transferTo">A container to transfer items to.</param>
+    public async Task TransferOrThrowItemsAsync<TItem>(
+        Dictionary<TItem, float> itemsToThrow,
+        Item transferTo = null,
+        CancellationToken token = default
+    )
+        where TItem : Item
+    {
+        foreach (var (item, price) in itemsToThrow)
+        {
+            token.ThrowIfCancellationRequested();
+
+            var wasPreviousOwner = _botInventoryController == item.Owner;
+
+            if (!await _transactionController.TransferOrThrowItemAsync(item, transferTo, token))
+            {
+                continue;
+            }
+
+            if (wasPreviousOwner)
+            {
+                _lootingBrain.IgnoreLoot(item.Id);
+                Stats.SubtractNetValue(price);
+                Stats.AvailableGridSpaces += item.GetItemSize();
+                Stats.Gear.TryRemoveContainedItem(item);
+            }
+            if (_log.DebugEnabled)
+            {
+                _log.LogDebug($"Thrown {item.LocalizedShortName()}{(wasPreviousOwner ? $" (-{price:N0}₽)" : string.Empty)}");
+            }
         }
     }
 
@@ -802,20 +981,22 @@ public class LootingInventoryController
     /// </summary>
     public void GetWeaponEquipAction(Weapon lootWeapon, List<LootingAction> lootingActions)
     {
-        var primary = (Weapon)_botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.FirstPrimaryWeapon).ContainedItem;
-        var secondary = (Weapon)_botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.SecondPrimaryWeapon).ContainedItem;
-        var holster = (Weapon)_botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.Holster).ContainedItem;
+        var equipment = _botInventoryController.Inventory.Equipment;
+        var primary = (Weapon)equipment.GetSlot(EquipmentSlot.FirstPrimaryWeapon).ContainedItem;
+        var secondary = (Weapon)equipment.GetSlot(EquipmentSlot.SecondPrimaryWeapon).ContainedItem;
+        var holster = (Weapon)equipment.GetSlot(EquipmentSlot.Holster).ContainedItem;
 
         var lootValue = CurrentItemPrice;
 
-        // Loot weapon is a pistol for the holster slot
-        if (lootWeapon.WeapClass.Equals("pistol"))
+        // Loot weapon can fit in the holster slot
+        // Some mods allow SMGs in the holster.
+        if (equipment.GetSlot(EquipmentSlot.Holster).CanAccept(lootWeapon))
         {
             if (holster is null)
             {
                 if (_log.DebugEnabled)
                 {
-                    _log.LogDebug($"Trying to equip {lootWeapon.Name.Localized()} (₽{lootValue}) to holster");
+                    _log.LogDebug($"Trying to equip {lootWeapon.LocalizedName()} (₽{lootValue}) to holster");
                 }
 
                 var moveAction = LootingMoveAction.Rent(lootWeapon, null, lootValue);
@@ -829,7 +1010,7 @@ public class LootingInventoryController
                     if (_log.DebugEnabled)
                     {
                         _log.LogDebug(
-                            $"Trying to swap {lootWeapon.Name.Localized()} (₽{lootValue}) with {holster.Name.Localized()} (₽{holsterValue}) in holster"
+                            $"Trying to swap {lootWeapon.LocalizedName()} (₽{lootValue}) with {holster.LocalizedName()} (₽{holsterValue}) in holster"
                         );
                     }
 
@@ -847,17 +1028,17 @@ public class LootingInventoryController
         {
             if (_log.DebugEnabled)
             {
-                _log.LogDebug($"Trying to equip {lootWeapon.Name.Localized()} (₽{lootValue}) to primary slot");
+                _log.LogDebug($"Trying to equip {lootWeapon.LocalizedName()} (₽{lootValue}) to primary slot");
             }
 
             var moveAction = LootingMoveAction.Rent(lootWeapon, null, lootValue);
             lootingActions.Add(moveAction);
 
-            if (secondary != null && IsWeaponBetter(secondary, lootWeapon, Stats.SecondaryValue > lootValue))
+            if (secondary is not null && IsWeaponBetter(secondary, lootWeapon, Stats.SecondaryValue > lootValue))
             {
                 if (_log.DebugEnabled)
                 {
-                    _log.LogDebug($"then swapping it to the secondary slot [Occupied by: {secondary.Name.Localized()}]");
+                    _log.LogDebug($"then swapping it to the secondary slot [Occupied by: {secondary.LocalizedName()}]");
                 }
 
                 var swapAction = LootingSwapAction.Rent(secondary, lootWeapon, 0f, false);
@@ -873,7 +1054,7 @@ public class LootingInventoryController
         {
             if (_log.DebugEnabled)
             {
-                _log.LogDebug($"Trying to equip {lootWeapon.Name.Localized()} (₽{lootValue}) to secondary slot");
+                _log.LogDebug($"Trying to equip {lootWeapon.LocalizedName()} (₽{lootValue}) to secondary slot");
             }
 
             var moveAction = LootingMoveAction.Rent(lootWeapon, null, lootValue);
@@ -883,7 +1064,7 @@ public class LootingInventoryController
             {
                 if (_log.DebugEnabled)
                 {
-                    _log.LogDebug($"then swapping it to the primary slot [Occupied by: {primary.Name.Localized()}]");
+                    _log.LogDebug($"then swapping it to the primary slot [Occupied by: {primary.LocalizedName()}]");
                 }
 
                 var swapAction = LootingSwapAction.Rent(lootWeapon, primary, 0f, false);
@@ -900,7 +1081,7 @@ public class LootingInventoryController
             if (_log.DebugEnabled)
             {
                 _log.LogDebug(
-                    $"Trying to swap the secondary {secondary.Name.Localized()} with the primary ({primary.Name.Localized()}) because it is a better weapon"
+                    $"Trying to swap the secondary [{secondary.LocalizedName()}] with the primary [{primary.LocalizedName()}] because it is a better weapon"
                 );
             }
 
@@ -909,7 +1090,7 @@ public class LootingInventoryController
 
             // Update the variables since we swapped the two
             (primary, secondary) = (secondary, primary);
-            ValuePair.SwapPair(Stats.WeaponValues.Primary, Stats.WeaponValues.Secondary);
+            ValuePair.SwapPair(Stats.Gear.Primary, Stats.Gear.Secondary);
         }
 
         // If the weapon is better than the secondary
@@ -921,7 +1102,7 @@ public class LootingInventoryController
             if (_log.DebugEnabled)
             {
                 _log.LogDebug(
-                    $"Trying to swap {lootWeapon.Name.Localized()} (₽{lootValue}) with secondary {secondary.Name.Localized()} (₽{Stats.SecondaryValue})"
+                    $"Trying to swap {lootWeapon.LocalizedName()} (₽{lootValue}) with secondary {secondary.LocalizedName()} (₽{Stats.SecondaryValue})"
                 );
             }
 
@@ -935,8 +1116,8 @@ public class LootingInventoryController
             {
                 _log.LogDebug(
                     thrownSecondary
-                        ? $"then swapping it to the primary slot [Occupied by: {primary.Name.Localized()}]"
-                        : $"Trying to swap {lootWeapon.Name.Localized()} (₽{lootValue}) with primary {primary.Name.Localized()} (₽{Stats.PrimaryValue})"
+                        ? $"then swapping it to the primary slot [Occupied by: {primary.LocalizedName()}]"
+                        : $"Trying to swap {lootWeapon.LocalizedName()} (₽{lootValue}) with primary {primary.LocalizedName()} (₽{Stats.PrimaryValue})"
                 );
             }
 
@@ -980,7 +1161,7 @@ public class LootingInventoryController
             if (_log.DebugEnabled)
             {
                 _log.LogDebug(
-                    $"Cannot swap {itemToLoot.Name.Localized()} with {equipped.Name.Localized()} because of conflicting item {conflictingItem.Name.Localized()}"
+                    $"Cannot swap {itemToLoot.LocalizedName()} with {equipped.LocalizedName()} because of conflicting item {conflictingItem.LocalizedName()}"
                 );
             }
             return false;
@@ -993,28 +1174,29 @@ public class LootingInventoryController
             if (_log.DebugEnabled)
             {
                 _log.LogDebug(
-                    $"Found better armor {itemToLoot.Name.Localized()} versus {equipped.Name.Localized()}. Difference: {armorDifference}"
+                    $"Found better armor {itemToLoot.LocalizedName()} versus {equipped.LocalizedName()}. Difference: {armorDifference}"
                 );
             }
             return true;
         }
 
         // If the item is a container and is bigger than what is equipped, only equip it if the armor class is the same
-        if (armorDifference == 0 && LootHasLargerContainer(itemToLoot, equipped))
+        var sizeDifference = GetContainerSizeDifference(itemToLoot, equipped);
+        if (armorDifference == 0 && sizeDifference > 0)
         {
             if (_log.DebugEnabled)
             {
-                _log.LogDebug($"Found bigger container {itemToLoot.Name.Localized()} versus {equipped.Name.Localized()}");
+                _log.LogDebug($"Found bigger container {itemToLoot.LocalizedName()} versus {equipped.LocalizedName()}");
             }
             return true;
         }
 
-        // If the item is more valuable than what is equipped, only equip it if the armor class is the same
-        if (armorDifference == 0 && LootIsMoreValuable(equipped))
+        // If the item is more valuable than what is equipped, only equip it if the armor class and container size is the same
+        if (armorDifference == 0 && sizeDifference == 0 && LootIsMoreValuable(equipped))
         {
             if (_log.DebugEnabled)
             {
-                _log.LogDebug($"Found more valuable gear {itemToLoot.Name.Localized()} versus {equipped.Name.Localized()}");
+                _log.LogDebug($"Found more valuable gear {itemToLoot.LocalizedName()} versus {equipped.LocalizedName()}");
             }
             return true;
         }
@@ -1025,9 +1207,19 @@ public class LootingInventoryController
     /// <summary>
     /// Compare if <paramref name="potentialLoot"/> has a larger container than <paramref name="equipped"/>
     /// </summary>
+    /// <returns>Returns true if the item to loot has a larger container than what is equipped</returns>
     public bool LootHasLargerContainer(Item potentialLoot, Item equipped)
     {
-        return potentialLoot.GetContainerSize() > equipped.GetContainerSize();
+        return GetContainerSizeDifference(potentialLoot, equipped) > 0;
+    }
+
+    /// <summary>
+    /// Calculate the difference between the container sizes of <paramref name="potentialLoot"/> and <paramref name="equipped"/>
+    /// </summary>
+    /// <returns>Returns a positive integer if the item to loot has a larger container than what is equipped</returns>
+    public int GetContainerSizeDifference(Item potentialLoot, Item equipped)
+    {
+        return potentialLoot.GetContainerSize() - equipped.GetContainerSize();
     }
 
     /// <summary>
@@ -1036,11 +1228,11 @@ public class LootingInventoryController
     public bool IsBetterArmorThanEquipped(Item potentialLoot)
     {
         Item equippedArmor;
-        if (EquipmentTypeUtils.IsHelmet(potentialLoot))
+        if (potentialLoot is Headwear)
         {
             equippedArmor = CurrentHeadArmor;
         }
-        else if (EquipmentTypeUtils.IsChestArmor(potentialLoot) || EquipmentTypeUtils.IsArmoredRig(potentialLoot))
+        else if (potentialLoot is Armor || potentialLoot is Vest vest && EquipmentTypeUtils.IsArmoredRig(vest))
         {
             equippedArmor = CurrentTorsoArmor;
         }
@@ -1124,7 +1316,7 @@ public class LootingInventoryController
             if (_log.DebugEnabled)
             {
                 _log.LogDebug(
-                    $"Weapon {potentialWeapon.Name.Localized()} is better versus {equippedWeapon.Name.Localized()}. Difference: {powerDifference}, IsMoreValuable: {true}"
+                    $"Weapon {potentialWeapon.LocalizedName()} is better versus {equippedWeapon.LocalizedName()}. Difference: {powerDifference}, IsMoreValuable: {true}"
                 );
             }
             return true;
@@ -1152,7 +1344,7 @@ public class LootingInventoryController
 
         var currentPower = 0;
         var magazine = weapon.GetCurrentMagazine();
-        if (magazine != null)
+        if (magazine is not null)
         {
             foreach (var item in magazine.Cartridges._items)
             {
@@ -1199,186 +1391,224 @@ public class LootingInventoryController
             return true;
         }
 
-        var items = UnityEngine.Pool.ListPool<Item>.Get();
-        try
+        using var pooledList = UnityEngine.Pool.ListPool<Item>.Get(out var items);
+
+        // Slot must not be locked and is not a quest item
+        foreach (var grid in parentItem.Grids)
         {
-            // Slot must not be locked and is not a quest item
-            foreach (var grid in parentItem.Grids)
+            foreach (var containedItem in grid.ItemCollection.ItemsList)
             {
-                foreach (var containedItem in grid.ItemCollection.ItemsList)
+                if (!containedItem.QuestItem)
                 {
-                    if (!containedItem.QuestItem)
-                    {
-                        items.Add(containedItem);
-                    }
+                    items.Add(containedItem);
                 }
             }
-            foreach (var slot in parentItem.Slots)
+        }
+        foreach (var slot in parentItem.Slots)
+        {
+            if (!slot.Locked && slot.ContainedItem is not null && !slot.ContainedItem.QuestItem)
             {
-                if (!slot.Locked && slot.ContainedItem is not null && !slot.ContainedItem.QuestItem)
-                {
-                    items.Add(slot.ContainedItem);
-                }
+                items.Add(slot.ContainedItem);
             }
+        }
 
-            if (items.Count > 0)
-            {
-                if (_log.DebugEnabled)
-                {
-                    _log.LogDebug($"Looting {items.Count} items from {parentItem.Name.Localized()}");
-                }
+        if (items.Count == 0)
+        {
+            return true;
+        }
 
-                await LootingTransactionController.SimulatePlayerDelayAsync(LootingBrain.LootingStartDelay, token);
-                return await TryAddItemsToBotAsync(items, token);
-            }
+        if (_log.DebugEnabled)
+        {
+            _log.LogDebug($"Looting {items.Count} items from {parentItem.LocalizedName()}");
+        }
+
+        await LootingTransactionController.SimulatePlayerDelayAsync(LootingBrain.LootingStartDelay, token);
+        return await TryAddItemsToBotAsync(items, true, token);
+    }
+
+    public async Task<bool> TryNestContainerAsync(SearchableItem item, int itemSize, CancellationToken token = default)
+    {
+        // BUG: Swapping out item then looting item can cause a ghost loot item in the world
+        if (_log.DebugEnabled)
+        {
+            _log.LogDebug($"Trying to pick up container [{item.LocalizedName()}]...");
+        }
+
+        using var pooledUseless = DictionaryPool<Item, float>.Get(out var uselessItems);
+        using var pooledOperations = UnityEngine.Pool.ListPool<OperationResult<RemoveResult>>.Get(out var removeOperations);
+
+        // Get undervalued items and remove them so they won't interfere with TryFillContainerAndPickUp, but roll it back afterward
+        GetUndervaluedItems(item, uselessItems);
+        foreach (var (uselessItem, _) in uselessItems)
+        {
+            removeOperations.Add(ItemManipulator.RemoveWithoutRestrictions(uselessItem, _botInventoryController));
+        }
+
+        // Check if we'll exceed the limit will the undervalued items removed.
+        if (LootingBots.UseWeightRestriction.Value && !HasExcessWeightFor(item))
+        {
+            removeOperations.SafeRollBack();
 
             if (_log.DebugEnabled)
             {
-                _log.LogDebug($"No nested items found to loot in {parentItem.Name.Localized()}");
+                _log.LogDebug($"Cannot nest container [{item.LocalizedName()}], will exceed weight limit");
             }
+            return false;
+        }
 
-            return true;
-        }
-        finally
+        var fillResult = OperationsUtils.TryFillContainerAndPickUp(item, _botInventoryController, _transactionController, _log);
+
+        removeOperations.SafeRollBack();
+
+        if (fillResult.Failed)
         {
-            UnityEngine.Pool.ListPool<Item>.Release(items);
+            if (_log.DebugEnabled)
+            {
+                _log.LogDebug(fillResult._error);
+            }
+            return false;
         }
+
+        // Only actually throw them if we succeeded
+        await ThrowUndervaluedItemsAsync(item, uselessItems, token);
+
+        if (_log.DebugEnabled)
+        {
+            _log.LogDebug($"Filling container [{item.LocalizedName()}] with {fillResult.Value.Count - 1} items...");
+        }
+
+        await LootingTransactionController.SimulatePlayerDelayAsync(LootingBots.TransactionDelay.Value * fillResult.Value.Count, token);
+
+        var networkResult = await fillResult.Value.ExecuteAsync();
+        if (networkResult.Failed)
+        {
+            if (_log.ErrorEnabled)
+            {
+                _log.LogError(
+                    $"Failed to fill container [{item.LocalizedName()}] with items from backpack and pick up. Network Error: {networkResult.Error}"
+                );
+            }
+            return false;
+        }
+
+        Stats.AddNetValue(CurrentItemPrice + fillResult.Value.NetWorthDelta);
+        Stats.Gear.TryAddContainedItem(item, itemSize, CurrentItemPrice);
+        UpdateGridStats();
+
+        if (_log.InfoEnabled)
+        {
+            _log.LogInfo(
+                $"Filled container [{item.LocalizedName()}] with items from backpack and picked up [place: {item.Parent.LocalizedParentName()}]"
+            );
+        }
+        return true;
     }
 
     /// <summary>
-    /// Searches through the child items of a container and attempts to throw them
+    /// Searches through the child items of a container
     /// </summary>
-    /// <param name="item">Only throws items of a container of type <see cref="SearchableItem"/></param>
-    public async Task ThrowUndervaluedItemsAsync(Item item, CancellationToken token = default)
+    /// <param name="container">Only throws items of a container of type <see cref="SearchableItem"/></param>
+    /// <param name="undervaluedItems"></param>
+    public void GetUndervaluedItems(Item container, Dictionary<Item, float> undervaluedItems)
     {
-        token.ThrowIfCancellationRequested();
-
         // Limit to only SearchableItem
         // As opposed to LootNestedItems, we only need to throw away its children if it's a container
-        if (item is not SearchableItem parentItem)
+        if (container is not SearchableItem)
         {
             return;
         }
 
-        var itemsToThrow = DictionaryPool<Item, float>.Get();
-        try
+        var minimumValue = _isPMC ? LootingBots.PMCMinLootThreshold.Value : LootingBots.ScavMinLootThreshold.Value;
+
+        using var pooledList = UnityEngine.Pool.ListPool<Item>.Get(out var potentialUndervalued);
+        container.GetAllGridContainedItems(
+            potentialUndervalued,
+            static (item, controller) => // Check the conditions to get potential items to throw
+                !item.QuestItem
+                && !item.IsDogtag()
+                && item is not Money
+                && item is not SearchableItem
+                && (item is not Ammo ammo || !controller.IsUsableAmmo(ammo))
+                && (item is not Magazine mag || !controller.IsUsableMag(mag)),
+            this
+        );
+
+        foreach (var item in potentialUndervalued)
         {
-            var minimumValue = _isPMC ? LootingBots.PMCMinLootThreshold.Value : LootingBots.ScavMinLootThreshold.Value;
-
-            foreach (var grid in parentItem.Grids)
+            if (item is Ammo or Magazine)
             {
-                foreach (var childItem in grid.ItemCollection.ItemsList)
-                {
-                    // Iterate and throw useless items for child container
-                    if (childItem is SearchableItem)
-                    {
-                        await ThrowUndervaluedItemsAsync(childItem, token);
-                        continue;
-                    }
-
-                    // Check the conditions to filter out items to keep
-                    if (childItem.QuestItem || childItem is Meds or BarterOther || (childItem is Ammo ammo && IsUsableAmmo(ammo)))
-                    {
-                        continue;
-                    }
-
-                    // If it's a magazine we cannot use, throw it
-                    if (childItem is Magazine mag && !IsUsableMag(mag))
-                    {
-                        itemsToThrow.Add(mag, _itemAppraiser.GetItemPrice(mag, _log));
-                        continue;
-                    }
-
-                    var value = _itemAppraiser.GetItemPrice(childItem, _log);
-                    if (value < minimumValue)
-                    {
-                        itemsToThrow.Add(childItem, value);
-                    }
-                }
+                // Unusable ammo/mags do not need to be price checked
+                undervaluedItems.Add(item, _itemAppraiser.GetItemPrice(item, _log));
+                continue;
             }
 
-            if (itemsToThrow.Count > 0)
+            var value = _itemAppraiser.GetItemPrice(item, _log);
+            if (value < minimumValue)
             {
-                if (_log.InfoEnabled)
-                {
-                    _log.LogInfo($"Throwing {itemsToThrow.Count} undervalued items from {parentItem.Name.Localized()}");
-                }
-                var corpseEquipment = _lootingBrain.ActiveLoot.GetRootItem() as InventoryEquipment;
-
-                foreach (var (toThrow, value) in itemsToThrow)
-                {
-                    await LootingTransactionController.SimulatePlayerDelayAsync(token: token);
-
-                    if (!await _transactionController.TransferOrThrowItemAsync(toThrow, corpseEquipment, token))
-                    {
-                        continue;
-                    }
-
-                    if (_log.DebugEnabled)
-                    {
-                        _log.LogDebug($"Thrown {toThrow.Name.Localized()} (-{value:N0}₽)");
-                    }
-                    Stats.SubtractNetValue(value);
-                    Stats.AvailableGridSpaces += toThrow.GetItemSize();
-                    _lootingBrain.IgnoreLoot(toThrow.Id);
-                }
-
-                return;
+                undervaluedItems.Add(item, value);
             }
+        }
+    }
 
+    /// <summary>
+    /// Searches through the child items of a container and attempts to throw them.
+    /// </summary>
+    /// <param name="container">The container from which itemsToThrow came from.</param>
+    /// <param name="itemsToThrow">A Dictionary of key: items, value: prices to throw.</param>
+    /// <param name="previousOwner">The owner of items to throw.</param>
+    /// <param name="transferTo">A container to transfer items to.</param>
+    public ValueTask ThrowUndervaluedItemsAsync(Item container, Dictionary<Item, float> itemsToThrow, CancellationToken token = default)
+    {
+        if (container is null)
+        {
+            return new ValueTask();
+        }
+
+        token.ThrowIfCancellationRequested();
+
+        if (itemsToThrow.Count == 0)
+        {
             if (_log.DebugEnabled)
             {
-                _log.LogDebug($"No undervalued items found to throw in {parentItem.Name.Localized()}");
+                _log.LogDebug($"No undervalued items found to throw in {container.LocalizedName()}");
             }
+            return new ValueTask();
         }
-        finally
+
+        if (_log.InfoEnabled)
         {
-            DictionaryPool<Item, float>.Release(itemsToThrow);
+            _log.LogInfo($"Throwing {itemsToThrow.Count} undervalued items from {container.LocalizedName()}");
         }
+        return new ValueTask(TransferOrThrowItemsAsync(itemsToThrow, _lootingBrain.ActiveLoot.GetRootItem(), token));
     }
 
     /// <summary>
     /// Strip and loot a weapon's attachments.
     /// </summary>
-    public async Task<bool> StripWeaponAsync(Weapon weapon, CancellationToken token = default)
+    public ValueTask<bool> StripWeaponAsync(Weapon weapon, List<Mod> modsToLoot, CancellationToken token = default)
     {
-        var itemsToAdd = UnityEngine.Pool.ListPool<Item>.Get();
-        try
+        // Get all mods where parent slot is not required, can be modded in raid, and is not a magazine
+        weapon.GetAllSlotContainedItems(
+            modsToLoot,
+            static (mod, _) => mod.Parent.Container is Slot { Required: false } && mod is { RaidModdable: true } and not Magazine,
+            (object)null
+        );
+
+        if (modsToLoot.Count == 0)
         {
-            foreach (var mod in weapon.Mods)
+            if (_log.DebugEnabled)
             {
-                // Check if the mod's slot is not required, can be modded in raid, and is not a magazine
-                if (mod.Parent.Container is Slot { Required: false } && mod is { RaidModdable: true } and not Magazine)
-                {
-                    itemsToAdd.Add(mod);
-                }
+                _log.LogDebug($"No attachments to strip for weapon: {weapon.LocalizedName()}");
             }
-
-            if (itemsToAdd.Count > 0)
-            {
-                if (_log.InfoEnabled)
-                {
-                    _log.LogInfo($"Trying to strip attachments of weapon: {weapon.Name.Localized()}");
-                }
-
-                // Call TryAddItemsToBot with the filtered items
-                var success = await TryAddItemsToBotAsync(itemsToAdd, token);
-                if (!success)
-                {
-                    return false;
-                }
-            }
-            else if (_log.DebugEnabled)
-            {
-                _log.LogDebug($"No attachments to strip for weapon: {weapon.Name.Localized()}");
-            }
-
-            return true;
+            return new ValueTask<bool>(true);
         }
-        finally
+
+        if (_log.InfoEnabled)
         {
-            UnityEngine.Pool.ListPool<Item>.Release(itemsToAdd);
+            _log.LogInfo($"Trying to strip attachments of weapon: {weapon.LocalizedName()}");
         }
+
+        return new ValueTask<bool>(TryAddItemsToBotAsync(modsToLoot, false, token));
     }
 
     /// <summary>
@@ -1413,48 +1643,220 @@ public class LootingInventoryController
     /// </summary>
     public bool AllowedToPickup(Item lootItem, int itemSize = 1)
     {
-        if (!_lootingBrain.HasFreeSpace)
-        {
-            return false;
-        }
-
         var pickupNotRestricted = _isPMC
             ? LootingBots.PMCGearToPickup.Value.IsItemEligible(lootItem, true)
             : LootingBots.ScavGearToPickup.Value.IsItemEligible(lootItem, true);
 
-        // All usable mags and money should be considered eligible to loot. Otherwise, all other items fall subject to the mod settings for restricting pickup and loot value thresholds
+        // All usable mags and money should be considered eligible to loot.
+        // Otherwise, all other items fall subject to the mod settings for restricting pickup and loot value thresholds.
         return lootItem is Money
             || lootItem is Magazine mag && IsUsableMag(mag)
             || lootItem is Ammo ammo && IsUsableAmmo(ammo)
             || (
                 pickupNotRestricted
                 && (
-                    EquipmentTypeUtils.IsDogtag(lootItem) || IsValuableEnough(CurrentItemPrice / itemSize) // Divide by slots to get price per slot
+                    lootItem is SearchableItem container and not Pockets && CanPickupContainer(container) // Allow pick up based on container ratio and not price
+                    || lootItem.IsDogtag() // Always pick up dog tags regardless of price
+                    || IsValuableEnough(CurrentItemPrice / itemSize) // Divide by slots to get price per slot
                 )
             );
     }
 
     /// <summary>
+    /// Check if picking this item up would exceed the weight limit.
+    /// </summary>
+    public bool HasExcessWeightFor(Item item)
+    {
+        return !LootingBots.UseWeightRestriction.Value || item.TotalWeight < Stats.OverweightLimit - Stats.TotalWeight;
+    }
+
+    /// <summary>
+    /// Check if this container can be picked up.
+    /// </summary>
+    /// <param name="container">The container to pick up.</param>
+    /// <returns>True if container has a ratio more than <see cref="LootUtils.VEST_GRID_CELL_MIN_RATIO"/> if a Vest, or >1f if a backpack.</returns>
+    public bool CanPickupContainer(SearchableItem container)
+    {
+        var ratio = (float)container.Grids.GetTotalGridSlots() / container.GetItemSize();
+        return container switch
+        {
+            Vest => ratio > LootUtils.VEST_GRID_CELL_MIN_RATIO,
+            _ => ratio > 1f,
+        };
+    }
+
+    /// <summary>
+    /// Try to find an item to be replaced for the potential item.
+    /// </summary>
+    /// <param name="source">The item's "parent". From the backpack, vest, or pockets.</param>
+    /// <param name="index">Index of the item to be replaced from <paramref name="source"/>.</param>
+    /// <returns>True if found an item to be replaced.</returns>
+    public bool HasReplacement(Item lootItem, int itemSize, out ContainedItems source, out int index, out ContainedLootItem loot)
+    {
+        loot = new ContainedLootItem(lootItem, itemSize, CurrentItemPrice);
+        if (Stats.Gear.Backpack.TryFindReplacement(loot, out index))
+        {
+            source = Stats.Gear.Backpack;
+            return true;
+        }
+        if (lootItem.IsPlacedInFastAccessSlots() && Stats.Gear.Vest.TryFindReplacement(loot, out index))
+        {
+            source = Stats.Gear.Vest;
+            return true;
+        }
+        if (Stats.Gear.Pockets.TryFindReplacement(loot, out index))
+        {
+            source = Stats.Gear.Pockets;
+            return true;
+        }
+
+        source = null;
+        index = -1;
+        return false;
+    }
+
+    public void GetGearAction(Item lootItem, EquipmentSlot slot, List<LootingAction> lootingActions, bool transferItems = false)
+    {
+        var equippedItem = _botInventoryController.Inventory.Equipment.GetSlot(slot).ContainedItem;
+        if (equippedItem is null)
+        {
+            if (_log.DebugEnabled)
+            {
+                _log.LogDebug($"GetGearAction: Trying to equip {lootItem.LocalizedName()} (₽{CurrentItemPrice:N0})");
+            }
+            lootingActions.Add(LootingMoveAction.Rent(lootItem, null, CurrentItemPrice + lootItem.GetAllGridContainedItemsValue(_log)));
+            return;
+        }
+
+        if (slot != EquipmentSlot.TacticalVest)
+        {
+            if (ShouldSwapGear(equippedItem, lootItem))
+            {
+                GetSwapAction(lootItem, equippedItem, lootingActions, transferItems);
+                if (transferItems)
+                {
+                    // Has to be outside GetSwapAction to not conflict with Vest logic below
+                    lootingActions.Add(LootingLootAction.Rent(equippedItem, this));
+                }
+            }
+            return;
+        }
+
+        // Gear action for vest
+        if (ShouldSwapGear(equippedItem, lootItem))
+        {
+            // If we have a chest armor equipped and the tac vest we are looting is armored,
+            // check if the armored rig is higher armor class than the chest,
+            // then make sure to drop the chest and pick up the armored rig
+            var chest = _botInventoryController.Inventory.Equipment.GetSlot(EquipmentSlot.ArmorVest).ContainedItem;
+            if (chest is not null && EquipmentTypeUtils.IsArmoredRig(lootItem))
+            {
+                if (ShouldSwapGear(chest, lootItem))
+                {
+                    if (_log.DebugEnabled)
+                    {
+                        _log.LogDebug(
+                            $"Trying to drop chest armor [{chest.LocalizedName()}] then loot armored rig [{lootItem.LocalizedName()}]"
+                        );
+                    }
+
+                    lootingActions.Add(LootingThrowAction.Rent(chest, -_itemAppraiser.GetItemPrice(chest, _log)));
+                    GetSwapAction(lootItem, equippedItem, lootingActions, true);
+                    lootingActions.Add(LootingLootAction.Rent(equippedItem, this));
+                    lootingActions.Add(LootingLootAction.Rent(chest, this));
+                }
+                else
+                {
+                    if (_log.DebugEnabled)
+                    {
+                        _log.LogDebug($"Equipped chest armor is better than or equal to found armored rig {lootItem.LocalizedName()}");
+                    }
+                }
+            }
+            else
+            {
+                GetSwapAction(lootItem, equippedItem, lootingActions, true);
+                lootingActions.Add(LootingLootAction.Rent(equippedItem, this));
+            }
+        }
+        else if (
+            EquipmentTypeUtils.IsArmoredRig(equippedItem) && _lootingBrain.ActiveLoot.GetRootItem() is InventoryEquipment corpseEquipment
+        )
+        {
+            // At this point, the bot has an equipped armored rig so it won't be swapping for a normal rig,
+            // so if:
+            //   1. Corpse armor is better armor,
+            //   2. OR same armor but corpse rig has larger container than equipped rig,
+            //   3. OR same armor and same sized container but more valuable.
+            // Drop the current armored rig then loot the armor and tac vest.
+            // Same with ShouldSwapGear, but chest armor is compared with the armored rig, and size and price is compared with the vest(lootItem).
+            var corpseChestArmor = corpseEquipment.GetSlot(EquipmentSlot.ArmorVest).ContainedItem;
+            if (corpseChestArmor is null || !AllowedToEquip(corpseChestArmor))
+            {
+                return;
+            }
+            var shouldSwap = false;
+
+            var armorDifference = GetArmorDifference(corpseChestArmor, equippedItem);
+            if (armorDifference > 0)
+            {
+                shouldSwap = true;
+            }
+            var containerDifference = GetContainerSizeDifference(lootItem, equippedItem);
+            if (armorDifference == 0 && containerDifference > 0)
+            {
+                shouldSwap = true;
+            }
+            if (armorDifference == 0 && containerDifference == 0 && LootIsMoreValuable(equippedItem))
+            {
+                shouldSwap = true;
+            }
+
+            if (!shouldSwap)
+            {
+                return;
+            }
+
+            if (_log.DebugEnabled)
+            {
+                _log.LogDebug(
+                    $"Trying to loot chest armor [{corpseChestArmor.LocalizedName()}] and tac vest [{lootItem.LocalizedName()}] and drop current armored rig [{equippedItem.LocalizedName()}]"
+                );
+            }
+
+            // Throw the corpse's chest armor so we can swap the vests
+            lootingActions.Add(LootingThrowAction.Rent(corpseChestArmor, 0f, false));
+            GetSwapAction(lootItem, equippedItem, lootingActions, true);
+            lootingActions.Add(LootingMoveAction.Rent(corpseChestArmor, null, _itemAppraiser.GetItemPrice(corpseChestArmor, _log)));
+            lootingActions.Add(LootingLootAction.Rent(equippedItem, this));
+        }
+    }
+
+    /// <summary>
     /// Generates a SwapAction to be executed by the transaction controller.
     /// </summary>
-    public void GetSwapAction(Item toEquip, Item toSwap, List<LootingAction> lootingActions, bool transferItems = false)
+    public void GetSwapAction(Item lootItem, Item equippedItem, List<LootingAction> lootingActions, bool transferItems)
     {
         var toEquipValue = CurrentItemPrice;
-        var toSwapValue = _itemAppraiser.GetItemPrice(toSwap, _log);
+        var toSwapValue = _itemAppraiser.GetItemPrice(equippedItem, _log);
 
         if (_log.DebugEnabled)
         {
             _log.LogDebug(
-                $"Trying to equip {toEquip.Name.Localized()} (₽{toEquipValue:N0}) and swap with {toSwap.Name.Localized()} (₽{toSwapValue:N0}){(transferItems ? $" then loot {toSwap.Name.Localized()}" : string.Empty)}"
+                $"Trying to equip {lootItem.LocalizedName()} (₽{toEquipValue:N0}) and swap with {equippedItem.LocalizedName()} (₽{toSwapValue:N0}){(transferItems ? $" then loot {equippedItem.LocalizedName()}" : string.Empty)}"
             );
         }
 
         // Include contained items in calculating NetWorthDelta
-        toEquipValue += GetAllContainedItemsValue(toEquip);
-        toSwapValue += GetAllContainedItemsValue(toSwap);
+        toEquipValue += lootItem.GetAllGridContainedItemsValue(_log);
+        toSwapValue += equippedItem.GetAllGridContainedItemsValue(_log);
 
-        var swapAction = LootingSwapAction.Rent(toEquip, toSwap, toEquipValue - toSwapValue, transferItems);
-        lootingActions.Add(swapAction);
+        lootingActions.Add(LootingSwapAction.Rent(lootItem, equippedItem, toEquipValue - toSwapValue, transferItems));
+    }
+
+    public void IgnoreLoot(string id)
+    {
+        _lootingBrain.IgnoreLoot(id);
     }
 
     public void SetRootItemOwner(IItemOwner owner)
@@ -1462,21 +1864,13 @@ public class LootingInventoryController
         _transactionController.SetRootItemOwner(owner);
     }
 
-    /// <summary>
-    /// Calculates the sum value of its children (recursive). Excludes slots.
-    /// </summary>
-    private float GetAllContainedItemsValue(Item item)
+    public void Dispose()
     {
-        var price = 0f;
-
-        item.GetAllContainedItems(_itemsScratch);
-        foreach (var containedItem in _itemsScratch)
+        foreach (var action in _unsubActions)
         {
-            price += _itemAppraiser.GetItemPrice(containedItem, _log);
+            action();
         }
-        _itemsScratch.Clear();
-
-        return price;
+        _transactionController.Dispose();
     }
 
     /// <summary>

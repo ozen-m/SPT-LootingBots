@@ -10,19 +10,14 @@ namespace LootingBots.Actions;
 public class LootingMoveAction : LootingAction
 {
     private static readonly UnityEngine.Pool.ObjectPool<LootingMoveAction> _pool = new(
-        Create,
+        () => new LootingMoveAction(),
         null,
         a => a.Reset(),
         ListActionPool.LogOnDestroyInstance,
-        true,
+        false,
         2,
         32
     );
-
-    public static LootingMoveAction Create()
-    {
-        return new LootingMoveAction();
-    }
 
     public static LootingMoveAction Rent(Item item, ItemAddress place = null, float netWorthDelta = 0f)
     {
@@ -39,9 +34,27 @@ public class LootingMoveAction : LootingAction
     /// </summary>
     public ItemAddress Place { get; set; }
 
-    public override Task<bool> ExecuteAsync(LootingTransactionController controller, CancellationToken token)
+    public override Task<bool> ExecuteAsync(LootingTransactionController controller, CancellationToken token = default)
     {
-        return controller.MoveItemAsync(Item, Place, token);
+        return Place is not null ? controller.MoveItemAsync(Item, Place, token) : controller.TryEquipItemAsync(Item, token).AsTask();
+    }
+
+    public override Task PostActionsAsync(LootingInventoryController invController, CancellationToken token = default)
+    {
+        // Clean up vest of other items
+        if (Item is Vest vest)
+        {
+            return invController.TransferItemsToBackpackAsync(vest).AsTask();
+        }
+
+        // Clean up the bot's tac vest, pockets and armband since the bot had just equipped a backpack,
+        // which it wasn't able to do OnSpawnAsync.
+        if (Item is Backpack)
+        {
+            return invController.TransferItemsToBackpackAsync().AsTask();
+        }
+
+        return Task.CompletedTask;
     }
 
     public override void Return()

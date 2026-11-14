@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using EFT;
 using LootingBots.Components;
 
@@ -21,41 +22,67 @@ public enum BotType
 
 public static class BotTypeUtils
 {
+    private static readonly HashSet<WildSpawnType> _bossWildTypes =
+    [
+        WildSpawnType.bossBully,
+        WildSpawnType.bossGluhar,
+        WildSpawnType.bossKilla,
+        WildSpawnType.bossKnight,
+        WildSpawnType.bossKojaniy,
+        WildSpawnType.bossSanitar,
+        WildSpawnType.bossTagilla,
+        WildSpawnType.bossTest,
+        WildSpawnType.bossZryachiy,
+        WildSpawnType.bossBoar,
+        WildSpawnType.bossKolontay,
+        WildSpawnType.bossPartisan,
+        WildSpawnType.bossTagillaAgro,
+        WildSpawnType.bossKillaAgro,
+    ];
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool HasScav(this BotType botType)
     {
         return (botType & BotType.Scav) != 0;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool HasPmc(this BotType botType)
     {
         return (botType & BotType.Pmc) != 0;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool HasPlayerScav(this BotType botType)
     {
         return (botType & BotType.PlayerScav) != 0;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool HasRaider(this BotType botType)
     {
         return (botType & BotType.Raider) != 0;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool HasCultist(this BotType botType)
     {
         return (botType & BotType.Cultist) != 0;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool HasBoss(this BotType botType)
     {
         return (botType & BotType.Boss) != 0;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool HasFollower(this BotType botType)
     {
         return (botType & BotType.Follower) != 0;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool HasBloodhound(this BotType botType)
     {
         return (botType & BotType.Bloodhound) != 0;
@@ -63,28 +90,35 @@ public static class BotTypeUtils
 
     public static bool IsBotEnabled(this BotType enabledTypes, LootingBrain brain)
     {
-        if (brain.IsPlayerScav)
-        {
-            return enabledTypes.HasPlayerScav();
-        }
-        var role = brain.BotOwner.Profile.Info.Settings.Role;
-        return enabledTypes.IsBotEnabled(role);
+        return brain.IsPlayerScav ? enabledTypes.HasPlayerScav() : enabledTypes.IsBotEnabled(brain.BotOwner.Profile.Info.Settings.Role);
     }
 
     public static bool IsBotEnabled(this BotType enabledTypes, WildSpawnType botType)
     {
-        if (botType.IsPMC())
-        {
-            return enabledTypes.HasPmc();
-        }
-
-        if (IsBoss(botType))
-        {
-            return enabledTypes.HasBoss();
-        }
-
         switch (botType)
         {
+            case WildSpawnType.pmcBEAR:
+            case WildSpawnType.pmcUSEC:
+            {
+                return enabledTypes.HasPmc();
+            }
+            case WildSpawnType.bossBully:
+            case WildSpawnType.bossGluhar:
+            case WildSpawnType.bossKilla:
+            case WildSpawnType.bossKnight:
+            case WildSpawnType.bossKojaniy:
+            case WildSpawnType.bossSanitar:
+            case WildSpawnType.bossTagilla:
+            case WildSpawnType.bossTest:
+            case WildSpawnType.bossZryachiy:
+            case WildSpawnType.bossBoar:
+            case WildSpawnType.bossKolontay:
+            case WildSpawnType.bossPartisan:
+            case WildSpawnType.bossTagillaAgro:
+            case WildSpawnType.bossKillaAgro:
+            {
+                return enabledTypes.HasBoss();
+            }
             case WildSpawnType.assault:
             case WildSpawnType.assaultGroup:
             {
@@ -108,6 +142,7 @@ public static class BotTypeUtils
             case WildSpawnType.followerBoarClose1:
             case WildSpawnType.followerBoarClose2:
             case WildSpawnType.followerBoar:
+            case WildSpawnType.tagillaHelperAgro:
             {
                 return enabledTypes.HasFollower();
             }
@@ -119,6 +154,9 @@ public static class BotTypeUtils
             case WildSpawnType.sectantPriest:
             case WildSpawnType.sectantWarrior:
             case WildSpawnType.cursedAssault:
+            case WildSpawnType.sectantPredvestnik:
+            case WildSpawnType.sectantPrizrak:
+            case WildSpawnType.sectantOni:
             {
                 return enabledTypes.HasCultist();
             }
@@ -143,24 +181,9 @@ public static class BotTypeUtils
         return wildSpawnType is WildSpawnType.assault or WildSpawnType.assaultGroup;
     }
 
-    public static bool IsBoss(WildSpawnType wildSpawnType)
+    public static bool IsBoss(this WildSpawnType wildSpawnType)
     {
-        var bosses = new List<WildSpawnType>
-        {
-            WildSpawnType.bossBully,
-            WildSpawnType.bossGluhar,
-            WildSpawnType.bossKilla,
-            WildSpawnType.bossKnight,
-            WildSpawnType.bossKojaniy,
-            WildSpawnType.bossSanitar,
-            WildSpawnType.bossTagilla,
-            WildSpawnType.bossTest,
-            WildSpawnType.bossZryachiy,
-            WildSpawnType.bossBoar,
-            WildSpawnType.bossKolontay,
-            WildSpawnType.bossPartisan,
-        };
-        return bosses.Contains(wildSpawnType);
+        return _bossWildTypes.Contains(wildSpawnType);
     }
 
     /// <summary>

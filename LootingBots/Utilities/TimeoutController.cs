@@ -5,20 +5,19 @@
 // UniTask is licensed under the MIT License.
 // https://github.com/Cysharp/UniTask/blob/master/LICENSE
 
-using UnityEngine;
-
 namespace LootingBots.Utilities;
 
 /// <summary>
 /// This controller manages the creation and cancellation of a <see cref="CancellationTokenSource"/>.
 /// It reuses the <see cref="CancellationTokenSource"/> until a timeout occurs, a new source is then created when asked for a new timeout.
 /// </summary>
-public sealed class TimeoutController : MonoBehaviour
+public sealed class TimeoutController : IDisposable
 {
-    private CancellationTokenSource _timeoutSource;
+    private CancellationTokenSource _timeoutSource = new();
     private float _remainingTime;
     private bool _isRunning;
     private bool _isCanceledExternally;
+    private bool _isDisposed;
 
     public bool IsActive
     {
@@ -43,9 +42,13 @@ public sealed class TimeoutController : MonoBehaviour
     /// <exception cref="InvalidOperationException">Thrown if a timeout is already running.</exception>
     public CancellationToken Timeout(int secondsTimeout)
     {
+        if (_isDisposed)
+        {
+            throw new ObjectDisposedException(nameof(TimeoutController));
+        }
         if (_isRunning)
         {
-            throw new InvalidOperationException("A timeout is already running.");
+            throw new InvalidOperationException("Timeout is already running");
         }
         if (IsCanceled)
         {
@@ -56,6 +59,8 @@ public sealed class TimeoutController : MonoBehaviour
         _remainingTime = secondsTimeout;
         _isRunning = true;
         _isCanceledExternally = false;
+
+        TimeoutRunner.Instance.Add(this);
         return _timeoutSource.Token;
     }
 
@@ -79,35 +84,39 @@ public sealed class TimeoutController : MonoBehaviour
         SignalCancellation();
     }
 
-    private void Awake()
+    public void Dispose()
     {
-        _timeoutSource = new CancellationTokenSource();
-    }
-
-    private void Update()
-    {
-        if (!_isRunning)
+        if (_isDisposed)
         {
             return;
         }
 
-        _remainingTime -= Time.deltaTime;
+        _isDisposed = true;
+        Cancel();
+        _timeoutSource.Dispose();
+    }
 
-        if (_remainingTime <= 0)
+    internal bool Run(float deltaTime)
+    {
+        if (!_isRunning)
+        {
+            return false;
+        }
+
+        _remainingTime -= deltaTime;
+
+        if (_remainingTime <= 0f)
         {
             SignalCancellation();
+            return false;
         }
+
+        return true;
     }
 
     private void SignalCancellation()
     {
         _timeoutSource.Cancel();
         _isRunning = false;
-    }
-
-    private void OnDestroy()
-    {
-        Cancel();
-        _timeoutSource.Dispose();
     }
 }

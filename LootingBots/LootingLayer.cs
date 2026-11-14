@@ -3,7 +3,7 @@ using DrakiaXYZ.BigBrain.Brains;
 using EFT;
 using LootingBots.Components;
 using LootingBots.Logic;
-using LootingBots.Utilities;
+using LootingBots.Utilities.Extensions;
 using UnityEngine;
 
 namespace LootingBots;
@@ -40,9 +40,11 @@ internal class LootingLayer : CustomLayer
 
     public override bool IsActive()
     {
-        var isBotActive = BotOwner.BotState == EBotState.Active;
-        var isNotHealing = !BotOwner.Medecine.FirstAid.Have2Do && !BotOwner.Medecine.SurgicalKit.HaveWork;
-        return isBotActive && isNotHealing && _lootingBrain.IsBrainEnabled && (_lootFinder.IsScheduledScan || _lootingBrain.IsBotLooting);
+        return BotOwner.BotState == EBotState.Active // Bot is active
+            && BotOwner.Memory.IsPeace // Bot does not have an enemy
+            && (!BotOwner.Medecine.FirstAid.Have2Do && !BotOwner.Medecine.SurgicalKit.HaveWork) // Bot is not healing
+            && _lootingBrain.IsBrainEnabled
+            && (_lootFinder.IsScheduledScan || _lootingBrain.IsBotLooting);
     }
 
     public override void Start()
@@ -74,16 +76,14 @@ internal class LootingLayer : CustomLayer
 
     public override bool IsCurrentActionEnding()
     {
-        var currentActionType = CurrentAction?.Type;
-
-        if (currentActionType == typeof(FindLootLogic))
+        if (CurrentAction == _findLootLogic)
         {
             return !_lootFinder.IsScanRunning;
         }
 
         var notLooting = !_lootingBrain.IsBotLooting;
 
-        if (currentActionType == typeof(LootingLogic) && notLooting)
+        if (CurrentAction == _lootingLogic && notLooting)
         {
             // Reset scan timer once looting has completed
             _lootFinder.ResetScanTimer();
@@ -102,12 +102,7 @@ internal class LootingLayer : CustomLayer
                 : string.Empty,
             Color.green
         );
-        debugPanel.AppendLabeledValue(
-            "Target Loot",
-            $" {lootName} ({_lootingBrain.ActiveLootType.ToString()})",
-            Color.yellow,
-            Color.yellow
-        );
+        debugPanel.AppendLabeledValue("Target Loot", $" {lootName} ({_lootingBrain.ActiveLootType})", Color.yellow, Color.yellow);
 
         debugPanel.AppendLabeledValue(
             "Distance to Loot",
