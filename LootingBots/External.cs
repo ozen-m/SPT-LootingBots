@@ -28,14 +28,7 @@ public static class External
                 return true;
             }
 
-            if (!lootingBrain.HasFreeSpace)
-            {
-                if (log.WarningEnabled)
-                {
-                    log.LogWarning("Forcing a loot scan despite the bot not having enough free space");
-                }
-            }
-            else if (log.DebugEnabled)
+            if (log.DebugEnabled)
             {
                 log.LogDebug("Forcing a loot scan");
             }
